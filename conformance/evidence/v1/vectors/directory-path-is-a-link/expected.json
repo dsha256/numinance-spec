@@ -1,0 +1,35 @@
+{
+  "vector": "directory-path-is-a-link",
+  "description": "The path given to the verifier is itself a link: refused, no report.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "materialize": [
+    {
+      "op": "export_path_symlink"
+    }
+  ],
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 3,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:3",
+    "rule:links-refused"
+  ]
+}

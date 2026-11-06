@@ -1,0 +1,10 @@
+apiVersion: numinance.dev/v1
+kind: ExecutorManifest
+metadata: {name: claude-cli-bedrock, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/claude-cli
+  capabilities: [EXECUTOR_CAPABILITY_FILESYSTEM_READ, EXECUTOR_CAPABILITY_FILESYSTEM_WRITE, EXECUTOR_CAPABILITY_SHELL, EXECUTOR_CAPABILITY_SUBAGENTS,
+    EXECUTOR_CAPABILITY_MCP, EXECUTOR_CAPABILITY_STRUCTURED_PLAN, EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS]
+  models:
+    - {id: eu.anthropic.claude-sonnet-v1:0, max_context: 200000}
+  cost_class: EXECUTOR_COST_CLASS_MEDIUM

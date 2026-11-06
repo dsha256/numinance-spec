@@ -1,0 +1,30 @@
+{
+  "vector": "rolled-back-unsigned",
+  "description": "A RolledBack change is unsigned too; rollback.json is required and declared absent.",
+  "status": "shipped",
+  "export": "rolled-back",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "unsigned",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unsigned",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unsigned",
+    "exit:5"
+  ]
+}

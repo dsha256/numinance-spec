@@ -1,0 +1,33 @@
+{
+  "vector": "attestation-edited",
+  "description": "attestation.json edited after signing.",
+  "status": "shipped",
+  "export": "attestation-edited",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_invalid"
+  ]
+}

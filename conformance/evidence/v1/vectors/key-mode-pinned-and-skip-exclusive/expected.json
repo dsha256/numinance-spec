@@ -1,0 +1,31 @@
+{
+  "vector": "key-mode-pinned-and-skip-exclusive",
+  "description": "A pinned key together with --skip-signatures is a usage error.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "skip_signatures": true,
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2",
+    "rule:key-mode-exclusive"
+  ]
+}

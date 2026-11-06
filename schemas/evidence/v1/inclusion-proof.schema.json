@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/inclusion-proof.schema.json",
+  "title": "Evidence inclusion proof",
+  "description": "head-inclusion-proof.json in an evidence/v1 export: a Merkle inclusion proof (RFC 6962) that the head record is in the log at the head checkpoint. The same shape is embedded as inclusion_proof in attestation.json and bundle-manifest.json. Not expressible here and checked by the verifier: the file is the canonical JSON form; leaf_index is below tree_size; tree_size equals the checkpoint tree_size; audit_path has exactly the length leaf_index and tree_size imply (at most 64 entries) and folds with the leaf hash to the checkpoint root_hash; the file is at most 8 KiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["leaf_index", "tree_size"],
+  "properties": {
+    "leaf_index": { "type": "integer", "minimum": 0, "maximum": 9007199254740990 },
+    "tree_size": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "audit_path": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/digest" },
+      "description": "Sibling hashes from the leaf to the root; absent when empty (a tree of one leaf)."
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    }
+  }
+}

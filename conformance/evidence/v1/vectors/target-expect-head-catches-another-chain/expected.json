@@ -1,0 +1,35 @@
+{
+  "vector": "target-expect-head-catches-another-chain",
+  "description": "NEW: the export of another genuine chain of the same change passes without --expect-head and fails with the head of the original.",
+  "status": "target",
+  "export": "closed-other-chain",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "expect_head": "sha256:f660cbc6ee23d051bd40f405bc60f2947b10577324e15172e5f1464b624b0d8c"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "expectation_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:expectation_mismatch",
+    "rule:expect-flags"
+  ]
+}

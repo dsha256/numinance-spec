@@ -1,0 +1,69 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloor caps the level of the changes it matches; when floors from the org and control packs match, the\n lowest max_level holds.",
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        },
+        "max_level": {
+          "description": "max_level is required: no rule, default or narrower scope resolves a matching change above it.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_level"
+      ],
+      "title": "Autonomy Floor",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyMatch selects changes; an absent key matches every value and an empty match matches every change. In a\n rule, risk matches exactly and a key the change has no value for does not match. In a floor, risk matches that\n class and every higher one, and a key the change has no value for counts as a match.",
+      "properties": {
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        },
+        "playbook": {
+          "description": "playbook is the name of the change's playbook.",
+          "type": "string"
+        },
+        "risk": {
+          "description": "risk is the change's risk class, fixed at Classified.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        }
+      },
+      "title": "Autonomy Match",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.AutonomyFloor.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

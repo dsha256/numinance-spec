@@ -1,0 +1,55 @@
+// BundleManifest describes the directory written by `numi evidence export <chg_id> [--view <view>]`: change.json, attestation.json, records.ndjson, tool-events.ndjson, diff.digest, verification/, review/, provenance/, deployment.json, observation.json, rollback.json (if any), summary.json.
+// Every entry is content-addressed so `numi evidence verify` works offline; control packs define views.
+// Signed at export per the rule in record.proto with context "numinance.evidence.v1.BundleManifest" over the canonical form of version canon_version; head_record_hash is a bound field, never the signed value. Nested messages canonicalise recursively as objects keyed by proto field name with empty repeated fields absent; a types.v1.Reference is hashed as {ref, sha256} only (artifact_ref is carried under the key ref in the canonical form), its artifact_type lies outside the hashed form and is never decision-bearing (a verifier parses a checkpoint by the transparencylog port's declared type, not by that field); the exact hashed layout is pinned by golden files in the conformance suite.
+// Export waits for the daily checkpoint that seals the attestation leaf (up to 24 hours after Close); the manifest references the latest checkpoint and proves both the head leaf and the attestation leaf under it. A bundle without the attestation proof fails verification. checkpoint_ref and both proofs are inside the signed input.
+// Bounds a decoder enforces before canonicalising or verifying: change_id is printable ASCII of at most 256 bytes; view is empty or a token matching ^[a-z0-9][a-z0-9._-]{0,127}$; spec_version is strict x.y.z; entries holds 1 to 64 files (the manifest, the export index and the directory reader share this bound; a decoder rejects an empty list or one beyond 64 as invalid and never truncates); signature is empty or 64 bytes.
+syntax = "proto3";
+
+package numinance.evidence.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/evidence/v1/inclusion_proof.proto";
+import "numinance/types/v1/types.proto";
+
+// BundleEntry is one file in the export bundle.
+message BundleEntry {
+  // Relative path, forward slashes, NFC-normalised UTF-8 of at most 1024 bytes without control characters, backslash, ":" or NUL; no leading "/", no empty, "." or ".." segment. The writer never follows symlinks. Verifiers reject, never repair.
+  string path = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the file content.
+  numinance.types.v1.Digest sha256 = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Size of the file in bytes.
+  uint64 size = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BundleManifest lists every file in one export and is signed by the runner key.
+message BundleManifest {
+  // Change the bundle covers, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Control-pack view name; empty for the full export.
+  string view = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the bundle was written, UTC.
+  google.protobuf.Timestamp exported_at = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // x.y.z version of numinance-spec that wrote the bundle.
+  string spec_version = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // First sequence of the exported evidence range.
+  uint64 first_sequence = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Last sequence of the exported evidence range: the terminal record of a sealed chain, whose seal record follows it.
+  uint64 last_sequence = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the record at last_sequence (the terminal record, not the seal record that follows it); a bound field covered by the signature.
+  numinance.types.v1.Digest head_record_hash = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Every file in the bundle; paths are unique after Unicode case folding.
+  repeated BundleEntry entries = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Raw Ed25519 signature (64 bytes) by the runner key over the signing input.
+  bytes signature = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the runner public key that made the signature; the key material travels in provenance/, which is not a trust anchor: a key is trusted only through the attestation leaf's checkpoint anchor or an out-of-band key registry, and a key outside the trusted set fails verification.
+  numinance.types.v1.Digest signing_key_id = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Version of the canonical form used for the signing input; 1 for spec 1.0.0, 0 is rejected.
+  uint32 canon_version = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The latest TransparencyLog checkpoint at export, at or after the daily checkpoint that sealed the attestation leaf; required, inside the signed input.
+  numinance.types.v1.Reference checkpoint_ref = 12 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Proof that the head leaf (0x48 || head_record_hash) is under checkpoint_ref; required, inside the signed input.
+  InclusionProof inclusion_proof = 13 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Proof that the attestation leaf is under checkpoint_ref; required, inside the signed input. The leaf is 0x41 || sha256(canonical Attestation with signature empty) under its canon_version, the same value as its signing hash; attestation.json is the canonical Attestation with signature set, and the leaf preimage is that document with the signature key removed, or verification fails.
+  InclusionProof attestation_inclusion_proof = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

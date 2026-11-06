@@ -1,0 +1,35 @@
+{
+  "vector": "matrix-truncated-abandoned-allow-unsigned-pinned",
+  "description": "An Abandoned export with its terminal record cut off, under allow-unsigned alone, pinned log: the head proof of the full chain fails.",
+  "status": "shipped",
+  "export": "abandoned-truncated",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_unsigned": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "anchor_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:anchor_invalid",
+    "rule:truncation-matrix"
+  ]
+}

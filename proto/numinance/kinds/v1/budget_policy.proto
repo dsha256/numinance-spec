@@ -1,0 +1,47 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+
+// BudgetPolicy sets the per-Change and per-run limits; exhaustion pauses and escalates.
+message BudgetPolicy {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "BudgetPolicy".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  BudgetPolicySpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BudgetPolicySpec holds the limits; an absent field is unset and comes from a wider scope.
+message BudgetPolicySpec {
+  // tokens is the maximum model spend in tokens.
+  optional uint32 tokens = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // wall_clock is the maximum elapsed time.
+  google.protobuf.Duration wall_clock = 2 [json_name = "wall_clock", (numinance.annotations.v1.field).since = "1.0.0"];
+  // tool_calls is the maximum number of tool calls.
+  optional uint32 tool_calls = 3 [json_name = "tool_calls", (numinance.annotations.v1.field).since = "1.0.0"];
+  // files_changed is the maximum number of files changed.
+  optional uint32 files_changed = 4 [json_name = "files_changed", (numinance.annotations.v1.field).since = "1.0.0"];
+  // lines_changed is the maximum number of lines changed.
+  optional uint32 lines_changed = 5 [json_name = "lines_changed", (numinance.annotations.v1.field).since = "1.0.0"];
+  // repositories is the maximum number of repositories touched.
+  optional uint32 repositories = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // services is the maximum number of services touched.
+  optional uint32 services = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // network_destinations is the maximum number of distinct network destinations.
+  optional uint32 network_destinations = 8 [json_name = "network_destinations", (numinance.annotations.v1.field).since = "1.0.0"];
+  // retries is the maximum number of retries.
+  optional uint32 retries = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // max_risk_escalation is the highest risk class a run may escalate to.
+  optional numinance.annotations.v1.RiskClass max_risk_escalation = 10 [json_name = "max_risk_escalation", (numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,32 @@
+{
+  "vector": "target-expect-head-sealed-last-record",
+  "description": "NEW: on a sealed chain --expect-head accepts the record_hash of the last record, the seal record (the head_record_hash of the report and of summary.json).",
+  "status": "target",
+  "export": "closed-sealed",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "expect_head": "sha256:5ca81ad719a4931f34537f4269312eb94989ba6cfeec4b537a22d3eee4daf898"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:expect-flags"
+  ]
+}

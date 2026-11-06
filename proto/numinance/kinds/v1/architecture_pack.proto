@@ -1,0 +1,51 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// ArchitecturePack binds conventions to checks; a rule without a check fails validation.
+message ArchitecturePack {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "ArchitecturePack".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  ArchitecturePackSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ArchitecturePackSpec lists the rules of the pack.
+message ArchitecturePackSpec {
+  // rules is required and non-empty; the loader enforces it, the schema cannot.
+  repeated ArchitectureRule rules = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ArchitectureRule is one convention and the check that enforces it.
+message ArchitectureRule {
+  // id is required and unique in the pack.
+  string id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // statement is required: the convention in plain language. It is untrusted text, delimited and labelled as untrusted when it reaches a prompt.
+  string statement = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // severity is required: the severity of a finding of this rule.
+  numinance.types.v1.FindingSeverity severity = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // check is required; the loader enforces it, the schema cannot.
+  ArchitectureCheck check = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ArchitectureCheck binds a rule to one verifier rule.
+message ArchitectureCheck {
+  // verifier is required: the name of the verifier that runs the check.
+  string verifier = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // rule_id is required: the verifier's id of the rule its findings carry.
+  string rule_id = 2 [json_name = "rule_id", (numinance.annotations.v1.field).since = "1.0.0"];
+  // config is passed to the verifier as is; the Engine never reads it.
+  google.protobuf.Struct config = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

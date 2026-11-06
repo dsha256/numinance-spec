@@ -1,0 +1,28 @@
+apiVersion: numinance.dev/v1alpha1
+kind: EvalSet
+metadata: {name: core-replay, scope: SCOPE_REPO}
+spec:
+  version: 1.0.0
+  cases:
+    - name: bugfix-clean
+      outcome: {value: "sha256:0b2958497ee0c936c59fa8dfb74b43077ad626e5dafd62df6521c4dd1e581242"}
+      expect: {acceptance: EVAL_ACCEPTANCE_ACCEPTED, merged: true, severe: false, verification_failures: []}
+    - name: bugfix-lint-retry
+      outcome: {value: "sha256:70fd102e81fe47531de6d7921cbb496665bfa88fcc83f211129b4e76fe53b8ed"}
+      expect:
+        acceptance: EVAL_ACCEPTANCE_ACCEPTED
+        merged: true
+        severe: false
+        verification_failures:
+          - {layer: lint, count: 1}
+    - name: planted-sql-injection
+      outcome: {value: "sha256:88761b4780b189a6b983d61a91302970697577cad92842f3b1c8c44256d5ce4d"}
+      expect:
+        acceptance: EVAL_ACCEPTANCE_REJECTED
+        merged: false
+        severe: false
+        verification_failures:
+          - {layer: security-scan, count: 1}
+          - {layer: tests, count: 2}
+      category: EVAL_CATEGORY_PLANTED_SECURITY_BUG
+      seeded: {defect: sql-injection, caught_by: security-scan}

@@ -1,0 +1,156 @@
+// PluginService is served by a plugin and called by the host; it is never exposed as a model tool and no PluginService RPC is ever an action target. Every RPC except Invoke is host-only lifecycle; Invoke only carries an action whose target is a method in a numinance.ports.* package, and the target's annotations in the host's descriptor copy govern it, never Invoke's own. Every element is since 1.0.0. No PluginService RPC declares evidence: the host records each lifecycle call in its own lifecycle evidence and each Invoke under the target's declared evidence. Bounds: every string is at most 1024 bytes and every repeated field at most 256 entries unless stated; over-limit input is rejected, never truncated; duplicate entries in any repeated field are rejected; the host reads every response through a size-limited reader with a per-call timeout; a rejection names an index-based field path and the violated bound, never the offending value.
+syntax = "proto3";
+
+package numinance.plugin.v1;
+
+import "google/protobuf/descriptor.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/plugin/v1/envelope.proto";
+import "numinance/plugin/v1/manifest.proto";
+
+// PluginService is the lifecycle surface a plugin serves to the host.
+service PluginService {
+  // Handshake negotiates the protocol version, spec version and capabilities.
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Negotiates the protocol version, spec version and capabilities between the host and a plugin."
+    };
+  }
+  // GetManifest returns the manifest the plugin declares.
+  rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the manifest the plugin declares."
+    };
+  }
+  // GetDescriptors returns the descriptors of the ports the plugin implements.
+  rpc GetDescriptors(GetDescriptorsRequest) returns (GetDescriptorsResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the protobuf descriptors of the ports the plugin implements."
+    };
+  }
+  // Invoke dispatches one action after the policy decision and the grant check; exec is OPERATION because the stream carries OPERATION targets, not because Invoke has the start, get and cancel shape; for a non-OPERATION target the plugin sends exactly one message, for an OPERATION target at most 1024, a RUNNING message at most 64 KiB and the terminal message at most 4 MiB, so a stream is at most 64 MiB of RUNNING messages plus the terminal one, and only the last is terminal; a target whose method is server-streaming (a port verb such as authorexecutor Execute) is always an OPERATION target and rides the same stream: each message of the target's stream is one RUNNING message whose ActionResult.result holds it (type URL the method's output type; the RUNNING bound of 64 KiB covers it), the terminal message carries no result, and its status follows the last stream message as the port defines it (for authorexecutor Execute, SUCCEEDED after EXECUTION_COMPLETED and FAILED after EXECUTION_FAILED); a terminal status that disagrees with the last stream message is rejected, a stream whose last stream message is not one the port names terminal is rejected, a stream that ends without a stream message may only end FAILED (a provider rejection), and a RUNNING message with a result on a target that is not server-streaming is rejected; the host reads each message through a size-limited reader, never buffers the stream, and decodes strictly, rejecting unknown fields; a stream that breaks these is rejected and recorded as failed; no dry run of Invoke itself: the host sets ActionContext.dry_run only for a target whose supports_dry_run is true.
+  rpc Invoke(InvokeRequest) returns (stream InvokeResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_PRIVILEGED
+      exec: EXEC_MODE_OPERATION
+      idempotent: false
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Carries one policy-approved action to the plugin; the target method's annotations govern it."
+    };
+  }
+  // Health reports whether the plugin is serving.
+  rpc Health(HealthRequest) returns (HealthResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Reports whether the plugin is serving."
+    };
+  }
+  // Shutdown asks the plugin to stop; before calling it the host cancels in-flight operations and revokes the plugin's credential handles and egress grants, the plugin starts no new work after it, and the host kills the process after a bounded grace period; no dry run: stopping its own process is the whole effect, there is nothing to preview, and the host may always kill the process.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Asks the plugin to stop its process after the host has cancelled in-flight operations."
+    };
+  }
+}
+
+// HealthStatus is the serving status of a plugin.
+enum HealthStatus {
+  // HEALTH_STATUS_UNSPECIFIED is the zero value; it is rejected by the host.
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  // HEALTH_STATUS_SERVING accepts calls.
+  HEALTH_STATUS_SERVING = 1;
+  // HEALTH_STATUS_NOT_SERVING accepts no calls.
+  HEALTH_STATUS_NOT_SERVING = 2;
+}
+
+// HandshakeRequest is the host offer.
+message HandshakeRequest {
+  // spec_version is the strict x.y.z spec version of the host.
+  string spec_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // protocol_versions are the protocol versions the host offers; they must equal the NUMINANCE_PLUGIN_PROTOCOLS offer; at install both carry the host's full set, and at run time both carry only the version locked at install, always equal to each other.
+  repeated uint32 protocol_versions = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // ports are the ports of the installed manifest, each at the major that manifest declares, which the host serves natively or through a shim, in the Manifest.ports grammar; a port the host cannot serve at that major fails install and aborts the handshake.
+  repeated string ports = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // capabilities are the non-Core capability names the host knows for the ports of the installed manifest only; Core verbs are never negotiated.
+  repeated string capabilities = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// HandshakeResponse is the plugin choice, at most 64 KiB serialized; the host records the negotiated versions in its own lifecycle evidence; the plugin declares none; spec_version never selects the host's validation path.
+message HandshakeResponse {
+  // protocol_version is one of the offered versions and equals the version on the plugin's stdout protocol line; a value that is zero or not in the offer aborts the handshake; the host records the negotiated version in the lockfile at install and at run time offers only that version, so a plugin cannot select a lower protocol later.
+  uint32 protocol_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec_version is the strict x.y.z spec version the plugin was built against.
+  string spec_version = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // capabilities are the negotiated capabilities: a subset of both the host offer and the manifest; any entry not in both the host offer and the manifest aborts the handshake.
+  repeated string capabilities = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetManifestRequest has no fields; the plugin has one manifest.
+message GetManifestRequest {}
+
+// GetManifestResponse carries the declared manifest.
+message GetManifestResponse {
+  // manifest is the manifest the plugin declares, at most 1 MiB serialized; it must equal (proto.Equal) the manifest decoded from the installed package's manifest.yaml whose digest the lockfile pins, or the host refuses to start the plugin; it is never a source of intents or capabilities.
+  Manifest manifest = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetDescriptorsRequest has no fields; the plugin returns every implemented port.
+message GetDescriptorsRequest {}
+
+// GetDescriptorsResponse carries the port descriptors.
+message GetDescriptorsResponse {
+  // descriptor_set is the serialized descriptors of the ports implemented, at most 2 MiB serialized; the host validates it against the spec version it supports; for every port the host serves, the host's compiled copy of the port file is authoritative, a shared port file that differs from the host copy in any option fails install, and an RPC that is not in a port file the host serves is not dispatchable; any file whose name or package collides with a host-compiled file (annotations, types, google.protobuf well-known types, any numinance.ports.*) must equal the host copy (proto.Equal on FileDescriptorProto with source_code_info cleared) or install fails, and the host copy is used either way; plugin-private files must not use the numinance. or google. package prefixes and must not extend any google.protobuf options message; options are always read through the host's own registry; source_code_info of every plugin-supplied file is discarded after validation and never rendered; at most 64 files.
+  google.protobuf.FileDescriptorSet descriptor_set = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// InvokeRequest carries one action.
+message InvokeRequest {
+  // envelope is the action, built by the host.
+  Envelope envelope = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// InvokeResponse carries one result message of the stream.
+message InvokeResponse {
+  // result is the reported result; INVOKE_STATUS_RUNNING on every message but the last.
+  ActionResult result = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// HealthRequest has no fields; health is reported for the whole plugin.
+message HealthRequest {}
+
+// HealthResponse carries the serving status.
+message HealthResponse {
+  // status is the serving status of the plugin.
+  HealthStatus status = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ShutdownRequest has no fields; the host asks the whole plugin to stop.
+message ShutdownRequest {}
+
+// ShutdownResponse has no fields; the reply confirms the plugin accepted the stop.
+message ShutdownResponse {}

@@ -1,0 +1,16 @@
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: trunk-with-cab, scope: SCOPE_ORG}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: design-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: build, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [design-review]}
+    - name: cab
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: change-advisory-board
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        timeout: 86400s
+      requires: [build]

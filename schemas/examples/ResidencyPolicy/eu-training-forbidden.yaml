@@ -1,0 +1,8 @@
+apiVersion: numinance.dev/v1
+kind: ResidencyPolicy
+metadata: {name: eu-training-forbidden, scope: SCOPE_ORG}
+spec:
+  floors:
+    floor: RESIDENCY_CLASS_VENDOR_ZDR
+  regions: [eu-central-1]
+  training_use: TRAINING_USE_FORBIDDEN

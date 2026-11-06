@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.UnresolvedQuestion.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "UnresolvedQuestion is one question the sources did not answer.",
+      "properties": {
+        "blocking": {
+          "description": "blocking is true when the Change cannot proceed without an answer; the question is then posted to the ticket.",
+          "type": "boolean"
+        },
+        "question": {
+          "description": "question is required.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "blocking"
+      ],
+      "title": "Unresolved Question",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.UnresolvedQuestion.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.UnresolvedQuestion.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

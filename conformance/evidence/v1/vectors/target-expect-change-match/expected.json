@@ -1,0 +1,32 @@
+{
+  "vector": "target-expect-change-match",
+  "description": "NEW: --expect-change names the change the caller was told to expect, and it is the change the verified chain is of.",
+  "status": "target",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "expect_change": "chg_01010101010101010101010101010101"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:expect-flags"
+  ]
+}

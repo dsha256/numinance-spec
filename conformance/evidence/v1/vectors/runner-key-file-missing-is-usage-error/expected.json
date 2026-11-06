@@ -1,0 +1,29 @@
+{
+  "vector": "runner-key-file-missing-is-usage-error",
+  "description": "A key file that cannot be read is a usage error, exit 2.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/no-such-key.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/no-such-key.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2"
+  ]
+}

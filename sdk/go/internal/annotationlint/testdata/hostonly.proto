@@ -1,0 +1,88 @@
+// Lint fixture for the host_only and resource_name rules of tools/scripts/test-annotation-lint.sh. The script copies it
+// to proto/numinance/ports/lintfixture/v1/hostonly.proto in a scratch copy of the spec module.
+// It is never part of the spec module.
+syntax = "proto3";
+
+package numinance.ports.lintfixture.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// HostOnlyService makes HostOnlyRequest an RPC input, so its marks are read.
+service HostOnlyService {
+  // Put is clean.
+  rpc Put(HostOnlyRequest) returns (HostOnlyRequest) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      since: "1.0.0"
+      llm_description: "Clean."
+    };
+  }
+}
+
+// OrphanRequest is no RPC input, so its host_only mark is invalid.
+message OrphanRequest {
+  // ref is a Reference, but no request walk reaches this message.
+  numinance.types.v1.Reference ref = 1 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    host_only: true
+  }];
+}
+
+// HostOnlyRequest marks one Reference (clean) and one string (invalid).
+message HostOnlyRequest {
+  // worktree_ref is a Reference, so host_only is allowed.
+  numinance.types.v1.Reference worktree_ref = 1 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    host_only: true
+  }];
+  // secret_key is a string, so host_only is invalid.
+  string secret_key = 2 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    host_only: true
+  }];
+}
+
+// ResourceService makes ResourceRequest an RPC input, so its resource_name marks are read.
+service ResourceService {
+  // Touch is clean.
+  rpc Touch(ResourceRequest) returns (ResourceRequest) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      since: "1.0.0"
+      llm_description: "Clean."
+    };
+  }
+}
+
+// OrphanResource is no RPC input, so its resource_name mark is invalid.
+message OrphanResource {
+  // repository is a string, but no request walk reaches this message.
+  string repository = 1 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    resource_name: true
+  }];
+}
+
+// ResourceRequest marks a string (clean), a repeated string (clean) and a number (invalid).
+message ResourceRequest {
+  // repository names the repository the call touches, in the spelling of a grant's resource scope.
+  string repository = 1 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    resource_name: true
+  }];
+  // environments names the environments the call touches.
+  repeated string environments = 2 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    resource_name: true
+  }];
+  // count is a number, so resource_name is invalid.
+  uint32 count = 3 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    resource_name: true
+  }];
+}

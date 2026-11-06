@@ -1,0 +1,60 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.PlaybookStep.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "PlaybookStep is one step of a playbook. A Change's risk class is the maximum over its steps.",
+      "properties": {
+        "capability_set": {
+          "description": "capability_set is required: the name of the capability set the step's grant is derived from.",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "evidence names the evidence the step must record; missing declared evidence turns success into PARTIAL.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "name is required and unique in the playbook.",
+          "type": "string"
+        },
+        "rehearse": {
+          "description": "rehearse is true when the step is rehearsed in a disposable environment first.",
+          "type": "boolean"
+        },
+        "risk": {
+          "description": "risk is required: the step's declared risk class, which only raises; the resolved risk is the maximum of risk and\n the action risk of every RPC the capability set grants.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        },
+        "verifiers": {
+          "description": "verifiers names the verifiers that run on the step's output.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "capability_set",
+        "risk"
+      ],
+      "title": "Playbook Step",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.PlaybookStep.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.PlaybookStep.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,144 @@
+// Governance annotations for Numinance protos.
+//
+// This package is protocol-level and protected: any change needs an RFC and a
+// security review. It defines the options that every RPC and new field must
+// carry, and the RiskClass and ExecMode enums those options use. The Engine
+// and the plugin host read these options from descriptors (protoreflect) before
+// policy evaluation; they are never parsed from .proto text.
+//
+// Extension numbers: custom options must use numbers outside the range
+// reserved by protobuf itself. We use 50001 for MethodOptions.action and 50002
+// for FieldOptions.field. Numbers 50000 to 99999 are the range protobuf
+// designates for in-organization use, which suits a protocol whose options are
+// consumed by one Engine and its plugins. If the options are ever published in
+// a way that needs a globally unique number, request one from the protobuf
+// Global Extension Registry; that would be a contract-breaking change.
+// 50003 is numinance.kinds.v1.merge on FieldOptions.
+//
+// Versioning: every message and field in this file is since 1.0.0. The field
+// option extension is declared in this same file, so the fields below carry
+// (numinance.annotations.v1.field).since directly.
+syntax = "proto3";
+
+package numinance.annotations.v1;
+
+import "google/protobuf/descriptor.proto";
+
+// RiskClass classifies the worst-case effect of an action. A change's risk
+// class is the maximum over its playbook steps. A capability's risk_floor can
+// never be lowered, neither by a provider nor by a customer; lowering the risk
+// of an existing RPC in a later release is a contract-breaking change.
+enum RiskClass {
+  // RISK_CLASS_UNSPECIFIED is the zero value. It has no meaning and is
+  // rejected by lint and by the plugin host.
+  RISK_CLASS_UNSPECIFIED = 0;
+  // RISK_CLASS_READ has no side effect.
+  RISK_CLASS_READ = 1;
+  // RISK_CLASS_LOW is reversible and narrowly scoped.
+  RISK_CLASS_LOW = 2;
+  // RISK_CLASS_MEDIUM is reversible with effort, or wide in scope.
+  RISK_CLASS_MEDIUM = 3;
+  // RISK_CLASS_HIGH affects production or is hard to reverse.
+  RISK_CLASS_HIGH = 4;
+  // RISK_CLASS_PRIVILEGED touches credentials, IAM, policy, deployment, or is
+  // destructive.
+  RISK_CLASS_PRIVILEGED = 5;
+}
+
+// ExecMode says how an action is executed and which verb shape it follows.
+enum ExecMode {
+  // EXEC_MODE_UNSPECIFIED is the zero value. It has no meaning and is rejected
+  // by lint and by the plugin host.
+  EXEC_MODE_UNSPECIFIED = 0;
+  // EXEC_MODE_SYNC is a single request and response.
+  EXEC_MODE_SYNC = 1;
+  // EXEC_MODE_OPERATION is a long-running operation: start, get, cancel.
+  EXEC_MODE_OPERATION = 2;
+  // EXEC_MODE_DECLARATIVE is observe, plan, apply with a plan_digest.
+  EXEC_MODE_DECLARATIVE = 3;
+}
+
+// ActionOptions is the governance contract of one RPC. Every RPC in every
+// Numinance service sets it through the `action` method option. The host
+// checks each invocation against these values and the caller's grant before
+// dispatch.
+message ActionOptions {
+  // risk is the worst-case risk class of the RPC. It must be honest for the
+  // worst case and must never be lowered in a later release.
+  RiskClass risk = 1 [(field).since = "1.0.0"];
+  // exec is the execution mode the RPC follows.
+  ExecMode exec = 2 [(field).since = "1.0.0"];
+  // idempotent is true when replaying the call with the same idempotency key
+  // has no additional effect. A port may declare a verb idempotent under a
+  // caller-owned reconciliation rule stated in the verb's comment; the host
+  // still treats the verb as retryable.
+  bool idempotent = 3 [(field).since = "1.0.0"];
+  // supports_dry_run is true when the RPC can run without side effects and
+  // report what it would do. Side-effecting RPCs that do not support it must
+  // justify that in the RPC comment.
+  bool supports_dry_run = 4 [(field).since = "1.0.0"];
+  // compensating_action names the RPC (service.Method) that undoes this one,
+  // or is empty when the action cannot be compensated.
+  string compensating_action = 5 [(field).since = "1.0.0"];
+  // evidence lists the evidence record types this RPC must produce. Missing
+  // declared evidence turns a success into PARTIAL.
+  repeated string evidence = 6 [(field).since = "1.0.0"];
+  // capability is the negotiated capability name (<port>.<feature>) that
+  // gates this RPC. Empty means the RPC is a Core verb of its port.
+  string capability = 7 [(field).since = "1.0.0"];
+  // since is the strict x.y.z spec version in which the RPC was introduced.
+  string since = 8 [(field).since = "1.0.0"];
+  // llm_description is the description shown to a model when the RPC is
+  // exposed as a tool. It is written as documentation, not as instructions.
+  string llm_description = 9 [(field).since = "1.0.0"];
+  // tool_groups names the tool groups this RPC belongs to, used to scope which
+  // tools an agent sees.
+  repeated string tool_groups = 10 [(field).since = "1.0.0"];
+  // scopes lists the grant scopes a caller needs to invoke this RPC.
+  repeated string scopes = 11 [(field).since = "1.0.0"];
+}
+
+// FieldAnnotations carries lifecycle and sensitivity metadata for one field.
+// Set it through the `field` field option.
+message FieldAnnotations {
+  // since is the strict x.y.z spec version in which the field was introduced.
+  // Required on every field added after 1.0.0.
+  string since = 1 [(field).since = "1.0.0"];
+  // deprecated_in is the strict x.y.z spec version in which the field was
+  // deprecated, or empty when it is not deprecated.
+  string deprecated_in = 2 [(field).since = "1.0.0"];
+  // replaced_by names the field or RPC that supersedes a deprecated field.
+  string replaced_by = 3 [(field).since = "1.0.0"];
+  // sensitive marks a field that may hold a secret or personal data. It is
+  // redacted in logs and never copied into evidence in clear text.
+  bool sensitive = 4 [(field).since = "1.0.0"];
+  // host_only marks a types.v1.Reference field of a port request that only
+  // the host may resolve: HostService.ResolveReference refuses a reference equal
+  // to the value of such a field, even when the same value also sits in a field
+  // that is not host-only, and the mark applies to every Reference nested under
+  // a marked message-typed field. Allowed on a Reference field, or a wrapper of
+  // References, in a numinance.ports.* file only (annotation lint
+  // HOST_ONLY_INVALID). Added by numinance-spec/rfcs/0001-host-only-field-annotation.md.
+  bool host_only = 5 [(field).since = "1.0.0"];
+  // resource_name marks a string or repeated string field of a port request whose values name resources the call
+  // touches (a repository, an environment, an artifact), in the spelling a grant's resource scope uses. The Engine
+  // reads the marks from the descriptor of the RPC's input and derives the policy input's action.resource_scope from
+  // the request message itself, never from a value the caller states beside it; a marked value outside the acting
+  // grant's resource scope is denied. The mark applies to a marked field at any depth of the input message, through
+  // singular, repeated, group and map-value message fields. A request that names no resource through a marked field is
+  // denied, and so is a request with an unknown field, so never mark an optional filter field: mark only fields a call
+  // must name. An empty marked string names nothing and is never defaulted to an implicit resource. Allowed on a string
+  // or repeated string field of a message that an RPC input reaches, in a numinance.ports.* file only (annotation lint
+  // RESOURCE_NAME_INVALID). Added by numinance-spec/rfcs/0002-resource-name-field-annotation.md.
+  bool resource_name = 6 [(field).since = "1.0.0"];
+}
+
+extend google.protobuf.MethodOptions {
+  // action is the governance contract of an RPC. Required on every RPC.
+  ActionOptions action = 50001;
+}
+
+extend google.protobuf.FieldOptions {
+  // field is lifecycle and sensitivity metadata for a field.
+  FieldAnnotations field = 50002;
+}

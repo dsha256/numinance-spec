@@ -1,0 +1,267 @@
+// Shared value types used by more than one Numinance package.
+//
+// The plugin, evidence and events packages and the ports import these types
+// and must not copy them, so each value has one wire definition. The package
+// has no services. Every element is since 1.0.0; enum values cannot carry the
+// field option. Enum numbers are fixed identifiers of the Numinance runtime.
+//
+// Enums are closed: a consumer MUST reject the zero value and any number it
+// does not recognise, before any comparison, exactly as it rejects a missing
+// value, so a value added in a minor fails closed at older consumers.
+syntax = "proto3";
+
+package numinance.types.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+
+// PrincipalKind is the identity an actor acts as. It is a claim, not an
+// authentication: the host sets it from the verified transport identity.
+enum PrincipalKind {
+  // PRINCIPAL_KIND_UNSPECIFIED is the zero value; it is rejected by the host.
+  PRINCIPAL_KIND_UNSPECIFIED = 0;
+  // PRINCIPAL_KIND_AUTHOR_AGENT writes in a sandbox and opens PRs.
+  PRINCIPAL_KIND_AUTHOR_AGENT = 1;
+  // PRINCIPAL_KIND_REVIEWER_AGENT is read-only and runs on a different model vendor.
+  PRINCIPAL_KIND_REVIEWER_AGENT = 2;
+  // PRINCIPAL_KIND_RELEASE_PIPELINE is the only identity that invokes CD or merges when policy allows.
+  PRINCIPAL_KIND_RELEASE_PIPELINE = 3;
+  // PRINCIPAL_KIND_HUMAN_APPROVER is a customer OIDC principal.
+  PRINCIPAL_KIND_HUMAN_APPROVER = 4;
+  // PRINCIPAL_KIND_RUNNER writes evidence and holds no customer credentials.
+  PRINCIPAL_KIND_RUNNER = 5;
+  // PRINCIPAL_KIND_BREAK_GLASS is a named human, time-boxed, impossible for any agent identity to invoke.
+  PRINCIPAL_KIND_BREAK_GLASS = 6;
+  // PRINCIPAL_KIND_ENGINE is the producer of Engine facts on the event transport
+  // (ADR 0036; since 1.0.0, added before the first tag): the Engine relays that
+  // publish change, policy and evidence events, with no customer credentials and
+  // no sandbox. It is valid only as an event envelope producer and is never an actor: not the author,
+  // approver, reviewer or break-glass actor of a change, and not the actor_kind
+  // of an evidence record or a policy input. A consumer that reads an actor
+  // MUST reject it.
+  PRINCIPAL_KIND_ENGINE = 7;
+  // PRINCIPAL_KIND_BROKER is the capability broker as the author of its own evidence receipts
+  // (ADR 0050; since 1.0.0, added before the first tag: no released reader exists, and after the first tag a new actor kind is contract-breaking for verifiers). It is valid only as the actor_kind of an
+  // evidence receipt record of the broker (HandleIssued.v1, HandleRevoked.v1, ReceiptsOverflow.v1)
+  // and is never the author, approver, reviewer or break-glass actor of a change, a grant actor or a
+  // policy input. A consumer that reads an actor for any other purpose MUST reject it.
+  PRINCIPAL_KIND_BROKER = 8;
+  // PRINCIPAL_KIND_EGRESS_PROXY is the egress proxy as the author of its own evidence receipts
+  // (ADR 0050; since 1.0.0, added before the first tag, with the same release note as PRINCIPAL_KIND_BROKER). The same receipt-only rule as
+  // PRINCIPAL_KIND_BROKER applies; its receipts are NetworkRequests.v1 and ReceiptsOverflow.v1.
+  PRINCIPAL_KIND_EGRESS_PROXY = 9;
+}
+
+// ResidencyClass is the data-residency class of an executor and model combination.
+// It is derived from manifest dimensions, never declared. It is unordered: a
+// number never implies strictness, and a residency floor is compared through
+// an explicit order table, never through the numbers.
+enum ResidencyClass {
+  // RESIDENCY_CLASS_UNSPECIFIED is the zero value; it is rejected by the host.
+  RESIDENCY_CLASS_UNSPECIFIED = 0;
+  // RESIDENCY_CLASS_IN_ACCOUNT runs compute and inference in the customer account.
+  RESIDENCY_CLASS_IN_ACCOUNT = 1;
+  // RESIDENCY_CLASS_PRIVATE_ENDPOINT reaches a vendor model over a private network path.
+  RESIDENCY_CLASS_PRIVATE_ENDPOINT = 2;
+  // RESIDENCY_CLASS_VENDOR_ZDR is a vendor endpoint with zero data retention.
+  RESIDENCY_CLASS_VENDOR_ZDR = 3;
+  // RESIDENCY_CLASS_VENDOR_STANDARD is a vendor endpoint with standard retention.
+  RESIDENCY_CLASS_VENDOR_STANDARD = 4;
+  // RESIDENCY_CLASS_AIRGAPPED has no external network path.
+  RESIDENCY_CLASS_AIRGAPPED = 5;
+}
+
+// TrustClass is the trust class of an input the Engine reasons over.
+// Numbers are an enumeration, not a lattice; only SIGNED_POLICY and KERNEL
+// may create enforceable authority.
+enum TrustClass {
+  // TRUST_CLASS_UNSPECIFIED is the zero value; it is rejected by the host.
+  TRUST_CLASS_UNSPECIFIED = 0;
+  // TRUST_CLASS_UNTRUSTED_RETRIEVED is knowledge, tool output, tickets and comments.
+  TRUST_CLASS_UNTRUSTED_RETRIEVED = 1;
+  // TRUST_CLASS_REPOSITORY_AUTHORED is a file in the worktree.
+  TRUST_CLASS_REPOSITORY_AUTHORED = 2;
+  // TRUST_CLASS_SIGNED_SKILL is a signed skill; it may advise and never widen a grant.
+  TRUST_CLASS_SIGNED_SKILL = 3;
+  // TRUST_CLASS_SIGNED_POLICY is a pack, a profile or a floor.
+  TRUST_CLASS_SIGNED_POLICY = 4;
+  // TRUST_CLASS_KERNEL is the kernel itself.
+  TRUST_CLASS_KERNEL = 5;
+}
+
+// AutonomyLevel is a rung of the autonomy ladder; ordered by number, higher is more autonomy.
+// A consumer compares levels only after rejecting unknown numbers, so a rung
+// it does not know never counts as more autonomy than OPERATE.
+// A rung added in a minor takes the next number above all existing rungs;
+// any other change of order is a new major.
+enum AutonomyLevel {
+  // AUTONOMY_LEVEL_UNSPECIFIED is the zero value; it is rejected by the host.
+  AUTONOMY_LEVEL_UNSPECIFIED = 0;
+  // AUTONOMY_LEVEL_OBSERVE reads only.
+  AUTONOMY_LEVEL_OBSERVE = 1;
+  // AUTONOMY_LEVEL_SUGGEST proposes and writes nothing.
+  AUTONOMY_LEVEL_SUGGEST = 2;
+  // AUTONOMY_LEVEL_IMPLEMENT writes in a sandbox.
+  AUTONOMY_LEVEL_IMPLEMENT = 3;
+  // AUTONOMY_LEVEL_PR opens pull requests.
+  AUTONOMY_LEVEL_PR = 4;
+  // AUTONOMY_LEVEL_MERGE merges when policy allows.
+  AUTONOMY_LEVEL_MERGE = 5;
+  // AUTONOMY_LEVEL_STAGE deploys to pre-production.
+  AUTONOMY_LEVEL_STAGE = 6;
+  // AUTONOMY_LEVEL_RELEASE deploys to production.
+  AUTONOMY_LEVEL_RELEASE = 7;
+  // AUTONOMY_LEVEL_OPERATE runs operations against production.
+  AUTONOMY_LEVEL_OPERATE = 8;
+}
+
+// ChangeState is the state of a Change; numbers are identifiers, not an order.
+// The state machine fixes the allowed transitions. PAUSED is an overlay on an
+// active state, so a consumer also carries the previous state.
+enum ChangeState {
+  // CHANGE_STATE_UNSPECIFIED is the zero value; it is rejected by the host.
+  CHANGE_STATE_UNSPECIFIED = 0;
+  // CHANGE_STATE_OPENED is entered when intake accepted a ticket, incident or intent.
+  CHANGE_STATE_OPENED = 1;
+  // CHANGE_STATE_UNDERSTOOD is entered when the code graph, repository docs and knowledge bundle are resolved.
+  CHANGE_STATE_UNDERSTOOD = 2;
+  // CHANGE_STATE_CLASSIFIED is entered when the playbook and risk class are fixed and the initial grant is derived.
+  CHANGE_STATE_CLASSIFIED = 3;
+  // CHANGE_STATE_PLANNED is entered when the plan with work units, risk per step and required evidence is produced.
+  CHANGE_STATE_PLANNED = 4;
+  // CHANGE_STATE_PLAN_GATE is entered when policy is evaluated on the plan.
+  CHANGE_STATE_PLAN_GATE = 5;
+  // CHANGE_STATE_IMPLEMENTING is entered when work units run under author grants.
+  CHANGE_STATE_IMPLEMENTING = 6;
+  // CHANGE_STATE_INTEGRATED is entered when the candidate is assembled from work units.
+  CHANGE_STATE_INTEGRATED = 7;
+  // CHANGE_STATE_VERIFYING is entered when the verifier pipeline runs.
+  CHANGE_STATE_VERIFYING = 8;
+  // CHANGE_STATE_REPAIRING is entered for the bounded repair loop (max max_repair_attempts).
+  CHANGE_STATE_REPAIRING = 9;
+  // CHANGE_STATE_REHEARSING is entered when migrations or infra are applied to a disposable environment.
+  CHANGE_STATE_REHEARSING = 10;
+  // CHANGE_STATE_RELEASE_GATE is entered when policy is evaluated on all evidence.
+  CHANGE_STATE_RELEASE_GATE = 11;
+  // CHANGE_STATE_MERGING is entered when the PR is opened, or merged when autonomy allows.
+  CHANGE_STATE_MERGING = 12;
+  // CHANGE_STATE_RELEASING is entered when the customer pipeline is invoked under the release identity.
+  CHANGE_STATE_RELEASING = 13;
+  // CHANGE_STATE_OBSERVING is entered for the canary window against SLOs and invariants.
+  CHANGE_STATE_OBSERVING = 14;
+  // CHANGE_STATE_RECOVERING is entered for rollback through the CD provider; a corrective Change is opened.
+  CHANGE_STATE_RECOVERING = 15;
+  // CHANGE_STATE_ESCALATED is entered when a human is required; it waits on a signal.
+  CHANGE_STATE_ESCALATED = 16;
+  // CHANGE_STATE_PAUSED is entered when the circuit breaker trips (overlay on any active state).
+  CHANGE_STATE_PAUSED = 17;
+  // CHANGE_STATE_CLOSED is terminal; the evidence is sealed.
+  CHANGE_STATE_CLOSED = 18;
+  // CHANGE_STATE_ABANDONED is terminal; the evidence is sealed.
+  CHANGE_STATE_ABANDONED = 19;
+  // CHANGE_STATE_ROLLED_BACK is terminal; the evidence is sealed.
+  CHANGE_STATE_ROLLED_BACK = 20;
+}
+
+// FindingSeverity is the severity of a verifier finding and of the rule that
+// produces it; higher is more severe, and a value added in a minor takes the
+// next number. What a severity blocks is policy, not this enum.
+enum FindingSeverity {
+  // FINDING_SEVERITY_UNSPECIFIED is the zero value; it is rejected by the host.
+  FINDING_SEVERITY_UNSPECIFIED = 0;
+  // FINDING_SEVERITY_INFO is advisory.
+  FINDING_SEVERITY_INFO = 1;
+  // FINDING_SEVERITY_LOW is a minor deviation.
+  FINDING_SEVERITY_LOW = 2;
+  // FINDING_SEVERITY_MEDIUM is a deviation that needs a fix.
+  FINDING_SEVERITY_MEDIUM = 3;
+  // FINDING_SEVERITY_HIGH is a deviation that risks correctness or security.
+  FINDING_SEVERITY_HIGH = 4;
+  // FINDING_SEVERITY_CRITICAL is a deviation that risks a security escape or data loss.
+  FINDING_SEVERITY_CRITICAL = 5;
+}
+
+// DecisionOutcome is the result of one policy decision.
+enum DecisionOutcome {
+  // DECISION_OUTCOME_UNSPECIFIED is the zero value; it is rejected.
+  DECISION_OUTCOME_UNSPECIFIED = 0;
+  // DECISION_OUTCOME_ALLOW lets the action proceed.
+  DECISION_OUTCOME_ALLOW = 1;
+  // DECISION_OUTCOME_DENY refuses the action; the denial is recorded like an allow.
+  DECISION_OUTCOME_DENY = 2;
+  // DECISION_OUTCOME_REQUIRE_APPROVAL holds the action until the named approvers decide.
+  DECISION_OUTCOME_REQUIRE_APPROVAL = 3;
+}
+
+// BreakerPosition is a position of the circuit breaker.
+// Order from least to most
+// restrictive: FULL_AUTO, PR_ONLY, READ_ONLY, STOPPED. A value added in a
+// minor states its place in this order in its comment; consumers compare
+// positions by that order, never by number alone.
+enum BreakerPosition {
+  // BREAKER_POSITION_UNSPECIFIED is the zero value; it is rejected.
+  BREAKER_POSITION_UNSPECIFIED = 0;
+  // BREAKER_POSITION_FULL_AUTO caps nothing beyond the autonomy policy.
+  BREAKER_POSITION_FULL_AUTO = 1;
+  // BREAKER_POSITION_PR_ONLY caps effective autonomy at PR.
+  BREAKER_POSITION_PR_ONLY = 2;
+  // BREAKER_POSITION_READ_ONLY allows no write.
+  BREAKER_POSITION_READ_ONLY = 3;
+  // BREAKER_POSITION_STOPPED pauses every run.
+  BREAKER_POSITION_STOPPED = 4;
+}
+
+// ExecutorCapability is one capability an author executor declares.
+// Playbooks require
+// capabilities by name, never vendors; a declared capability grants nothing,
+// since the sandbox, egress proxy and broker enforce every request.
+enum ExecutorCapability {
+  // EXECUTOR_CAPABILITY_UNSPECIFIED is the zero value; it is rejected by the host.
+  EXECUTOR_CAPABILITY_UNSPECIFIED = 0;
+  // EXECUTOR_CAPABILITY_FILESYSTEM_READ reads files of the worktree.
+  EXECUTOR_CAPABILITY_FILESYSTEM_READ = 1;
+  // EXECUTOR_CAPABILITY_FILESYSTEM_WRITE writes files of the worktree.
+  EXECUTOR_CAPABILITY_FILESYSTEM_WRITE = 2;
+  // EXECUTOR_CAPABILITY_SHELL runs commands.
+  EXECUTOR_CAPABILITY_SHELL = 3;
+  // EXECUTOR_CAPABILITY_NETWORK makes network requests through the egress proxy.
+  EXECUTOR_CAPABILITY_NETWORK = 4;
+  // EXECUTOR_CAPABILITY_SUBAGENTS starts subagents of its own.
+  EXECUTOR_CAPABILITY_SUBAGENTS = 5;
+  // EXECUTOR_CAPABILITY_BROWSER drives a browser.
+  EXECUTOR_CAPABILITY_BROWSER = 6;
+  // EXECUTOR_CAPABILITY_MCP calls MCP tools attached by the adapter.
+  EXECUTOR_CAPABILITY_MCP = 7;
+  // EXECUTOR_CAPABILITY_CHECKPOINT emits checkpoints it can resume from.
+  EXECUTOR_CAPABILITY_CHECKPOINT = 8;
+  // EXECUTOR_CAPABILITY_STRUCTURED_PLAN returns a structured plan before acting.
+  EXECUTOR_CAPABILITY_STRUCTURED_PLAN = 9;
+  // EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS asks the host before a tool call.
+  EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS = 10;
+  // EXECUTOR_CAPABILITY_NATIVE_SANDBOX has a sandbox of its own inside the work-unit sandbox.
+  EXECUTOR_CAPABILITY_NATIVE_SANDBOX = 11;
+  // EXECUTOR_CAPABILITY_CONTEXT_PERSISTENCE keeps context across runs.
+  EXECUTOR_CAPABILITY_CONTEXT_PERSISTENCE = 12;
+}
+
+// Digest is a sha256 content digest as "sha256:" plus 64 lowercase hex characters.
+message Digest {
+  // value is exactly "sha256:" plus 64 lowercase hex characters. Any other
+  // length, case or prefix, and an empty value in a present message, is
+  // rejected. Absence is the unset message.
+  string value = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Reference is a claim-check pointer to content in the artifact store.
+// It carries a store key and a digest, never content. Consumers reject a
+// Reference that breaks a rule below; they never truncate or repair it.
+message Reference {
+  // artifact_ref is required: an opaque store key matching
+  // ^[A-Za-z0-9][A-Za-z0-9._/-]{0,1023}$ with no ".." segment. It is resolved
+  // only through the artifact store, never as a URL or a filesystem path.
+  string artifact_ref = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // sha256 is required; it is the digest of the artifact content.
+  Digest sha256 = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // artifact_type is required: a token matching ^[a-z0-9][a-z0-9._-]{0,127}$
+  // that names the kind of content, checked against the host's allow-list.
+  string artifact_type = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

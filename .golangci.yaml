@@ -1,0 +1,138 @@
+# golangci-lint v2 configuration encoding the Google Go Style Guide where a linter can.
+version: "2"
+run:
+  timeout: 5m
+  # Concurrent worktrees and parallel fixture tests share one lint cache; without this a second run exits 3 with
+  # "parallel golangci-lint is running" and prints no findings. The cache is safe to share.
+  allow-parallel-runners: true
+  tests: true
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck          # decisions: handle errors
+    - errorlint         # best-practices: %w, errors.Is/As instead of type/string comparisons
+    - errname           # sentinel errors named ErrX, types named XError
+    - revive            # naming, doc comments, receiver names, early return, context-as-argument
+    - gocritic          # decisions: copying, switch/break, literal formatting
+    - unused
+    - ineffassign
+    - unconvert
+    - unparam
+    - nilerr
+    - nilnil            # decisions: in-band errors
+    - noctx             # requests without context
+    - contextcheck      # decisions: contexts
+    - containedctx      # never store context in a struct
+    - forbidigo         # repo-specific bans
+    - gochecknoinits    # decisions: no init outside generated code
+    - gochecknoglobals  # decisions: global state
+    - gosec
+    - prealloc
+    - predeclared
+    - testifylint
+    - thelper           # best-practices: t.Helper in helpers
+    - tparallel
+    - usetesting
+    - depguard          # go.md: allowed dependency list
+  settings:
+    revive:
+      rules:
+        - name: exported            # doc comments start with the identifier name
+        - name: package-comments
+        - name: receiver-naming
+        - name: var-naming          # initialisms, no underscores
+        - name: error-strings       # lowercase, no punctuation
+        - name: error-return        # error is the last result
+        - name: error-naming
+        - name: indent-error-flow   # early return, no else after return
+        - name: early-return
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: unexported-return
+        - name: blank-imports
+        - name: dot-imports
+        - name: superfluous-else
+        - name: unnecessary-stmt
+        - name: use-any
+        - name: redundant-import-alias
+        - name: import-shadowing
+        - name: bare-return
+        - name: empty-block
+        - name: range-val-address
+        - name: unhandled-error
+          arguments: ["fmt.Print.*", "fmt.Fprint.*", "strings.Builder.Write.*", "bytes.Buffer.Write.*"]
+    gocritic:
+      enabled-tags: [diagnostic, style]
+      disabled-checks: [hugeParam, paramTypeCombine, unnamedResult]
+    errorlint:
+      errorf: true
+      asserts: true
+      comparison: true
+    forbidigo:
+      forbid:
+        - pattern: '^fmt\.Print.*$'
+          msg: use log/slog or return the value
+        - pattern: '^log\.(Print|Fatal|Panic).*$'
+          msg: use log/slog; fatal only in main via os.Exit
+        - pattern: '^math/rand\.'
+          msg: use crypto/rand for anything unpredictable
+        - pattern: '^time\.Now$'
+          pkg: '^github\.com/numinance/numinance/internal/.*/(domain|app)'
+          msg: inject kernel/clock.Clock in domain and app code
+        - pattern: '^context\.(Background|TODO)$'
+          pkg: '^github\.com/numinance/numinance/internal/'
+          msg: contexts come from the caller; Background only in cmd/ and tests
+      analyze-types: true
+    gochecknoglobals:
+      # sentinel errors and regexp/MustCompile are tolerated by the linter's defaults
+    depguard:
+      rules:
+        main:
+          list-mode: strict
+          files: ["$all", "!$test"]
+          allow:
+            - $gostd
+            - github.com/numinance/numinance
+            - github.com/numinance/numinance-spec
+            - google.golang.org/grpc
+            - google.golang.org/protobuf
+            - connectrpc.com/connect
+            - go.temporal.io/sdk
+            - github.com/open-policy-agent/opa
+            - github.com/google/cel-go
+            - github.com/containerd/containerd
+            - github.com/sigstore/sigstore-go
+            - github.com/in-toto/attestation
+            - oras.land/oras-go
+            - github.com/theupdateframework/go-tuf
+            - github.com/tree-sitter/go-tree-sitter
+            - go.opentelemetry.io/otel
+            - github.com/aws/aws-sdk-go-v2
+            - github.com/jackc/pgx
+            - go.yaml.in/yaml
+            - gopkg.in/yaml.v3
+            - golang.org/x
+          deny:
+            - pkg: github.com/spf13/cobra
+              desc: stdlib flag only (ADR-0003)
+            - pkg: github.com/hashicorp/go-plugin
+              desc: handshake is reimplemented in stdlib (ADR-0011)
+            - pkg: github.com/stretchr/testify
+              desc: no assertion libraries (Google style)
+        tests:
+          list-mode: lax
+          files: ["$test"]
+          deny:
+            - pkg: github.com/stretchr/testify
+              desc: no assertion libraries (Google style)
+  exclusions:
+    paths:
+      - ".*/gen/.*"
+      - ".*\\.pb\\.go$"
+formatters:
+  enable: [gofmt, goimports]
+  settings:
+    goimports:
+      local-prefixes: [github.com/numinance]

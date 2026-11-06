@@ -1,0 +1,8 @@
+apiVersion: numinance.dev/v1
+kind: AdapterSelector
+metadata: {name: payments, scope: SCOPE_REPO}
+spec:
+  ports:
+    scm: {provider: dev.numinance.official/github, instance: main}
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: ci-prod}
+    knowledge: [confluence-eng, jira-pay]

@@ -1,0 +1,425 @@
+{
+  "$defs": {
+    "google.protobuf.Timestamp.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "numinance.kinds.v1.AuthoredConstraint.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AuthoredConstraint is one constraint with its provenance; a prompt labels its text untrusted.",
+      "properties": {
+        "id": {
+          "description": "id is required: the rule or control id within origin.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "origin is required: the kind and name of the object it comes from, such as \"ArchitecturePack/company-python\".",
+          "type": "string"
+        },
+        "origin_digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "origin_digest is required: the digest of the origin as the lockfile or the signed policy bundle pins it."
+        },
+        "statement": {
+          "description": "statement is the constraint text as its origin states it, for display only.",
+          "type": "string"
+        },
+        "trust": {
+          "description": "trust is required and is TRUST_CLASS_SIGNED_POLICY or TRUST_CLASS_KERNEL; a decoder refuses any other value.",
+          "enum": [
+            "TRUST_CLASS_UNSPECIFIED",
+            "TRUST_CLASS_UNTRUSTED_RETRIEVED",
+            "TRUST_CLASS_REPOSITORY_AUTHORED",
+            "TRUST_CLASS_SIGNED_SKILL",
+            "TRUST_CLASS_SIGNED_POLICY",
+            "TRUST_CLASS_KERNEL"
+          ],
+          "title": "Trust Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "origin",
+        "id",
+        "statement",
+        "trust"
+      ],
+      "title": "Authored Constraint",
+      "type": "object"
+    },
+    "numinance.kinds.v1.BundleBudgetUsed.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleBudgetUsed is what building the bundle consumed, checked against the stage budget of the profile.",
+      "properties": {
+        "calls": {
+          "description": "calls is the number of resolver searches and fetches.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ms": {
+          "description": "ms is the wall-clock time in milliseconds.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tokens": {
+          "description": "tokens is the bundle size in tokens.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tokens",
+        "calls",
+        "ms"
+      ],
+      "title": "Bundle Budget Used",
+      "type": "object"
+    },
+    "numinance.kinds.v1.BundleConflict.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleConflict is one disagreement between sources: what it is about and the source section of every claim.",
+      "properties": {
+        "claims": {
+          "description": "claims has at least two entries, each the section of a source that makes one claim.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.CitedGuidance.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "topic": {
+          "description": "topic is required: what the sources disagree on.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "topic"
+      ],
+      "title": "Bundle Conflict",
+      "type": "object"
+    },
+    "numinance.kinds.v1.BundleQuery.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleQuery is one search: the tool, the digest of its arguments, how many results it returned and whether it was cut.",
+      "properties": {
+        "args_digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "args_digest is required: the digest of the canonical arguments, never the arguments."
+        },
+        "results": {
+          "description": "results is the number of results returned.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool": {
+          "description": "tool is required: the tool name as the connection pins it.",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "truncated is true when the results were cut at a cap.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tool",
+        "results",
+        "truncated"
+      ],
+      "title": "Bundle Query",
+      "type": "object"
+    },
+    "numinance.kinds.v1.BundleResolver.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleResolver names the resolver model and prompt.",
+      "properties": {
+        "model_id": {
+          "description": "model_id is required.",
+          "type": "string"
+        },
+        "prompt_version": {
+          "description": "prompt_version is required.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_id",
+        "prompt_version"
+      ],
+      "title": "Bundle Resolver",
+      "type": "object"
+    },
+    "numinance.kinds.v1.BundleSource.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleSource is one selected source; its content is the artifact with this digest, delivered read-only to the worktree.",
+      "properties": {
+        "access_basis": {
+          "description": "access_basis is required: whose authority the fetch ran under.",
+          "enum": [
+            "KNOWLEDGE_AUTH_UNSPECIFIED",
+            "KNOWLEDGE_AUTH_USER_DELEGATED",
+            "KNOWLEDGE_AUTH_SERVICE_ACCOUNT"
+          ],
+          "title": "Knowledge Auth",
+          "type": "string"
+        },
+        "classification": {
+          "description": "classification is the source's data classification as the source system reports it.",
+          "type": "string"
+        },
+        "digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "digest is required: the digest of the redacted content delivered to the executor."
+        },
+        "fetched_at": {
+          "$ref": "#/$defs/google.protobuf.Timestamp.jsonschema.strict.json",
+          "description": "fetched_at is required."
+        },
+        "rank": {
+          "description": "rank is the source's position in the selection, from 1.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "redactions": {
+          "description": "redactions is the number of secrets and PII spans redacted before persistence.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ref": {
+          "description": "ref is required and unique: the canonical source reference, redacted, since a ref can hold a credential.",
+          "type": "string"
+        },
+        "selection_reason": {
+          "description": "selection_reason is required: why the resolver selected the source.",
+          "type": "string"
+        },
+        "source_version": {
+          "description": "source_version is the version or ETag the source reported; absent when it reports none.",
+          "type": "string"
+        },
+        "staleness": {
+          "description": "staleness is required.",
+          "enum": [
+            "SOURCE_STALENESS_UNSPECIFIED",
+            "SOURCE_STALENESS_FRESH",
+            "SOURCE_STALENESS_STALE",
+            "SOURCE_STALENESS_UNKNOWN"
+          ],
+          "title": "Source Staleness",
+          "type": "string"
+        },
+        "system": {
+          "description": "system is required: the KnowledgeConnection name the source was read through.",
+          "type": "string"
+        },
+        "title": {
+          "description": "title is the source's own title.",
+          "type": "string"
+        },
+        "trust": {
+          "description": "trust is required and is TRUST_CLASS_UNTRUSTED_RETRIEVED; a decoder refuses any other value.",
+          "enum": [
+            "TRUST_CLASS_UNSPECIFIED",
+            "TRUST_CLASS_UNTRUSTED_RETRIEVED",
+            "TRUST_CLASS_REPOSITORY_AUTHORED",
+            "TRUST_CLASS_SIGNED_SKILL",
+            "TRUST_CLASS_SIGNED_POLICY",
+            "TRUST_CLASS_KERNEL"
+          ],
+          "title": "Trust Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "system",
+        "title",
+        "rank",
+        "selection_reason",
+        "classification",
+        "redactions",
+        "access_basis",
+        "staleness",
+        "trust"
+      ],
+      "title": "Bundle Source",
+      "type": "object"
+    },
+    "numinance.kinds.v1.CitedGuidance.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "CitedGuidance points at one section of a source.",
+      "properties": {
+        "ref": {
+          "description": "ref is required and is the ref of a source in the bundle.",
+          "type": "string"
+        },
+        "section": {
+          "description": "section is the section id the bundle tool serves; absent means the whole source.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "title": "Cited Guidance",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ContextBundleSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ContextBundleSpec is the bundle; relevance scores are not stored because they are not reproducible.",
+      "properties": {
+        "authored_constraints": {
+          "description": "authored_constraints come only from the resolved profile's policy and packs; enforcement comes from the grant.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.AuthoredConstraint.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "authz_context_digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "authz_context_digest is required: the AuthorizationContext digest every search and fetch ran under."
+        },
+        "budget_used": {
+          "$ref": "#/$defs/numinance.kinds.v1.BundleBudgetUsed.jsonschema.strict.json",
+          "description": "budget_used is required: what building the bundle consumed."
+        },
+        "change_id": {
+          "description": "change_id is required: the Change the bundle was built for.",
+          "type": "string"
+        },
+        "cited_guidance": {
+          "description": "cited_guidance points at sections of the sources; it is advisory only and untrusted.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.CitedGuidance.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "conflicts": {
+          "description": "conflicts lists sources that disagree; a conflict a pack's precedence resolves is left out, none silently.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.BundleConflict.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "context_generation": {
+          "description": "context_generation is the resolution generation, from 1; a refresh opens a new one and never changes an earlier bundle.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pinned_toolsets": {
+          "additionalProperties": {
+            "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json"
+          },
+          "description": "pinned_toolsets maps each KnowledgeConnection name to the digest of the tool inventory pinned when it was read.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "query_plan": {
+          "description": "query_plan lists the searches the resolver ran, in order.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.BundleQuery.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "receipts": {
+          "description": "receipts holds the artifact digest of the retrieval receipt of every search and fetch; the bundle does not repeat them.",
+          "items": {
+            "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "resolver": {
+          "$ref": "#/$defs/numinance.kinds.v1.BundleResolver.jsonschema.strict.json",
+          "description": "resolver is required: the model and prompt that planned the queries and selected the sources."
+        },
+        "sources": {
+          "description": "sources lists the selected sources, unique by ref.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.BundleSource.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "stage": {
+          "description": "stage is required: the stage name the bundle serves.",
+          "type": "string"
+        },
+        "unresolved_questions": {
+          "description": "unresolved_questions are what the sources did not answer; a model wrote them from untrusted input, so they are untrusted.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.UnresolvedQuestion.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "work_unit_id": {
+          "description": "work_unit_id is required: the work unit the bundle was built for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "change_id",
+        "work_unit_id",
+        "stage",
+        "context_generation"
+      ],
+      "title": "Context Bundle Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.UnresolvedQuestion.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "UnresolvedQuestion is one question the sources did not answer.",
+      "properties": {
+        "blocking": {
+          "description": "blocking is true when the Change cannot proceed without an answer; the question is then posted to the ticket.",
+          "type": "boolean"
+        },
+        "question": {
+          "description": "question is required.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "blocking"
+      ],
+      "title": "Unresolved Question",
+      "type": "object"
+    },
+    "numinance.types.v1.Digest.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Digest is a sha256 content digest as \"sha256:\" plus 64 lowercase hex characters.",
+      "properties": {
+        "value": {
+          "description": "value is exactly \"sha256:\" plus 64 lowercase hex characters. Any other\n length, case or prefix, and an empty value in a present message, is\n rejected. Absence is the unset message.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Digest",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ContextBundleSpec.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ContextBundleSpec.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

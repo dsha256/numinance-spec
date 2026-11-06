@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/vectors-index.schema.json",
+  "title": "Evidence conformance vector index",
+  "description": "conformance/evidence/v1/vectors/index.json: the list of conformance vectors with their status and the rule labels each covers. Not expressible here: each vector names a directory under vectors/ whose expected.json has the same status and covers; the list is sorted by vector name without duplicates.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "vectors"],
+  "properties": {
+    "format": { "type": "string", "enum": ["numinance.evidence.vectors/v1"] },
+    "vectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["vector", "status", "covers"],
+        "properties": {
+          "vector": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "status": { "type": "string", "enum": ["shipped", "target"] },
+          "covers": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+apiVersion: numinance.dev/v1
+kind: KnowledgeConnection
+metadata: {name: confluence-oauth, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/bridge-mcp
+  endpoint: https://mcp.example.com/v1/mcp
+  auth: KNOWLEDGE_AUTH_USER_DELEGATED
+  oauth: {client_id: "https://numinance.example.com/oauth/client.json"}
+  pinned_tools:
+    - {name: getConfluencePage, hash: {value: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"}}
+  read_only: true
+  scope: [ENG]

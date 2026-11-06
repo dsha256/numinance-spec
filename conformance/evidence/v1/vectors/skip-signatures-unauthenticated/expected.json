@@ -1,0 +1,28 @@
+{
+  "vector": "skip-signatures-unauthenticated",
+  "description": "Signatures not checked: the links, digests and re-derivations are, and the level is unauthenticated.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "skip_signatures": true,
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub"
+  ],
+  "expect": {
+    "level": "unauthenticated",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unauthenticated",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unauthenticated",
+    "exit:5",
+    "mode:skip-signatures"
+  ]
+}

@@ -1,0 +1,59 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/adapter_selector.proto";
+import "numinance/kinds/v1/autonomy_policy.proto";
+import "numinance/kinds/v1/budget_policy.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/kinds/v1/residency_policy.proto";
+
+// SDLCProfile binds a component to its stages, playbooks, control and architecture packs, toolchains, adapters,
+// autonomy, residency and budgets. Other kinds are named; adapters, autonomy, residency and
+// budgets are inline.
+message SDLCProfile {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "SDLCProfile".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  SDLCProfileSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// SDLCProfileSpec holds the bindings; an absent field is unset and comes from a wider scope. A policy-bearing field has
+// authority only when the profile is loaded from a protected path or a signed policy bundle; any other copy, even one
+// claiming SCOPE_ORG, is RepositoryAuthored with no authority. The loader also
+// refuses a FORBID field in a document whose metadata.scope is not SCOPE_ORG.
+message SDLCProfileSpec {
+  // stages names the StageRegistry the component follows; only an org-scoped profile sets it, so a narrower scope cannot
+  // select a registry without the org's gates.
+  optional string stages = 1 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+  // playbooks names the Playbook objects the component may run, unique; a narrower scope adds names, never removes one.
+  repeated string playbooks = 2 [(merge) = MERGE_DIRECTIVE_APPEND, (numinance.annotations.v1.field).since = "1.0.0"];
+  // control_packs names the ControlPack objects that apply, unique; each name resolves only to a ControlPack. A narrower
+  // scope adds names, never removes one, so a repo cannot drop a pack the org applies.
+  repeated string control_packs = 3 [json_name = "control_packs", (merge) = MERGE_DIRECTIVE_APPEND, (numinance.annotations.v1.field).since = "1.0.0"];
+  // architecture_packs names the ArchitecturePack objects that apply, unique; a narrower scope adds names.
+  repeated string architecture_packs = 4 [json_name = "architecture_packs", (merge) = MERGE_DIRECTIVE_APPEND, (numinance.annotations.v1.field).since = "1.0.0"];
+  // toolchains names the LanguageToolchain objects of the component, unique; a narrower scope adds names.
+  repeated string toolchains = 5 [(merge) = MERGE_DIRECTIVE_APPEND, (numinance.annotations.v1.field).since = "1.0.0"];
+  // adapters binds ports as AdapterSelector does; adapters.knowledge names the KnowledgeConnection objects the component
+  // may read.
+  AdapterPorts adapters = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // autonomy sets levels as AutonomyPolicy does, one more layer at the profile's scope after that scope's AutonomyPolicy;
+  // its floors carry FORBID, and no rule resolves a change above the org's and every pack's floors.
+  AutonomyPolicySpec autonomy = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // residency sets limits as ResidencyPolicy does; its floors and limits carry FORBID and its required regions are
+  // refused below the org scope, so only an org-scoped profile sets it.
+  ResidencyPolicySpec residency = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // budgets sets limits as BudgetPolicy does, in its units; only an org-scoped profile sets it until a tighten-only
+  // directive exists, since a narrower scope could otherwise raise a count or max_risk_escalation.
+  BudgetPolicySpec budgets = 9 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+}

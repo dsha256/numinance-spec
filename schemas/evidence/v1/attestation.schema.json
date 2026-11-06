@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/attestation.schema.json",
+  "title": "Evidence attestation",
+  "description": "attestation.json in an evidence/v1 export: the runner-signed statement of what a Closed change did, made at Close. Not expressible here and checked by the verifier: the file is the canonical JSON form; the signature verifies over the canonical form without the signature; every field that restates the chain (change_id, sequence range, head_record_hash, digests, actors, approval_ev_ids, verifier_results) equals what the records derive; first_sequence is at most last_sequence; actors are sorted by principal then kind; credential_scopes is sorted without duplicates and its first entry is the digest of the rest; at most 1024 entries in each list; executor_id and model_id are at most 256 bytes of valid UTF-8; every ASCII string is at most 256 bytes; the file is at most 1 MiB. ticket, signature and signing_key_id are optional in the shipped Go struct but the decoder rejects an attestation without them, so the schema requires them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "change_id",
+    "ticket",
+    "first_sequence",
+    "last_sequence",
+    "head_record_hash",
+    "signature",
+    "signing_key_id",
+    "canon_version",
+    "checkpoint_ref",
+    "inclusion_proof"
+  ],
+  "properties": {
+    "change_id": { "$ref": "#/$defs/changeId" },
+    "ticket": {
+      "type": "string",
+      "pattern": "^(?:none|[!-\"$-~]{1,128}#sha256:[0-9a-f]{64})$",
+      "description": "The ticket leaf: the literal none, or a reference of 1 to 128 printable ASCII characters without space or # followed by # and the digest of the ticket."
+    },
+    "repository": { "$ref": "#/$defs/asciiText" },
+    "base_commit": { "$ref": "#/$defs/asciiText" },
+    "result_commit": { "$ref": "#/$defs/asciiText" },
+    "executor_id": { "type": "string", "description": "Executor identity; free text of at most 256 bytes, absent when none." },
+    "model_id": { "type": "string", "description": "Model identity; free text of at most 256 bytes, absent when none." },
+    "sandbox_image_digest": { "$ref": "#/$defs/digest" },
+    "policy_bundle_digest": { "$ref": "#/$defs/digest" },
+    "profile_digest": { "$ref": "#/$defs/digest" },
+    "toolchain_digest": { "$ref": "#/$defs/digest" },
+    "verifier_results": { "type": "array", "items": { "$ref": "#/$defs/artifact" } },
+    "ci_run_ids": { "type": "array", "items": { "$ref": "#/$defs/asciiText" } },
+    "deployment_ids": { "type": "array", "items": { "$ref": "#/$defs/asciiText" } },
+    "actors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["principal", "kind"],
+        "properties": {
+          "principal": { "$ref": "#/$defs/asciiText" },
+          "kind": { "$ref": "#/$defs/actorKind" }
+        }
+      }
+    },
+    "credential_scopes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/credentialScopeEntry" },
+      "description": "Empty or absent when the broker made no statement. Otherwise the first entry is the broker digest line and the rest are sorted handle scope lines."
+    },
+    "network_policy": { "$ref": "#/$defs/networkPolicy" },
+    "approval_ev_ids": { "type": "array", "items": { "$ref": "#/$defs/evId" } },
+    "first_sequence": { "$ref": "#/$defs/sequence" },
+    "last_sequence": { "$ref": "#/$defs/sequence" },
+    "head_record_hash": { "$ref": "#/$defs/digest" },
+    "signature": { "$ref": "#/$defs/signature" },
+    "signing_key_id": { "$ref": "#/$defs/digest" },
+    "canon_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The checkpoint-family canonical-form version; 1 in evidence/v1." },
+    "checkpoint_ref": { "$ref": "#/$defs/artifact" },
+    "inclusion_proof": { "$ref": "#/$defs/inclusionProof" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    },
+    "changeId": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "evId": { "type": "string", "pattern": "^ev_[0-9a-f]{32}$" },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "A chain sequence number, at most 2^53-1."
+    },
+    "asciiText": {
+      "type": "string",
+      "pattern": "^[!-~](?:[ -~]*[!-~])?$",
+      "description": "Printable ASCII, no leading or trailing space, at most 256 bytes (the length bound is not expressible here)."
+    },
+    "actorKind": {
+      "type": "string",
+      "enum": ["author-agent", "reviewer-agent", "release-pipeline", "human-approver", "runner", "break-glass", "broker", "egress-proxy"]
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{85}[AQgw]==$",
+      "description": "An Ed25519 signature: 64 raw bytes as standard padded base64, 88 characters ending ==."
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "description": "The egress proxy statement: ref is egress-policy.v1/ followed by the attestation's own change_id (that it is this attestation's change is checked by the verifier, not here) and sha256 the digest of the proxy's egress policy record.",
+      "properties": {
+        "ref": { "type": "string", "pattern": "^egress-policy[.]v1/chg_[0-9a-f]{32}$" },
+        "sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "description": "A reference of at most 1024 bytes with no .. path segment; the length bound and the segment rule are not expressible here."
+        },
+        "sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "credentialScopeEntry": {
+      "anyOf": [
+        { "type": "string", "pattern": "^broker\\.scopes\\.v1 sha256:[0-9a-f]{64}$" },
+        { "type": "string", "pattern": "^nhref_[0-9a-f]{12} [a-z][a-z0-9_]{0,31}:[!-~]+$" }
+      ],
+      "description": "Either the broker digest line (broker.scopes.v1 sha256:<hex>, which must be the first entry and appear once) or a handle scope line (nhref_<12 hex> <scope>:<value>)."
+    },
+    "inclusionProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leaf_index", "tree_size"],
+      "description": "A Merkle inclusion proof (RFC 6962). leaf_index is below tree_size and audit_path has exactly the length the two numbers imply (at most 64 entries); the schema cannot express either.",
+      "properties": {
+        "leaf_index": { "type": "integer", "minimum": 0, "maximum": 9007199254740990 },
+        "tree_size": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "audit_path": { "type": "array", "items": { "$ref": "#/$defs/digest" } }
+      }
+    }
+  }
+}

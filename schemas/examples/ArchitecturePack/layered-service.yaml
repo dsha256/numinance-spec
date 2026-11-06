@@ -1,0 +1,13 @@
+apiVersion: numinance.dev/v1
+kind: ArchitecturePack
+metadata: {name: layered-service, scope: SCOPE_ORG}
+spec:
+  rules:
+    - id: no-domain-io
+      statement: The domain layer performs no I/O.
+      severity: FINDING_SEVERITY_HIGH
+      check: {verifier: lint, rule_id: domain-imports, config: {forbidden: [net, os, database/sql]}}
+    - id: handlers-thin
+      statement: Transport handlers hold no business rules.
+      severity: FINDING_SEVERITY_MEDIUM
+      check: {verifier: lint, rule_id: transport-imports}

@@ -1,0 +1,11 @@
+apiVersion: numinance.dev/v1
+kind: LanguageToolchain
+metadata: {name: go-1.27, scope: SCOPE_ORG}
+spec:
+  language: go
+  version: "1.27"
+  verifiers:
+    - {name: unit-tests, provider: dev.numinance.official/go-test, config: {race: true}}
+    - {name: lint, provider: dev.numinance.official/golangci-lint}
+  formatters: [gofmt]
+  package_manager: go-modules

@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.KnowledgeBudgets.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "KnowledgeBudgets bounds the calls of one connection; an explicit 0 is refused.",
+      "properties": {
+        "bytes_per_call": {
+          "description": "bytes_per_call is the most bytes one fetch returns.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "calls_per_stage": {
+          "description": "calls_per_stage is the most searches and fetches in one stage.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "title": "Knowledge Budgets",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.KnowledgeBudgets.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.KnowledgeBudgets.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

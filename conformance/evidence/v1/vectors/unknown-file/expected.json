@@ -1,0 +1,35 @@
+{
+  "vector": "unknown-file",
+  "description": "A file the format does not define: refused, so it cannot hide a claim.",
+  "status": "shipped",
+  "export": "unknown-file",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "manifest_mismatch",
+      "unknown_file"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:manifest_mismatch",
+    "finding:unknown_file"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "vector": "attestation-ambiguous-author",
+  "description": "The author-agent records name two models. A runner-key holder wrote an attestation that states the first model and every other field correctly. A verifier that takes the first value agrees with it; the rule is that two values make the attestation a mismatch.",
+  "status": "shipped",
+  "export": "closed-ambiguous-author",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_mismatch",
+    "rule:attestation-ambiguity"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "vector": "canon-unicode-verified",
+  "description": "Executor and model identifiers with non-ASCII text, raw \u003c, \u003e and \u0026, an escaped quote and backslash and a supplementary-plane character: the canonical form is what encoding/json writes without HTML escaping.",
+  "status": "shipped",
+  "export": "closed-canon-unicode",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:canon-unicode"
+  ]
+}

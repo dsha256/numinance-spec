@@ -1,0 +1,35 @@
+{
+  "vector": "summary-says-rolled-back-chain-open",
+  "description": "summary.json says the change ended RolledBack and the verified chain has no terminal record: the summary disagrees with the chain, and rollback.json does not apply because the chain, not the summary, gives the ending.",
+  "status": "shipped",
+  "export": "summary-says-rolled-back-chain-open",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "summary_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:summary_mismatch",
+    "rule:rollback-json-only-when-rolled-back"
+  ]
+}

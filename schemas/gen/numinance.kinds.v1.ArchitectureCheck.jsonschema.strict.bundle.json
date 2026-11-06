@@ -1,0 +1,37 @@
+{
+  "$defs": {
+    "google.protobuf.Struct.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Struct",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitectureCheck binds a rule to one verifier rule.",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/google.protobuf.Struct.jsonschema.strict.json",
+          "description": "config is passed to the verifier as is; the Engine never reads it."
+        },
+        "rule_id": {
+          "description": "rule_id is required: the verifier's id of the rule its findings carry.",
+          "type": "string"
+        },
+        "verifier": {
+          "description": "verifier is required: the name of the verifier that runs the check.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verifier",
+        "rule_id"
+      ],
+      "title": "Architecture Check",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

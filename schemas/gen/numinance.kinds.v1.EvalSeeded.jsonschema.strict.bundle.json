@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.EvalSeeded.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalSeeded is a defect planted in a case, by token. The defect itself is not in the set: the case stands for a recorded run on a change that has it.",
+      "properties": {
+        "caught_by": {
+          "description": "caught_by is required: a token naming the verifier layer expected to catch the defect; it must be among the case's expected failures.",
+          "type": "string"
+        },
+        "defect": {
+          "description": "defect is required: a token of 1 to 64 characters naming the planted defect.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "defect",
+        "caught_by"
+      ],
+      "title": "Eval Seeded",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.EvalSeeded.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.EvalSeeded.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

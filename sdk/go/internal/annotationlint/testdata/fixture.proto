@@ -1,0 +1,62 @@
+// Lint fixture for tools/scripts/test-annotation-lint.sh. The script copies it
+// to proto/numinance/lintfixture/v1/fixture.proto in a scratch copy of the spec
+// module, builds it with buf and expects exactly the lines in fixture.golden.
+// It is never part of the spec module.
+syntax = "proto3";
+
+package numinance.lintfixture.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+
+// FixtureService has one RPC per action rule.
+service FixtureService {
+  // Annotated is clean.
+  rpc Annotated(AnnotatedRequest) returns (AnnotatedResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      since: "1.0.0"
+      llm_description: "Clean."
+    };
+  }
+  // Unannotated has no action option.
+  rpc Unannotated(UnannotatedRequest) returns (UnannotatedResponse);
+  // Incomplete has an action with no risk, no exec, a malformed since and no llm_description.
+  rpc Incomplete(IncompleteRequest) returns (IncompleteResponse) {
+    option (numinance.annotations.v1.action) = {since: "v1.0"};
+  }
+}
+
+// AnnotatedRequest is clean.
+message AnnotatedRequest {
+  // id is clean.
+  string id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // labels is a map; its synthetic entry message is not checked.
+  map<string, string> labels = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AnnotatedResponse has a field without since.
+message AnnotatedResponse {
+  // id has no since.
+  string id = 1;
+  // Nested has a field with a pre-release since.
+  message Nested {
+    // name has a pre-release since.
+    string name = 1 [(numinance.annotations.v1.field).since = "1.1.0-alpha.1"];
+  }
+  // nested is clean.
+  Nested nested = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// UnannotatedRequest is empty.
+message UnannotatedRequest {}
+
+// UnannotatedResponse is empty.
+message UnannotatedResponse {}
+
+// IncompleteRequest is empty.
+message IncompleteRequest {}
+
+// IncompleteResponse is empty.
+message IncompleteResponse {}

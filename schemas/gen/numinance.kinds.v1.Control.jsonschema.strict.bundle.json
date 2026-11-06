@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.Control.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Control is one requirement of the framework.",
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/numinance.kinds.v1.ControlApproval.jsonschema.strict.json",
+          "description": "approval is the human approval the control requires; absent requires none beyond the stage gates."
+        },
+        "id": {
+          "description": "id is required: the control's id within the pack, such as \"req-6.4.2\".",
+          "type": "string"
+        },
+        "requires_evidence": {
+          "description": "requires_evidence names the evidence a change the control applies to must record, unique; missing declared evidence\n turns success into PARTIAL.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Control",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ControlApproval.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlApproval is the approval a control requires. Policy enforces it at the release gate (and the plan gate where a\n stage declares one) whatever the StageRegistry contains; it only adds to the registry's gates. The loader refuses group\n or dual_control unless human is true.",
+      "properties": {
+        "dual_control": {
+          "description": "dual_control is true when two distinct human principals, neither the author nor acting in the author's run, must\n approve; absent means false.",
+          "type": "boolean"
+        },
+        "group": {
+          "description": "group names the approver group the approver must belong to; membership comes from the org's identity provider,\n never from repository files.",
+          "type": "string"
+        },
+        "human": {
+          "description": "human is true when a human principal must approve; absent means false.",
+          "type": "boolean"
+        }
+      },
+      "title": "Control Approval",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.Control.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.Control.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

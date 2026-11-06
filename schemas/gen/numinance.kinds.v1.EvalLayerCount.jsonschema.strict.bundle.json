@@ -1,0 +1,30 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.EvalLayerCount.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalLayerCount is the number of verification failures expected from one verifier layer.",
+      "properties": {
+        "count": {
+          "description": "count is required and at least 1.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "layer": {
+          "description": "layer is required: a token of 1 to 64 characters naming the verifier layer.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "layer",
+        "count"
+      ],
+      "title": "Eval Layer Count",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.EvalLayerCount.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.EvalLayerCount.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

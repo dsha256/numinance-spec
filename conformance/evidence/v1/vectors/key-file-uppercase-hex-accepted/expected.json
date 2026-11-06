@@ -1,0 +1,31 @@
+{
+  "vector": "key-file-uppercase-hex-accepted",
+  "description": "A key file in uppercase hexadecimal: the key reader decodes hexadecimal of either case.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner-uppercase.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner-uppercase.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:key-file-forms"
+  ]
+}

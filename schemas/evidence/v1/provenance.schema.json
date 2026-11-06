@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/provenance.schema.json",
+  "title": "Evidence provenance view",
+  "description": "provenance/provenance.json in an evidence/v1 export: a view derived from records.ndjson that lists the plans, candidates, executors and runs of the change, and the profile and policy bundle in force at the last record. Not expressible here and checked by the verifier: the file is the canonical JSON form; the view equals what DeriveViews produces from the records (lists in first-seen order without duplicates); the file is always present in a full export; at most 1 MiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "change_id", "profile_digest", "policy_bundle_digest"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "plans": { "type": "array", "items": { "$ref": "#/$defs/digest" }, "description": "Plan digests; absent when there are none." },
+    "candidates": { "type": "array", "items": { "$ref": "#/$defs/digest" }, "description": "Candidate digests; absent when there are none." },
+    "executors": { "type": "array", "items": { "$ref": "#/$defs/executor" }, "description": "Absent when no record names an executor." },
+    "runs": { "type": "array", "items": { "$ref": "#/$defs/run" }, "description": "Absent when no record carries a run." },
+    "profile_digest": { "$ref": "#/$defs/digest" },
+    "policy_bundle_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    },
+    "executor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor_id"],
+      "properties": {
+        "executor_id": { "type": "string", "description": "Executor identity; free text of at most 256 bytes." },
+        "model_id": { "type": "string", "description": "Model identity; free text of at most 256 bytes; absent when none." },
+        "sandbox_profile": { "type": "string", "enum": ["process", "container", "gvisor", "microvm"] },
+        "sandbox_image_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "principal", "kind"],
+      "properties": {
+        "run_id": { "type": "string", "pattern": "^run_[0-9a-f]{32}$" },
+        "principal": { "type": "string", "pattern": "^[!-~](?:[ -~]*[!-~])?$", "description": "The actor principal name; printable ASCII, at most 256 bytes." },
+        "kind": {
+          "type": "string",
+          "enum": ["author-agent", "reviewer-agent", "release-pipeline", "human-approver", "runner", "break-glass"]
+        }
+      }
+    }
+  }
+}

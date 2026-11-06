@@ -1,0 +1,6 @@
+rules:
+  - id: no-eval
+    languages: [python]
+    severity: ERROR
+    message: eval executes arbitrary code; do not call it
+    pattern: eval(...)

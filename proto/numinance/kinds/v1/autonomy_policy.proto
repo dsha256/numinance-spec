@@ -1,0 +1,78 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// AutonomyPolicy sets the autonomy level per playbook, risk class and environment, under floors (ADR 0018).
+message AutonomyPolicy {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "AutonomyPolicy".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  AutonomyPolicySpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyPolicySpec resolves a level: the lowest level of the matching rules, else the default; then no level
+// above the lowest max_level of the matching floors.
+message AutonomyPolicySpec {
+  // defaults is the level when no rule matches; absent everywhere means PR for READ, LOW and MEDIUM risk and
+  // Suggest for HIGH and PRIVILEGED.
+  AutonomyDefaults defaults = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // rules set levels for the changes they match; a narrower scope's list replaces the wider one, and no rule of any
+  // scope resolves a change above any control pack's floors or the org's floors (else the shipped floor).
+  repeated AutonomyRule rules = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // floors cap the level; only an org-scoped kind or a control pack may set them. Absent in the org means the shipped
+  // floor (Suggest for HIGH and PRIVILEGED, PR for the rest); only org floors displace it, pack floors only add caps.
+  AutonomyFloors floors = 3 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyDefaults is the level used when no rule matches.
+message AutonomyDefaults {
+  // level is required.
+  numinance.types.v1.AutonomyLevel level = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyMatch selects changes; an absent key matches every value and an empty match matches every change. In a
+// rule, risk matches exactly and a key the change has no value for does not match. In a floor, risk matches that
+// class and every higher one, and a key the change has no value for counts as a match.
+message AutonomyMatch {
+  // playbook is the name of the change's playbook.
+  optional string playbook = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // risk is the change's risk class, fixed at Classified.
+  optional numinance.annotations.v1.RiskClass risk = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // environment is the name of the environment the change acts in.
+  optional string environment = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyRule sets the level of the changes it matches.
+message AutonomyRule {
+  // match is required; the loader enforces it, the schema cannot.
+  AutonomyMatch match = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // level is required.
+  numinance.types.v1.AutonomyLevel level = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.
+message AutonomyFloors {
+  // rules is required and non-empty; the loader enforces it, the schema cannot.
+  repeated AutonomyFloor rules = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyFloor caps the level of the changes it matches; when floors from the org and control packs match, the
+// lowest max_level holds.
+message AutonomyFloor {
+  // match is required; the loader enforces it, the schema cannot.
+  AutonomyMatch match = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // max_level is required: no rule, default or narrower scope resolves a matching change above it.
+  numinance.types.v1.AutonomyLevel max_level = 2 [json_name = "max_level", (numinance.annotations.v1.field).since = "1.0.0"];
+}

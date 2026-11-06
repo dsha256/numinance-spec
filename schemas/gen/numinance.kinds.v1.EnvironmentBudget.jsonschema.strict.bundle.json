@@ -1,0 +1,22 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.EnvironmentBudget.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EnvironmentBudget bounds the environments of one provider.",
+      "properties": {
+        "max_concurrent": {
+          "description": "max_concurrent is the most environments alive at once; absent means 1. A Create above it waits or escalates.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "title": "Environment Budget",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.EnvironmentBudget.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.EnvironmentBudget.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

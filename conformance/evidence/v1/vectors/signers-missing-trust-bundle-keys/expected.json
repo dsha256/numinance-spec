@@ -1,0 +1,28 @@
+{
+  "vector": "signers-missing-trust-bundle-keys",
+  "description": "--trust-bundle-keys and no signers.json: the claim is the trust source and it is gone.",
+  "status": "shipped",
+  "export": "signers-missing",
+  "flags": {
+    "trust_bundle_keys": true
+  },
+  "keys": [],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "signer_untrusted",
+      "signers_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:signer_untrusted",
+    "finding:signers_invalid"
+  ]
+}

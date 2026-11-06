@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.018" timestamp="2026-11-01T10:18:53.697778+04:00" hostname="redacted"><testcase classname="tests.test_pricing" name="test_total" time="0.000"><failure message="assert 3 == 4&#10; +  where 3 = &lt;function total at 0x106e7c460&gt;([1, 2])&#10; +    where &lt;function total at 0x106e7c460&gt; = pricing.total">def test_total() -&gt; None:
+&gt;       assert pricing.total([1, 2]) == 4
+E       assert 3 == 4
+E        +  where 3 = &lt;function total at 0x106e7c460&gt;([1, 2])
+E        +    where &lt;function total at 0x106e7c460&gt; = pricing.total
+
+tests/test_pricing.py:5: AssertionError</failure></testcase></testsuite></testsuites>

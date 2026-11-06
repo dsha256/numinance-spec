@@ -1,0 +1,107 @@
+// The events the change context publishes: exactly these ten, all .v1.
+// Reference-only: ids, digests (numinance.types.v1.Digest), bounded counts and enum codes. Every message carries change_id, chg_ prefixed.
+// Field names and kinds are those of the change domain payloads, pinned by a test in the reference implementation. The kernel envelope's JSON payload is not the proto3 JSON form of these messages: a digest is its "sha256:<hex>" string and an enum is its kernel name (RiskClass "HIGH", ChangeState "PlanGate", DecisionOutcome "deny"); a relay that fills Any.value maps each field.
+syntax = "proto3";
+
+package numinance.events.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// ChangeOpened is the payload of ChangeOpened.v1: a Change was opened from an intent.
+message ChangeOpened {
+  // Change opened, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the intent the Change was opened from.
+  numinance.types.v1.Digest intent_digest = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Reference of the ticket the Change was opened from: an identifier or locator only, never ticket text and never a URL carrying a token. Absent when ticket_absent is true or for an event published before this field.
+  string ticket_ref = 3 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // Digest of the canonical bytes of the ticket the reference names. Absent with ticket_ref.
+  numinance.types.v1.Digest ticket_digest = 4 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // True when the Change was opened with no ticket: an explicit, recorded absence, which the Attestation signs as such.
+  bool ticket_absent = 5 [(numinance.annotations.v1.field).since = "1.1.0"];
+}
+
+// ChangeUnderstood is the payload of ChangeUnderstood.v1: the context bundle was resolved.
+message ChangeUnderstood {
+  // Change understood, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the resolved context bundle.
+  numinance.types.v1.Digest context_bundle_digest = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ChangeClassified is the payload of ChangeClassified.v1: the profile was resolved and the risk class set.
+message ChangeClassified {
+  // Change classified, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the resolved profile.
+  numinance.types.v1.Digest profile_digest = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Risk class of the Change; a consumer rejects RISK_CLASS_UNSPECIFIED.
+  numinance.annotations.v1.RiskClass risk_class = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Planning grant, grant_ prefixed.
+  string grant_id = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PlanProduced is the payload of PlanProduced.v1: the plan digest was frozen.
+message PlanProduced {
+  // Change planned, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the frozen plan.
+  numinance.types.v1.Digest plan_digest = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Number of work units in the plan, 1 to the change context's MaxWorkUnits.
+  uint32 work_unit_count = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Highest risk class over the plan's work units, not the Change risk class.
+  numinance.annotations.v1.RiskClass risk_class = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PlanGateDecided is the payload of PlanGateDecided.v1, published once per plan gate resolution.
+message PlanGateDecided {
+  // Change at the plan gate, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Policy decision that resolved the gate, dec_ prefixed.
+  string policy_decision_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // DECISION_OUTCOME_ALLOW or DECISION_OUTCOME_DENY; a require_approval decision is resolved by the approval signal first, and a consumer rejects any other value.
+  numinance.types.v1.DecisionOutcome outcome = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CandidateAssembled is the payload of CandidateAssembled.v1: the work units were integrated into one candidate.
+message CandidateAssembled {
+  // Change integrated, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the assembled candidate.
+  numinance.types.v1.Digest candidate_digest = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Number of work units in the candidate, 1 to the change context's MaxWorkUnits.
+  uint32 work_unit_count = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ChangeEscalated is the payload of ChangeEscalated.v1: the Change moved to CHANGE_STATE_ESCALATED.
+message ChangeEscalated {
+  // Change escalated, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // State the Change left; a consumer rejects CHANGE_STATE_UNSPECIFIED.
+  numinance.types.v1.ChangeState from_state = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ChangeClosed is the payload of ChangeClosed.v1: the Change reached CHANGE_STATE_CLOSED.
+message ChangeClosed {
+  // Change closed, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // State the Change left; a consumer rejects CHANGE_STATE_UNSPECIFIED.
+  numinance.types.v1.ChangeState from_state = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ChangeAbandoned is the payload of ChangeAbandoned.v1: the Change reached CHANGE_STATE_ABANDONED.
+message ChangeAbandoned {
+  // Change abandoned, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // State the Change left; a consumer rejects CHANGE_STATE_UNSPECIFIED.
+  numinance.types.v1.ChangeState from_state = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ChangeRolledBack is the payload of ChangeRolledBack.v1: the Change reached CHANGE_STATE_ROLLED_BACK.
+message ChangeRolledBack {
+  // Change rolled back, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // State the Change left; a consumer rejects CHANGE_STATE_UNSPECIFIED.
+  numinance.types.v1.ChangeState from_state = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

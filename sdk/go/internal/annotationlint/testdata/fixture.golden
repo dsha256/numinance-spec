@@ -1,0 +1,11 @@
+proto/numinance/lintfixture/v1/fixture.proto:24:3:ACTION_ANNOTATION_REQUIRED RPC numinance.lintfixture.v1.FixtureService.Unannotated has no (numinance.annotations.v1.action) option.
+proto/numinance/lintfixture/v1/fixture.proto:26:3:ACTION_EXEC_REQUIRED RPC numinance.lintfixture.v1.FixtureService.Incomplete action has no exec mode.
+proto/numinance/lintfixture/v1/fixture.proto:26:3:ACTION_LLM_DESCRIPTION_REQUIRED RPC numinance.lintfixture.v1.FixtureService.Incomplete action has no llm_description.
+proto/numinance/lintfixture/v1/fixture.proto:26:3:ACTION_RISK_REQUIRED RPC numinance.lintfixture.v1.FixtureService.Incomplete action has no risk class.
+proto/numinance/lintfixture/v1/fixture.proto:26:3:ACTION_SINCE_REQUIRED RPC numinance.lintfixture.v1.FixtureService.Incomplete action since is missing or not a strict x.y.z version.
+proto/numinance/lintfixture/v1/fixture.proto:42:3:FIELD_SINCE_REQUIRED field numinance.lintfixture.v1.AnnotatedResponse.id has no (numinance.annotations.v1.field).since or it is not a strict x.y.z version.
+proto/numinance/lintfixture/v1/fixture.proto:46:5:FIELD_SINCE_REQUIRED field numinance.lintfixture.v1.AnnotatedResponse.Nested.name has no (numinance.annotations.v1.field).since or it is not a strict x.y.z version.
+proto/numinance/ports/lintfixture/v1/hostonly.proto:28:3:HOST_ONLY_INVALID field numinance.ports.lintfixture.v1.OrphanRequest.ref is host_only but is not a types.v1.Reference field, or a wrapper of References, of a numinance.ports.* message that an RPC input reaches.
+proto/numinance/ports/lintfixture/v1/hostonly.proto:42:3:HOST_ONLY_INVALID field numinance.ports.lintfixture.v1.HostOnlyRequest.secret_key is host_only but is not a types.v1.Reference field, or a wrapper of References, of a numinance.ports.* message that an RPC input reaches.
+proto/numinance/ports/lintfixture/v1/hostonly.proto:65:3:RESOURCE_NAME_INVALID field numinance.ports.lintfixture.v1.OrphanResource.repository is resource_name but is not a string or repeated string field of a numinance.ports.* message that an RPC input reaches.
+proto/numinance/ports/lintfixture/v1/hostonly.proto:84:3:RESOURCE_NAME_INVALID field numinance.ports.lintfixture.v1.ResourceRequest.count is resource_name but is not a string or repeated string field of a numinance.ports.* message that an RPC input reaches.

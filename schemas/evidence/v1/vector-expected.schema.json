@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/vector-expected.schema.json",
+  "title": "Evidence conformance vector",
+  "description": "conformance/evidence/v1/vectors/<name>/expected.json: one conformance vector for an evidence verifier. It names an export directory under exports/, the flags a verifier is run with, and the outcome it must report. Not expressible here: the vector field equals its directory name; export names an existing directory under exports/ (it is absent only for a vector about a missing directory); key paths and materialize paths are relative and inside the vector; a materialize op carries the members its kind needs (symlink: path and target; mkdir: path; add_files: count; add_named_file: path (a file name); pad_file: path and size; empty_path, no_directory and export_path_symlink: none); keys lists every key file the flags name.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["vector", "description", "status", "flags", "keys", "expect", "covers"],
+  "properties": {
+    "vector": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "The vector name; the same as its directory." },
+    "description": { "type": "string", "description": "One sentence on what the vector shows." },
+    "status": { "type": "string", "enum": ["shipped", "target"], "description": "shipped: the first private verifier passed it. target: NEW behaviour (the report fields level_enum, weakened_by_flags and anchored_head_record_hash, and the flags --expect-change and --expect-head), which the open verifier and the private verifier both pass." },
+    "export": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$", "description": "Name of the export directory under exports/." },
+    "materialize": { "type": "array", "items": { "$ref": "#/$defs/op" }, "description": "Operations a harness applies to a copy of the export before running the verifier, for shapes a checked-in directory cannot hold (links, huge files, many files)." },
+    "flags": { "$ref": "#/$defs/flags" },
+    "keys": { "type": "array", "items": { "type": "string" }, "description": "Key files (under keys/) the vector needs." },
+    "expect": { "$ref": "#/$defs/expect" },
+    "covers": { "type": "array", "items": { "type": "string" }, "description": "Rule labels the vector exercises, such as level:verified, exit:0 or rule:attestation-gap." }
+  },
+  "$defs": {
+    "op": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": {
+          "type": "string",
+          "enum": ["add_files", "add_named_file", "empty_path", "export_path_symlink", "mkdir", "no_directory", "pad_file", "symlink"]
+        },
+        "path": { "type": "string", "description": "Path inside the export the operation acts on." },
+        "target": { "type": "string", "description": "Link target of a symlink." },
+        "size": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "description": "Target size in bytes of a pad_file." },
+        "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "description": "Number of files an add_files adds." }
+      }
+    },
+    "flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The verifier options of the run. An absent flag is false or unset.",
+      "properties": {
+        "runner_keys": { "type": "array", "items": { "type": "string" }, "description": "Paths of pinned runner public keys." },
+        "log_key": { "type": "string", "description": "Path of the pinned log public key." },
+        "log_origin": { "type": "string", "description": "The pinned log origin." },
+        "allow_incomplete": { "type": "boolean" },
+        "allow_unanchored": { "type": "boolean" },
+        "allow_unsigned": { "type": "boolean" },
+        "complete": { "type": "boolean" },
+        "skip_signatures": { "type": "boolean" },
+        "trust_bundle_keys": { "type": "boolean" },
+        "expect_change": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+        "expect_head": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "exit_code", "finding_codes", "target"],
+      "properties": {
+        "level": { "type": ["string", "null"], "description": "The exact level line the verifier prints, such as verified, unsigned export; null when it prints none (a refusal)." },
+        "exit_code": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "finding_codes": { "type": "array", "items": { "type": "string", "pattern": "^[a-z][a-z_]*$" }, "description": "The finding codes the verifier must report, as a set; order is not significant." },
+        "credential_scopes": { "type": "string", "enum": ["sourced", "unsourced"], "description": "Whether the credential scope lines name a broker as their source; absent when the vector does not assert it." },
+        "network_policy": { "type": "string", "enum": ["sourced", "unsourced"], "description": "Whether the attestation holds an egress proxy statement; absent when the vector does not assert it." },
+        "target": { "$ref": "#/$defs/target" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level_enum", "weakened_by_flags"],
+      "description": "The level split into the machine level and the flags that weakened it.",
+      "properties": {
+        "level_enum": {
+          "type": ["string", "null"],
+          "enum": ["failed", "incomplete", "self-consistent", "unanchored", "unauthenticated", "unsigned", "verified", null],
+          "description": "The base level; null when no level is printed."
+        },
+        "weakened_by_flags": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["incomplete", "unanchored", "unsigned export"] },
+          "description": "The allow flags whose use suffixes the level, in suffix order."
+        }
+      }
+    }
+  }
+}

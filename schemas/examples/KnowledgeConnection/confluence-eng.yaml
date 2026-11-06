@@ -1,0 +1,14 @@
+apiVersion: numinance.dev/v1
+kind: KnowledgeConnection
+metadata: {name: confluence-eng, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/bridge-mcp
+  endpoint: https://mcp.example.com/v1/mcp
+  auth: KNOWLEDGE_AUTH_USER_DELEGATED
+  pinned_tools:
+    - {name: searchConfluenceUsingCql, hash: {value: "sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f"}}
+    - {name: getConfluencePage, hash: {value: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"}}
+  read_only: true
+  scope: [ENG, PAY]
+  budgets: {calls_per_stage: 8, bytes_per_call: 65536}
+  cache_ttl: 2592000s

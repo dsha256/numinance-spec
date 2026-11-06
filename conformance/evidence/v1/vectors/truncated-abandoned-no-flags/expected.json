@@ -1,0 +1,27 @@
+{
+  "vector": "truncated-abandoned-no-flags",
+  "description": "The same cut export with no allowances: incomplete, exit 5.",
+  "status": "shipped",
+  "export": "abandoned-truncated",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "incomplete",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "incomplete",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:incomplete",
+    "exit:5"
+  ]
+}

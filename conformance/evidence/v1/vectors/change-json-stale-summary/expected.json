@@ -1,0 +1,40 @@
+{
+  "vector": "change-json-stale-summary",
+  "description": "The terminal record was dropped and summary.json still says the chain ended Closed, as does change.json: change.json is compared with the records, which show a change that has not ended, so it is invalid (the summary, the attestation and the manifest disagree with the chain too, and the not applicable claims are unsupported).",
+  "status": "shipped",
+  "export": "change-json-stale-summary",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_mismatch",
+      "change_invalid",
+      "manifest_mismatch",
+      "part_contradiction",
+      "summary_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_mismatch",
+    "finding:change_invalid",
+    "finding:manifest_mismatch",
+    "finding:part_contradiction",
+    "finding:summary_mismatch",
+    "rule:change-json-compared-with-the-chain",
+    "rule:not-applicable-needs-a-verified-chain"
+  ]
+}

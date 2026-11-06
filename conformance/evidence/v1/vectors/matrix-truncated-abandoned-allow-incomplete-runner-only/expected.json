@@ -1,0 +1,29 @@
+{
+  "vector": "matrix-truncated-abandoned-allow-incomplete-runner-only",
+  "description": "An Abandoned export with its terminal record cut off, under allow-incomplete alone, runner key only: the flag covers a weakness that is not the first one.",
+  "status": "shipped",
+  "export": "abandoned-truncated",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "unanchored",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unanchored",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unanchored",
+    "exit:5",
+    "rule:truncation-matrix"
+  ]
+}

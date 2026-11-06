@@ -1,0 +1,8 @@
+// Anchor reserves the name "numinance.evidence.v1.Anchor", the domain-separation context of the anchoring key (ADR 0037 decision 4). A hashedrekord entry on a transparency log is signed by a separate anchoring key over the input "numinance.evidence.v1.Anchor" || sha256(leaf), so the key is never the runner record key and never the log key, and the signature cannot be replayed as a record, checkpoint or attestation signature.
+// The name is reserved in evidence/v1 so no future message reuses it: like every stored signature context in this package, it equals the fully qualified name of a message here. Anchor carries no data and is never sent on the wire; the entry-format decoders and the anchoring key are specified in a later release.
+syntax = "proto3";
+
+package numinance.evidence.v1;
+
+// Anchor is the reserved context name; it has no fields.
+message Anchor {}

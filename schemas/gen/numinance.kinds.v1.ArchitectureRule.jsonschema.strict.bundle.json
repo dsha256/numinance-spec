@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "google.protobuf.Struct.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Struct",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitectureCheck binds a rule to one verifier rule.",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/google.protobuf.Struct.jsonschema.strict.json",
+          "description": "config is passed to the verifier as is; the Engine never reads it."
+        },
+        "rule_id": {
+          "description": "rule_id is required: the verifier's id of the rule its findings carry.",
+          "type": "string"
+        },
+        "verifier": {
+          "description": "verifier is required: the name of the verifier that runs the check.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verifier",
+        "rule_id"
+      ],
+      "title": "Architecture Check",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ArchitectureRule.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitectureRule is one convention and the check that enforces it.",
+      "properties": {
+        "check": {
+          "$ref": "#/$defs/numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.json",
+          "description": "check is required; the loader enforces it, the schema cannot."
+        },
+        "id": {
+          "description": "id is required and unique in the pack.",
+          "type": "string"
+        },
+        "severity": {
+          "description": "severity is required: the severity of a finding of this rule.",
+          "enum": [
+            "FINDING_SEVERITY_UNSPECIFIED",
+            "FINDING_SEVERITY_INFO",
+            "FINDING_SEVERITY_LOW",
+            "FINDING_SEVERITY_MEDIUM",
+            "FINDING_SEVERITY_HIGH",
+            "FINDING_SEVERITY_CRITICAL"
+          ],
+          "title": "Finding Severity",
+          "type": "string"
+        },
+        "statement": {
+          "description": "statement is required: the convention in plain language. It is untrusted text, delimited and labelled as untrusted when it reaches a prompt.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "statement",
+        "severity"
+      ],
+      "title": "Architecture Rule",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ArchitectureRule.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ArchitectureRule.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

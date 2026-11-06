@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.ExecutorManifestSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ExecutorManifestSpec is what the router reads to select an executor for a work unit. Every field is a claim of the\n adapter author; the sandbox, egress proxy and broker enforce the request whatever the manifest says.",
+      "properties": {
+        "capabilities": {
+          "description": "capabilities is required, non-empty and unique; playbook steps require capabilities by name.",
+          "items": {
+            "enum": [
+              "EXECUTOR_CAPABILITY_UNSPECIFIED",
+              "EXECUTOR_CAPABILITY_FILESYSTEM_READ",
+              "EXECUTOR_CAPABILITY_FILESYSTEM_WRITE",
+              "EXECUTOR_CAPABILITY_SHELL",
+              "EXECUTOR_CAPABILITY_NETWORK",
+              "EXECUTOR_CAPABILITY_SUBAGENTS",
+              "EXECUTOR_CAPABILITY_BROWSER",
+              "EXECUTOR_CAPABILITY_MCP",
+              "EXECUTOR_CAPABILITY_CHECKPOINT",
+              "EXECUTOR_CAPABILITY_STRUCTURED_PLAN",
+              "EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS",
+              "EXECUTOR_CAPABILITY_NATIVE_SANDBOX",
+              "EXECUTOR_CAPABILITY_CONTEXT_PERSISTENCE"
+            ],
+            "title": "Executor Capability",
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "cost_class": {
+          "description": "cost_class is required.",
+          "enum": [
+            "EXECUTOR_COST_CLASS_UNSPECIFIED",
+            "EXECUTOR_COST_CLASS_LOW",
+            "EXECUTOR_COST_CLASS_MEDIUM",
+            "EXECUTOR_COST_CLASS_HIGH"
+          ],
+          "title": "Executor Cost Class",
+          "type": "string"
+        },
+        "models": {
+          "description": "models is required, non-empty and unique by id: the models the executor may run.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ExecutorModel.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of the authorexecutor adapter, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "cost_class"
+      ],
+      "title": "Executor Manifest Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ExecutorModel.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ExecutorModel is one model the executor may run; a message, so per-model fields such as residency stay additive.",
+      "properties": {
+        "id": {
+          "description": "id is required: 1 to 253 bytes of ASCII letters, digits, \".\", \"_\", \"-\", \":\", \"/\" and \"@\", starting with a letter or digit.",
+          "type": "string"
+        },
+        "max_context": {
+          "description": "max_context is required and at least 1: the most tokens of context the model accepts in one request.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "max_context"
+      ],
+      "title": "Executor Model",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ExecutorManifestSpec.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ExecutorManifestSpec.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

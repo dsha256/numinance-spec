@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/export-index.schema.json",
+  "title": "Evidence export index",
+  "description": "export-index.json in an evidence/v1 export: the unsigned list of the files of the export with digests and sizes, and the parts that are absent with the reason. The signed bundle-manifest.json covers this file. Not expressible here and checked by the verifier: the file is the canonical JSON form; 1 to 64 entries with unique paths (an exporter writes them sorted by path; a verifier does not check the order); each entry digest and size match the file; a part is never both listed in entries and named in absent; reason and owner are 1 to 512 bytes; at most 12 absent parts; the file is at most 1 MiB. The index lists neither itself nor bundle-manifest.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "change_id", "entries"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "absent": { "type": "array", "items": { "$ref": "#/$defs/absentPart" }, "description": "Absent when no part is absent." }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "enum": [
+            "records.ndjson",
+            "summary.json",
+            "diff.digest",
+            "provenance/signers.json",
+            "head-checkpoint.json",
+            "head-inclusion-proof.json",
+            "change.json",
+            "attestation.json",
+            "tool-events.ndjson",
+            "verification/verdicts.json",
+            "review/review.json",
+            "provenance/provenance.json",
+            "provenance/executor-manifest.json",
+            "attestation-checkpoint.json",
+            "attestation-gap.json"
+          ],
+          "description": "A file of an export other than the index and the manifest, relative to the export directory."
+        },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "size": { "type": "integer", "minimum": 0, "maximum": 268435456, "description": "File size in bytes; at most 256 MiB for records.ndjson and tool-events.ndjson and 1 MiB for every other file." }
+      }
+    },
+    "absentPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["part", "reason", "owner"],
+      "properties": {
+        "part": {
+          "type": "string",
+          "enum": [
+            "change.json",
+            "attestation.json",
+            "records.ndjson",
+            "tool-events.ndjson",
+            "diff.digest",
+            "verification/",
+            "review/",
+            "provenance/",
+            "deployment.json",
+            "observation.json",
+            "rollback.json",
+            "summary.json"
+          ],
+          "description": "A part the design lists for an export; a trailing slash names a directory."
+        },
+        "reason": { "type": "string", "description": "Why the part is absent; 1 to 512 bytes." },
+        "owner": { "type": "string", "description": "Who owns producing the part; 1 to 512 bytes." },
+        "not_applicable": { "type": "boolean", "enum": [true], "description": "Present and true when the part does not apply to this change; absent otherwise (false is never written)." }
+      }
+    }
+  }
+}

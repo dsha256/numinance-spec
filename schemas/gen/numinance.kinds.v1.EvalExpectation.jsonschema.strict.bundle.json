@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.EvalExpectation.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalExpectation is the closed facts a replay is compared on. It names no text.",
+      "properties": {
+        "acceptance": {
+          "description": "acceptance is required: the expected human acceptance.",
+          "enum": [
+            "EVAL_ACCEPTANCE_UNSPECIFIED",
+            "EVAL_ACCEPTANCE_ACCEPTED",
+            "EVAL_ACCEPTANCE_REJECTED",
+            "EVAL_ACCEPTANCE_ABANDONED"
+          ],
+          "title": "Eval Acceptance",
+          "type": "string"
+        },
+        "merged": {
+          "description": "merged is required: whether the change is expected to merge.",
+          "type": "boolean"
+        },
+        "severe": {
+          "description": "severe is required: whether the outcome is expected to be a severity event (unauthorized action, critical escape or evidence gap).",
+          "type": "boolean"
+        },
+        "verification_failures": {
+          "description": "verification_failures lists the expected failures by layer, sorted by layer without duplicates; empty when none are expected.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.EvalLayerCount.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "acceptance",
+        "merged",
+        "severe"
+      ],
+      "title": "Eval Expectation",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EvalLayerCount.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalLayerCount is the number of verification failures expected from one verifier layer.",
+      "properties": {
+        "count": {
+          "description": "count is required and at least 1.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "layer": {
+          "description": "layer is required: a token of 1 to 64 characters naming the verifier layer.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "layer",
+        "count"
+      ],
+      "title": "Eval Layer Count",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.EvalExpectation.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.EvalExpectation.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

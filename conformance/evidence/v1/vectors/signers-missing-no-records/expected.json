@@ -1,0 +1,31 @@
+{
+  "vector": "signers-missing-no-records",
+  "description": "--trust-bundle-keys with no signers.json and no records.ndjson: the missing signers are a finding although the chain cannot be read.",
+  "status": "shipped",
+  "export": "signers-missing-no-records",
+  "flags": {
+    "trust_bundle_keys": true
+  },
+  "keys": [],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "file_missing",
+      "part_missing",
+      "signers_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:file_missing",
+    "finding:part_missing",
+    "finding:signers_invalid",
+    "rule:signers-decoded-without-a-chain"
+  ]
+}

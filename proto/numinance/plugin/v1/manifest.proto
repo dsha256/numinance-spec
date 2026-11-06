@@ -1,0 +1,167 @@
+// The Manifest is declared by the plugin (also manifest.yaml in the package); the plugin describes, the host authorises and enforces the declared intents.
+// Enums are closed as in types.v1 (a consumer rejects zero and unknown numbers), except an absent optional FilesystemIntent.mode. Every element is since 1.0.0.
+// Bounds: every string is at most 1024 bytes and every repeated field at most 256 entries unless a field states otherwise; over-limit input is rejected, never truncated; duplicate entries in any repeated field are rejected, keyed as capabilities and changes by name, network_intents by host and port, filesystem_intents by path, strings by value. No field carries credential material. A rejection names an index-based field path (for example capabilities[3].network_intents[0].host) and the violated bound, never the offending value.
+syntax = "proto3";
+
+package numinance.plugin.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// ExtensionClass is the class of an extension; it bounds the authority the extension can have.
+enum ExtensionClass {
+  // EXTENSION_CLASS_UNSPECIFIED is the zero value; it is rejected by the host.
+  EXTENSION_CLASS_UNSPECIFIED = 0;
+  // EXTENSION_CLASS_SKILL is knowledge rendered into guidance; it has no authority.
+  EXTENSION_CLASS_SKILL = 1;
+  // EXTENSION_CLASS_PLAYBOOK is a declarative procedure; it shapes grants and never widens them.
+  EXTENSION_CLASS_PLAYBOOK = 2;
+  // EXTENSION_CLASS_CONTROL_PACK can only restrict.
+  EXTENSION_CLASS_CONTROL_PACK = 3;
+  // EXTENSION_CLASS_CAPABILITY_PROVIDER is an executable plugin implementing ports.
+  EXTENSION_CLASS_CAPABILITY_PROVIDER = 4;
+}
+
+// SideEffect is the worst side effect a capability has.
+enum SideEffect {
+  // SIDE_EFFECT_UNSPECIFIED is the zero value; it is rejected by the host.
+  SIDE_EFFECT_UNSPECIFIED = 0;
+  // SIDE_EFFECT_NONE has no side effect.
+  SIDE_EFFECT_NONE = 1;
+  // SIDE_EFFECT_READ reads external state.
+  SIDE_EFFECT_READ = 2;
+  // SIDE_EFFECT_WRITE creates or changes external state.
+  SIDE_EFFECT_WRITE = 3;
+  // SIDE_EFFECT_DELETE removes external state.
+  SIDE_EFFECT_DELETE = 4;
+  // SIDE_EFFECT_DEPLOY changes what runs in an environment.
+  SIDE_EFFECT_DEPLOY = 5;
+}
+
+// Idempotency says how a capability behaves on replay.
+enum Idempotency {
+  // IDEMPOTENCY_UNSPECIFIED is the zero value; it is rejected by the host.
+  IDEMPOTENCY_UNSPECIFIED = 0;
+  // IDEMPOTENCY_NONE means a replay may have an extra effect.
+  IDEMPOTENCY_NONE = 1;
+  // IDEMPOTENCY_KEYED means a replay with the same idempotency key has no extra effect.
+  IDEMPOTENCY_KEYED = 2;
+  // IDEMPOTENCY_NATURAL means a replay has no extra effect without a key.
+  IDEMPOTENCY_NATURAL = 3;
+}
+
+// FilesystemMode is the access mode of a filesystem intent.
+enum FilesystemMode {
+  // FILESYSTEM_MODE_UNSPECIFIED is the zero value; it is rejected when present.
+  FILESYSTEM_MODE_UNSPECIFIED = 0;
+  // FILESYSTEM_MODE_READ_ONLY allows reads only.
+  FILESYSTEM_MODE_READ_ONLY = 1;
+  // FILESYSTEM_MODE_READ_WRITE allows reads and writes.
+  FILESYSTEM_MODE_READ_WRITE = 2;
+}
+
+// Manifest is the declaration of one extension version.
+message Manifest {
+  // plugin_id is a reverse-DNS identifier of at least two labels, each matching ^[a-z]([a-z0-9-]*[a-z0-9])?$ and joined by dots, at most 253 bytes, immutable across versions.
+  string plugin_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // version is the strict x.y.z version of the extension.
+  string version = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // digest is the declared content digest of the extension (governed install); required, absent or empty is rejected; it covers the package content with manifest.yaml excluded (the file that carries it), while the signature and provenance verified at install cover the whole artifact including manifest.yaml, so the manifest is signed; the lockfile pins the recomputed digest, never the declared one; the host recomputes it at install, compares, and never pins from the declared value.
+  numinance.types.v1.Digest digest = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // signer_identity is required, absent or empty is rejected; it is the OIDC issuer plus subject pair the verifier checks, declared and compared for an exact match on both to the verified signature identity; a mismatch fails install, and it is never used as a pin; when the lockfile has an entry for plugin_id, a signer_identity different from the locked one is a widening that needs approval.
+  string signer_identity = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is the extension class; only CAPABILITY_PROVIDER may declare ports and capabilities (and so intents); for SKILL, PLAYBOOK and CONTROL_PACK both must be empty or the manifest is rejected.
+  ExtensionClass kind = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // ports are the implemented port packages and majors, matching ^numinance\.ports\.[a-z][a-z0-9]*\.v[1-9][0-9]*$, each at most 128 bytes, at most one major per port name.
+  repeated string ports = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // capabilities are the declared capabilities; each name's port segment must match a ports entry, else the manifest is rejected; a name absent from the host's descriptor copy, or a side-effecting RPC with no entry, is rejected at install; an RPC with no entry is not invocable.
+  repeated CapabilityDescriptor capabilities = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // sbom_ref points to the software bill of materials; required for CAPABILITY_PROVIDER (absent is rejected), verified at install, and a mismatch fails install.
+  numinance.types.v1.Reference sbom_ref = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // provenance_ref points to the build provenance attestation; required for CAPABILITY_PROVIDER (absent is rejected), verified at install, and a mismatch fails install.
+  numinance.types.v1.Reference provenance_ref = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // permissions_delta is declared against previous_version; when the lockfile has an entry for plugin_id, previous_version must equal the locked version and the host recomputes the delta from the locked manifest; with no lock entry the host recomputes it from the registry manifest of previous_version, and a previous_version not in the registry fails install; any mismatch fails install; any widening against the lock needs approval (a version lower than the locked version is a rollback and a widening, and a version equal to the locked version with a different recomputed digest is rejected; a kind changed or a ports entry's major changed is a widening; a version past deprecated_after installs only under explicit policy; against the locked descriptor a widening is: a capability added; risk_floor, side_effect or dry_run lowered; idempotency raised toward NATURAL; compensation removed; any credential, network or filesystem intent or environment_scope entry added or a filesystem mode changed to READ_WRITE; any evidence_declared entry removed; timeout or any resource_budget field raised, compared as effective values with zero read as the host default (a change from non-zero to zero is a raise); everything else is a narrowing), and with no lock entry the whole manifest is a widening that needs approval (the registry-basis delta is validated, never shown as the approval surface); absent is accepted only when the lockfile has no entry for plugin_id.
+  PermissionsDelta permissions_delta = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // deprecated_after is when the version stops being supported; absent means not deprecated.
+  google.protobuf.Timestamp deprecated_after = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PermissionsDelta is the declared change of capabilities from the previous version; it is declared, compared and never trusted.
+message PermissionsDelta {
+  // previous_version is the strict x.y.z version the delta is against; required.
+  string previous_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // changes are the capability changes.
+  repeated CapabilityChange changes = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CapabilityChange is one changed capability; both previous and current absent, or previous equal to current, is rejected.
+message CapabilityChange {
+  // name equals the name of each present descriptor; a difference is rejected.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // previous is the descriptor in previous_version; absent means added.
+  CapabilityDescriptor previous = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // current is the descriptor in this version; absent means removed.
+  CapabilityDescriptor current = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CapabilityDescriptor declares one Core verb or capability and its intents.
+message CapabilityDescriptor {
+  // name matches ^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$, at most 128 bytes; a Core verb is <port>. plus the snake_case RPC method and is never negotiated; a capability equals the RPC's action.capability; Core verb and capability names share one namespace and a collision is rejected. When several RPCs carry the same action.capability, every bound below that cites the host's descriptor copy holds against each of them.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // risk_floor is at least action.risk of the host's descriptor copy, never the plugin's, and is never lowered against the locked descriptor.
+  numinance.annotations.v1.RiskClass risk_floor = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // side_effect is the worst side effect; it is floored by action.risk in the host's descriptor copy (risk above READ means at least WRITE) and a lower claim is rejected.
+  SideEffect side_effect = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // idempotency is the replay behaviour; action.idempotent false in the host's descriptor copy permits only IDEMPOTENCY_NONE, true permits KEYED or NATURAL.
+  Idempotency idempotency = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // dry_run is true only when the RPC sets supports_dry_run; false means the host refuses a dry run and a policy requiring a preview denies.
+  bool dry_run = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // compensation names the capability whose RPC is action.compensating_action in the host's descriptor copy, or is empty when that is empty; that capability must have an entry in this manifest, otherwise the manifest is rejected; a compensation is dispatched only as an ordinary action with its own policy decision and grant.
+  string compensation = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // credential_intents are intent names matching ^[a-z][a-z0-9._-]{0,127}$, resolved only against the broker catalog (a plugin cannot mint one); v1 is handle-only and the broker never returns credential material.
+  repeated string credential_intents = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // network_intents are the egress destinations needed.
+  repeated NetworkIntent network_intents = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // filesystem_intents are the sandbox paths needed.
+  repeated FilesystemIntent filesystem_intents = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // environment_scope are environment names or tags the capability requests to act in, tokens matching ^[a-z0-9][a-z0-9._-]{0,127}$, no wildcard tokens; the grant matches them against the profile's environments and they only narrow it; a token that matches no environment allows nothing; empty is rejected at install, never "all".
+  repeated string environment_scope = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // evidence_declared are the evidence record type names produced, resolved against evidence/v1, no wildcard; missing declared evidence turns success into PARTIAL; it must contain every entry of action.evidence in the host's descriptor copy; a capability whose side_effect is above READ with no declared evidence is rejected.
+  repeated string evidence_declared = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // timeout is a request bounding one call; the effective value is min(declared, grant budget, step deadline) and never exceeds the policy ceiling; absent or zero means the host default; negative is rejected.
+  google.protobuf.Duration timeout = 12 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // resource_budget is a request bounding resources; the effective value is min(declared, grant budget) and never exceeds the policy ceiling; absent or zero means the host default.
+  ResourceBudget resource_budget = 13 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // conformance_suite is required for CAPABILITY_PROVIDER (empty is rejected) and is conformance/<port>/<major>/<suite>, where <port> is the port segment of name and <major> the vN segment of its ports entry (conformance/scm/v1/basic), with <suite> matching ^[a-z0-9][a-z0-9._-]{0,127}$ and not ".."; the host looks it up in its kit index, never as a filesystem path; a declared claim, the host runs the suite and never trusts it.
+  string conformance_suite = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // llm_description is untrusted (TRUST_CLASS_UNTRUSTED_RETRIEVED), printable characters only, at most 2048 bytes; it is rendered delimited and labelled, never as instructions.
+  string llm_description = 15 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// NetworkIntent is one egress destination.
+message NetworkIntent {
+  // host is an exact lowercase DNS name (RFC 1123, at most 253 bytes, at least two labels, the last label not all-numeric, and and a name is rejected when every label is a number inet_aton would accept, such as 0xa9.0xfe.0xa9.0xfe or 2852039166) or IP literal, IP literals only in canonical form (dotted decimal without leading zeros, RFC 5952 IPv6, no zone ID or brackets) and a literal whose parse and re-serialisation differ is rejected; ASCII only (no IDN), no trailing dot; no scheme, port, path or wildcard; loopback, link-local, unspecified, multicast, broadcast, the IANA special-purpose ranges of RFC 6890 (at least 0.0.0.0/8, 192.0.0.0/24, 198.18.0.0/15 and 240.0.0.0/4) and metadata addresses (at least 169.254.169.254, fd00:ec2::254 and 168.63.129.16) are rejected in any textual form, and embedded IPv4 (mapped, compatible, NAT64, 6to4, Teredo) is checked as IPv4; well-known metadata hostnames are rejected; the lexical check is necessary, not sufficient: the egress proxy resolves the name at request time and refuses loopback, link-local, multicast, unspecified, runtime service and metadata addresses (the set above, regardless of policy), and connects to the address it checked without re-resolving; private ranges (RFC 1918, 100.64.0.0/10 shared address space and IPv6 ULA) are reachable only when signed customer policy allows the destination.
+  string host = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // port is 1 to 65535; zero is rejected.
+  uint32 port = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// FilesystemIntent is one sandbox path.
+message FilesystemIntent {
+  // path is absolute inside the sandbox root, NFC, printable characters only (no NUL, control characters or backslash), each segment at most 255 bytes, with no "..", "." or empty segments, at most 1024 bytes; the host resolves symlinks and rejects a path that resolves outside the sandbox root or into a protected mount; rejected, never repaired.
+  string path = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // mode is the access mode; absent means read-only.
+  optional FilesystemMode mode = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ResourceBudget bounds the resources of one call; a zero value means the host default.
+message ResourceBudget {
+  // cpu_millicores is the CPU limit in millicores.
+  uint64 cpu_millicores = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // memory_bytes is the memory limit in bytes.
+  uint64 memory_bytes = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // disk_bytes is the disk limit in bytes.
+  uint64 disk_bytes = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

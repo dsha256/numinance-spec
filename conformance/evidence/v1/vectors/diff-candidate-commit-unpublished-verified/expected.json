@@ -1,0 +1,32 @@
+{
+  "vector": "diff-candidate-commit-unpublished-verified",
+  "description": "The same chain with the candidate commit and no publication record, attested with no result_commit. It verifies: the candidate commit is evidence of the candidate, not a claim that anything was published.",
+  "status": "shipped",
+  "export": "closed-author-candidate-only",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "complete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:candidate-commit"
+  ]
+}

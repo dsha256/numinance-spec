@@ -1,0 +1,95 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// KnowledgeConnection is an approved, read-only knowledge source the context resolver may search and fetch through the
+// knowledge port. It is org-scoped only: the loader refuses another
+// metadata.scope and the profile context refuses one loaded below the org. It holds no credential; the broker supplies a
+// handle. extensions never hold credentials, endpoints, tool mappings or caps.
+message KnowledgeConnection {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "KnowledgeConnection".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  KnowledgeConnectionSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// KnowledgeAuth is whose authority a search or fetch runs under. This enum may grow.
+enum KnowledgeAuth {
+  // KNOWLEDGE_AUTH_UNSPECIFIED is the zero value; a loader rejects it, so there is no silent default.
+  KNOWLEDGE_AUTH_UNSPECIFIED = 0;
+  // KNOWLEDGE_AUTH_USER_DELEGATED uses the grant of the human who triggered the Change.
+  KNOWLEDGE_AUTH_USER_DELEGATED = 1;
+  // KNOWLEDGE_AUTH_SERVICE_ACCOUNT uses a service account for unattended runs; the broker issues its handle only with an
+  // approval record, and its effective scope is the intersection of the account's grant and the policy's allowed spaces
+  // and projects. Whether V1 allows it at all is an open design question.
+  KNOWLEDGE_AUTH_SERVICE_ACCOUNT = 2;
+}
+
+// KnowledgeConnectionSpec says which provider reaches the source, under whose authority, and within what bounds. The
+// field names are fixed by this schema; renaming one is for the spec maintainers.
+message KnowledgeConnectionSpec {
+  // provider is required: the extension id of a knowledge port provider, which must resolve to a lockfile entry.
+  string provider = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // endpoint is the https URL of the source; absent for a provider that reads the worktree. The loader refuses one that is
+  // not "https://" with a lower-case DNS host of two or more labels (no IP literal, numeric or single-label host, trailing
+  // dot, or .localhost, .local or .internal suffix), a port outside 1 to 65535, a "." or ".." path segment, user
+  // information, a query, a fragment, ";", "%", "\", a non-printable or non-ASCII byte, or over 2048 bytes; the full rule
+  // is the loader-checks row of sdk/go/kindyaml/README.md. Its host must also be in the provider manifest's egress
+  // allow-list.
+  optional string endpoint = 2 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+  // auth is required.
+  optional KnowledgeAuth auth = 3 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+  // pinned_tools is the requested read-only tool subset, unique by name; an empty list allows no tool. The bridge trusts
+  // only the admin-approved pins of the lockfile (knowledge_tools), never these alone; drift quarantines the connection.
+  repeated PinnedTool pinned_tools = 4 [json_name = "pinned_tools", (numinance.annotations.v1.field).since = "1.0.0"];
+  // read_only is required and must be true; the loader refuses false.
+  bool read_only = 5 [json_name = "read_only", (numinance.annotations.v1.field).since = "1.0.0"];
+  // scope is required, non-empty and unique: the spaces, projects or relative paths the connection may read ("*", ".",
+  // "..", a leading "/" and query or glob characters are refused). A provider passes it as a parameter, never as query text.
+  repeated string scope = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // budgets bounds the calls of one connection; it only lowers the stage budgets, never raises them.
+  KnowledgeBudgets budgets = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // cache_ttl is how long a fetched document is cached; absent means 30 days and 0s disables the cache.
+  google.protobuf.Duration cache_ttl = 8 [json_name = "cache_ttl", (numinance.annotations.v1.field).since = "1.0.0"];
+  // oauth names the OAuth client the bridge presents to the source (the per-server config of the MCP bridge: URL, OAuth client). Absent means no static client. It holds no secret: the broker holds
+  // every secret and issues a handle. Only the org sets it, since it decides under which client a run reads.
+  optional KnowledgeOAuth oauth = 9 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// KnowledgeOAuth is the OAuth client of a connection. It never carries a secret, and no field of it may be added that does.
+message KnowledgeOAuth {
+  // client_id identifies the client to the source. The loader refuses an empty one, one over 2048 bytes and any byte
+  // outside printable ASCII (so no whitespace, control or bidi character); one that starts with a scheme ("name:") or "//", contains "://" or a colon
+  // before its first "/", "?" or "#", or holds a backslash or "%", is read as a URL and must be an https URL that passes the endpoint rule of the loader-checks row of
+  // sdk/go/kindyaml/README.md; a "." or ".." path segment is refused.
+  optional string client_id = 1 [json_name = "client_id", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PinnedTool is one tool: its name and the hash of its canonicalised description, schemas and annotations.
+message PinnedTool {
+  // name is required: the tool name as the server lists it.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // hash is required.
+  numinance.types.v1.Digest hash = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// KnowledgeBudgets bounds the calls of one connection; an explicit 0 is refused.
+message KnowledgeBudgets {
+  // calls_per_stage is the most searches and fetches in one stage.
+  optional uint32 calls_per_stage = 1 [json_name = "calls_per_stage", (numinance.annotations.v1.field).since = "1.0.0"];
+  // bytes_per_call is the most bytes one fetch returns.
+  optional uint32 bytes_per_call = 2 [json_name = "bytes_per_call", (numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,35 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.Metadata.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

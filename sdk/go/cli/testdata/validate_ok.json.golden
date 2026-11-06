@@ -1,0 +1,1 @@
+{"status":"ok","revision":"0123abcd","documents":[{"scope":"org","path":".numinance/policy/go.yaml","kind":"LanguageToolchain","name":"go-1.27","status":"ok"}],"digest":"sha256:abc","provenance":[{"field":"autonomy.default_level","scope":"repo","path":".numinance/policy/autonomy.yaml"}]}

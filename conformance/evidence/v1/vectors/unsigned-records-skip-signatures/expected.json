@@ -1,0 +1,28 @@
+{
+  "vector": "unsigned-records-skip-signatures",
+  "description": "Records that carry no signature: --skip-signatures does not require one.",
+  "status": "shipped",
+  "export": "closed-basic-unsigned-records",
+  "flags": {
+    "skip_signatures": true,
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub"
+  ],
+  "expect": {
+    "level": "unauthenticated",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unauthenticated",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unauthenticated",
+    "exit:5",
+    "rule:skip-accepts-unsigned-records"
+  ]
+}

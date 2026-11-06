@@ -1,0 +1,20 @@
+apiVersion: numinance.dev/v1
+kind: ControlPack
+metadata: {name: controls/payments/pci-dss/4.0.1, scope: SCOPE_ORG}
+spec:
+  jurisdiction: global
+  framework: pci-dss
+  version: 4.0.1
+  effective_date: "2024-03-31"
+  sources: [PCI DSS v4.0.1 Requirement 6]
+  applicability: risk_at_least(change.risk, "MEDIUM")
+  controls:
+    - {id: req-6.2.3, requires_evidence: [review-record, diff], approval: {human: true, group: payments-reviewers}}
+    - {id: req-6.5.1, requires_evidence: [change-record, rollback-plan], approval: {human: true, dual_control: true}}
+  floors:
+    autonomy:
+      rules: [{match: {environment: production}, max_level: AUTONOMY_LEVEL_PR}]
+    residency: {floor: RESIDENCY_CLASS_IN_ACCOUNT}
+  export_views:
+    - {name: pci-dss-req6, controls: [req-6.2.3, req-6.5.1]}
+  counsel_status: COUNSEL_STATUS_NOT_REVIEWED

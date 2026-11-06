@@ -1,0 +1,28 @@
+{
+  "vector": "trust-bundle-keys-self-consistent",
+  "description": "The keys the directory claims, taken as trusted: consistency only, never verified.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "trust_bundle_keys": true,
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub"
+  ],
+  "expect": {
+    "level": "self-consistent",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "self-consistent",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:self-consistent",
+    "exit:5",
+    "mode:trust-bundle-keys"
+  ]
+}

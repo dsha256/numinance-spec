@@ -1,0 +1,10 @@
+apiVersion: numinance.dev/v1
+kind: ResidencyPolicy
+metadata: {name: eu-zdr, scope: SCOPE_ORG}
+spec:
+  floors:
+    floor: RESIDENCY_CLASS_VENDOR_ZDR
+    rules: [{match: {component: payments-api}, floor: RESIDENCY_CLASS_IN_ACCOUNT}]
+  regions: [eu-central-1]
+  cross_region: false
+  require_customer_keying: true

@@ -1,0 +1,750 @@
+{
+ "redaction": "Hand-written from the GitHub REST documentation (2022-11-28), not recorded: repository, branch, user and commit names are invented (acme/shop, reviewer-one), commit ids are fixed test values, and no header, token, e-mail address or real person appears. Replace with recordings made by the live test once a token exists (README, Not done).",
+ "interactions": [
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop",
+   "status": 200,
+   "body": {
+    "default_branch": "main",
+    "private": true,
+    "archived": false
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/branches/main",
+   "status": 200,
+   "body": {
+    "name": "main",
+    "commit": {
+     "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/missing",
+   "status": 404,
+   "body": {
+    "message": "Not Found"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/branches?page=1&per_page=2",
+   "status": 200,
+   "body": [
+    {
+     "name": "main",
+     "commit": {
+      "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+     }
+    },
+    {
+     "name": "numinance/chg-0001",
+     "commit": {
+      "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+     }
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/branches?page=2&per_page=2",
+   "status": 200,
+   "body": []
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/git/refs",
+   "status": 201,
+   "request": {
+    "ref": "refs/heads/numinance/chg-0002",
+    "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+   },
+   "body": {
+    "ref": "refs/heads/numinance/chg-0002"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/git/refs",
+   "status": 422,
+   "request": {
+    "ref": "refs/heads/numinance/chg-0002",
+    "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+   },
+   "body": {
+    "message": "Reference already exists"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/git/ref/heads/numinance/chg-0002",
+   "status": 200,
+   "body": {
+    "ref": "refs/heads/numinance/chg-0002",
+    "object": {
+     "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+    }
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/git/refs",
+   "status": 422,
+   "request": {
+    "ref": "refs/heads/numinance/chg-0001",
+    "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+   },
+   "body": {
+    "message": "Reference already exists"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/git/ref/heads/numinance/chg-0001",
+   "status": 200,
+   "body": {
+    "ref": "refs/heads/numinance/chg-0001",
+    "object": {
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/branches/main/protection",
+   "status": 200,
+   "body": {
+    "required_pull_request_reviews": {
+     "required_approving_review_count": 1
+    },
+    "required_status_checks": {
+     "contexts": [
+      "ci/test"
+     ]
+    },
+    "enforce_admins": {
+     "enabled": true
+    },
+    "allow_force_pushes": {
+     "enabled": false
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/branches/dev/protection",
+   "status": 404,
+   "body": {
+    "message": "Branch not protected"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/git/trees/a1b2c3d4e5f60718293a4b5c6d7e8f9012345678?recursive=1",
+   "status": 200,
+   "body": {
+    "sha": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+    "truncated": false,
+    "tree": [
+     {
+      "path": ".numinance",
+      "type": "tree",
+      "sha": "1111111111111111111111111111111111111111"
+     },
+     {
+      "path": ".numinance/policy",
+      "type": "tree",
+      "sha": "2222222222222222222222222222222222222222"
+     },
+     {
+      "path": ".numinance/policy/profile.yaml",
+      "type": "blob",
+      "sha": "3333333333333333333333333333333333333333",
+      "size": 120
+     },
+     {
+      "path": "README.md",
+      "type": "blob",
+      "sha": "4444444444444444444444444444444444444444",
+      "size": 42
+     },
+     {
+      "path": "src",
+      "type": "tree",
+      "sha": "5555555555555555555555555555555555555555"
+     },
+     {
+      "path": "src/main.go",
+      "type": "blob",
+      "sha": "6666666666666666666666666666666666666666",
+      "size": 900
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/contents/README.md?ref=a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+   "status": 200,
+   "body": {
+    "type": "file",
+    "encoding": "base64",
+    "content": "IyBzaG9wCkEgc2hvcC4K\n",
+    "sha": "4444444444444444444444444444444444444444",
+    "size": 15
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/contents/src?ref=a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+   "status": 200,
+   "body": [
+    {
+     "type": "file",
+     "name": "main.go"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/search/code?per_page=5&q=%22TODO%22+repo%3Aacme%2Fshop",
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "path": "src/main.go",
+      "repository": {
+       "full_name": "acme/shop"
+      }
+     },
+     {
+      "path": "x.go",
+      "repository": {
+       "full_name": "other/secret"
+      }
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls?base=main&head=acme%3Anuminance%2Fchg-0001&state=open",
+   "status": 200,
+   "body": []
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls?base=main&head=acme%3Anuminance%2Fchg-0001&state=open",
+   "status": 200,
+   "body": [
+    {
+     "number": 7,
+     "state": "open",
+     "merged": false,
+     "merged_at": null,
+     "merge_commit_sha": null,
+     "html_url": "https://github.com/acme/shop/pull/7",
+     "mergeable": true,
+     "user": {
+      "login": "author-bot"
+     },
+     "head": {
+      "ref": "numinance/chg-0001",
+      "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+     },
+     "base": {
+      "ref": "main"
+     }
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/pulls",
+   "status": 201,
+   "request": {
+    "title": "Fix the cart total",
+    "body": "Candidate.",
+    "head": "numinance/chg-0001",
+    "base": "main"
+   },
+   "body": {
+    "number": 7,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/7",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/git/ref/heads/numinance/chg-0003",
+   "status": 200,
+   "body": {
+    "ref": "refs/heads/numinance/chg-0003",
+    "object": {
+     "sha": "bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/git/ref/heads/numinance/chg-0004",
+   "status": 200,
+   "body": {
+    "ref": "refs/heads/numinance/chg-0004",
+    "object": {
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls?base=main&head=acme%3Anuminance%2Fchg-0004&state=open",
+   "status": 200,
+   "body": []
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/7",
+   "status": 200,
+   "body": {
+    "number": 7,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/7",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/commits/c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01/check-runs?page=1&per_page=100",
+   "status": 200,
+   "body": {
+    "total_count": 2,
+    "check_runs": [
+     {
+      "name": "ci/test",
+      "status": "completed",
+      "conclusion": "success"
+     },
+     {
+      "name": "ci/lint",
+      "status": "in_progress",
+      "conclusion": null
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/7/reviews?page=1&per_page=100",
+   "status": 200,
+   "body": [
+    {
+     "user": {
+      "login": "reviewer-one"
+     },
+     "state": "APPROVED",
+     "commit_id": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    {
+     "user": {
+      "login": "reviewer-two"
+     },
+     "state": "CHANGES_REQUESTED",
+     "commit_id": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    }
+   ]
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/8",
+   "status": 200,
+   "body": {
+    "number": 8,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/8",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/8",
+   "status": 200,
+   "body": {
+    "number": 8,
+    "state": "closed",
+    "merged": true,
+    "merged_at": "2026-11-01T10:00:00Z",
+    "merge_commit_sha": "feedface00000000feedface00000000feedface",
+    "html_url": "https://github.com/acme/shop/pull/8",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "PUT",
+   "path": "/repos/acme/shop/pulls/8/merge",
+   "status": 200,
+   "request": {
+    "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "merge_method": "squash"
+   },
+   "body": {
+    "sha": "feedface00000000feedface00000000feedface",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/9",
+   "status": 200,
+   "body": {
+    "number": 9,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/9",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "bad0bad0bad0bad0bad0bad0bad0bad0bad0bad0"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/10",
+   "status": 200,
+   "body": {
+    "number": 10,
+    "state": "closed",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/10",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/issues/7/comments?per_page=100",
+   "status": 200,
+   "body": []
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/issues/7/comments?per_page=100",
+   "status": 200,
+   "body": [
+    {
+     "id": 501,
+     "body": "Checks passed.\n\n<!-- numinance:4c851fa5abc3992df35c95a55fdcd69a -->"
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/issues/7/comments",
+   "status": 201,
+   "request": {
+    "body": "Checks passed.\n\n<!-- numinance:4c851fa5abc3992df35c95a55fdcd69a -->"
+   },
+   "body": {
+    "id": 501
+   }
+  },
+  {
+   "method": "PATCH",
+   "path": "/repos/acme/shop/pulls/7",
+   "status": 200,
+   "request": {
+    "state": "closed"
+   },
+   "body": {
+    "number": 7,
+    "state": "closed",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/7",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0001",
+     "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/collaborators/reviewer-one/permission",
+   "status": 200,
+   "body": {
+    "permission": "write"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/git/ref/heads/numinance/chg-0005",
+   "status": 200,
+   "body": {
+    "ref": "refs/heads/numinance/chg-0005",
+    "object": {
+     "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls?base=main&head=acme%3Anuminance%2Fchg-0005&state=open",
+   "status": 200,
+   "body": []
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls?base=main&head=acme%3Anuminance%2Fchg-0005&state=open",
+   "status": 200,
+   "body": [
+    {
+     "number": 11,
+     "state": "open",
+     "merged": false,
+     "merged_at": null,
+     "merge_commit_sha": null,
+     "html_url": "https://github.com/acme/shop/pull/11",
+     "mergeable": true,
+     "user": {
+      "login": "author-bot"
+     },
+     "head": {
+      "ref": "numinance/chg-0005",
+      "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+     },
+     "base": {
+      "ref": "main"
+     }
+    }
+   ]
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/pulls",
+   "status": 201,
+   "request": {
+    "title": "Numinance change chg_11111111111111111111111111111111",
+    "body": "Opened by Numinance for change chg_11111111111111111111111111111111 at candidate d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d.",
+    "head": "numinance/chg-0005",
+    "base": "main"
+   },
+   "body": {
+    "number": 11,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/11",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0005",
+     "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/11",
+   "status": 200,
+   "body": {
+    "number": 11,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/11",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0005",
+     "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/11",
+   "status": 200,
+   "body": {
+    "number": 11,
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "merge_commit_sha": null,
+    "html_url": "https://github.com/acme/shop/pull/11",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0005",
+     "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/11",
+   "status": 200,
+   "body": {
+    "number": 11,
+    "state": "closed",
+    "merged": true,
+    "merged_at": "2026-11-01T11:00:00Z",
+    "merge_commit_sha": "5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+    "html_url": "https://github.com/acme/shop/pull/11",
+    "mergeable": true,
+    "user": {
+     "login": "author-bot"
+    },
+    "head": {
+     "ref": "numinance/chg-0005",
+     "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+    },
+    "base": {
+     "ref": "main"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/commits/d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d/check-runs?page=1&per_page=100",
+   "status": 200,
+   "body": {
+    "total_count": 1,
+    "check_runs": [
+     {
+      "name": "ci/test",
+      "status": "completed",
+      "conclusion": "success"
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/pulls/11/reviews?page=1&per_page=100",
+   "status": 200,
+   "body": [
+    {
+     "user": {
+      "login": "reviewer-one"
+     },
+     "state": "APPROVED",
+     "commit_id": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d"
+    }
+   ]
+  },
+  {
+   "method": "PUT",
+   "path": "/repos/acme/shop/pulls/11/merge",
+   "status": 200,
+   "request": {
+    "sha": "d00dd00dd00dd00dd00dd00dd00dd00dd00dd00d",
+    "merge_method": "squash"
+   },
+   "body": {
+    "sha": "5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+    "merged": true,
+    "message": "Pull Request successfully merged"
+   }
+  }
+ ]
+}

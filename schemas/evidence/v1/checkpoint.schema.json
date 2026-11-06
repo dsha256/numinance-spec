@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/checkpoint.schema.json",
+  "title": "Evidence log checkpoint",
+  "description": "head-checkpoint.json and attestation-checkpoint.json in an evidence/v1 export: a signed tree head of the evidence log. Two shapes exist. A stored checkpoint carries signature and signing_key_id and its timestamp. A note checkpoint carries signed_note (a signed note, base64) and neither signature nor signing_key_id; its timestamp is optional. The schema allows both; the verifier requires the stored shape in an export. Not expressible here and checked by the verifier: the file is the canonical JSON form; the signature verifies over the canonical form without the signature; origin is 1 to 256 bytes of printable UTF-8 without leading or trailing space and equals the trusted log origin; signed_note is at most 64 KiB; a signed_note excludes signature and signing_key_id; a signature needs signing_key_id; the file is at most 4 KiB (90112 bytes for a note checkpoint).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["origin", "tree_size", "root_hash", "canon_version"],
+  "properties": {
+    "origin": { "type": "string", "description": "Log origin line, such as numinance.test/log." },
+    "tree_size": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "root_hash": { "$ref": "#/$defs/digest" },
+    "timestamp": { "$ref": "#/$defs/timestamp" },
+    "canon_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The checkpoint-family canonical-form version; 1 in evidence/v1." },
+    "signature": { "$ref": "#/$defs/signature" },
+    "signing_key_id": { "$ref": "#/$defs/digest" },
+    "signed_note": {
+      "type": "string",
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+      "description": "A signed note as standard padded base64."
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,8}[1-9])?Z$",
+      "description": "RFC 3339 in UTC in Go's form: Z suffix, no offset, an optional fraction of 1 to 9 digits whose last digit is not 0. Year 0000 and impossible calendar days are not excluded by the pattern."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{85}[AQgw]==$",
+      "description": "An Ed25519 signature: 64 raw bytes as standard padded base64, 88 characters ending ==."
+    }
+  }
+}

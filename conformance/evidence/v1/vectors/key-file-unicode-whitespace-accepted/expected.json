@@ -1,0 +1,31 @@
+{
+  "vector": "key-file-unicode-whitespace-accepted",
+  "description": "A key file surrounded by U+00A0: the key reader trims Unicode white space.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner-nbsp.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner-nbsp.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:key-file-forms"
+  ]
+}

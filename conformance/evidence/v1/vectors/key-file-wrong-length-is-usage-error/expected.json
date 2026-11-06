@@ -1,0 +1,30 @@
+{
+  "vector": "key-file-wrong-length-is-usage-error",
+  "description": "A key file holding 31 bytes.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner-short.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner-short.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2",
+    "rule:key-file-forms"
+  ]
+}

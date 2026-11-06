@@ -1,0 +1,28 @@
+{
+  "vector": "log-key-without-origin-is-usage-error",
+  "description": "A log key and a log origin go together.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2"
+  ]
+}

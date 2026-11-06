@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/signers.schema.json",
+  "title": "Evidence signers",
+  "description": "provenance/signers.json in an evidence/v1 export: the runner public keys that signed the export and, optionally, the log claim. The keys are claims by the exporter, not trust anchors: a verifier trusts only keys it was given out of band unless it is told to use these. Not expressible here and checked by the verifier: the file is the canonical JSON form; each key_id is the SHA-256 digest of the 32 raw bytes of its public_key; 1 to 64 signers; origin is 1 to 256 bytes of printable UTF-8 without leading or trailing space; the file is at most 1 MiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "signers"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "signers": { "type": "array", "items": { "$ref": "#/$defs/signer" } },
+    "log": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "public_key"],
+      "description": "The log the exporter claims anchored the chain.",
+      "properties": {
+        "origin": { "type": "string", "description": "Log origin line, such as numinance.test/log." },
+        "public_key": { "$ref": "#/$defs/publicKey" }
+      }
+    }
+  },
+  "$defs": {
+    "signer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key_id", "public_key"],
+      "properties": {
+        "key_id": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "public_key": { "$ref": "#/$defs/publicKey" }
+      }
+    },
+    "publicKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{42}[AEIMQUYcgkosw048]=$",
+      "description": "An Ed25519 public key: 32 raw bytes as standard padded base64, 44 characters ending =."
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "$defs": {
+    "google.protobuf.Value.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Value"
+    },
+    "numinance.kinds.v1.EvalCase.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalCase is one replay case: it names a recorded outcome by digest and states what the replay must show.",
+      "properties": {
+        "category": {
+          "description": "category is the adversarial situation the case stands for; absent for an ordinary case.",
+          "enum": [
+            "EVAL_CATEGORY_UNSPECIFIED",
+            "EVAL_CATEGORY_HIDDEN_ACCEPTANCE",
+            "EVAL_CATEGORY_INCOMPLETE_TICKET",
+            "EVAL_CATEGORY_CONFLICTING_TICKET",
+            "EVAL_CATEGORY_POISONED_README",
+            "EVAL_CATEGORY_MALICIOUS_COMMENT",
+            "EVAL_CATEGORY_STALE_DOCUMENTATION",
+            "EVAL_CATEGORY_FLAKY_TEST",
+            "EVAL_CATEGORY_PLANTED_SECURITY_BUG",
+            "EVAL_CATEGORY_MIGRATION_HAZARD",
+            "EVAL_CATEGORY_MISSING_PERMISSION",
+            "EVAL_CATEGORY_ROLLBACK"
+          ],
+          "title": "Eval Category",
+          "type": "string"
+        },
+        "expect": {
+          "$ref": "#/$defs/numinance.kinds.v1.EvalExpectation.jsonschema.strict.json",
+          "description": "expect is required: what the replayed outcome must show."
+        },
+        "name": {
+          "description": "name is required: a token of 1 to 64 characters, lowercase letters, digits and \". _ -\", starting with a letter or digit.",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "outcome is required: the digest of the replay outcome record the recording produces under the set and this case."
+        },
+        "seeded": {
+          "$ref": "#/$defs/numinance.kinds.v1.EvalSeeded.jsonschema.strict.json",
+          "description": "seeded names the defect planted in the case and the layer expected to catch it; it needs a category."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Eval Case",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EvalExpectation.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalExpectation is the closed facts a replay is compared on. It names no text.",
+      "properties": {
+        "acceptance": {
+          "description": "acceptance is required: the expected human acceptance.",
+          "enum": [
+            "EVAL_ACCEPTANCE_UNSPECIFIED",
+            "EVAL_ACCEPTANCE_ACCEPTED",
+            "EVAL_ACCEPTANCE_REJECTED",
+            "EVAL_ACCEPTANCE_ABANDONED"
+          ],
+          "title": "Eval Acceptance",
+          "type": "string"
+        },
+        "merged": {
+          "description": "merged is required: whether the change is expected to merge.",
+          "type": "boolean"
+        },
+        "severe": {
+          "description": "severe is required: whether the outcome is expected to be a severity event (unauthorized action, critical escape or evidence gap).",
+          "type": "boolean"
+        },
+        "verification_failures": {
+          "description": "verification_failures lists the expected failures by layer, sorted by layer without duplicates; empty when none are expected.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.EvalLayerCount.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "acceptance",
+        "merged",
+        "severe"
+      ],
+      "title": "Eval Expectation",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EvalLayerCount.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalLayerCount is the number of verification failures expected from one verifier layer.",
+      "properties": {
+        "count": {
+          "description": "count is required and at least 1.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "layer": {
+          "description": "layer is required: a token of 1 to 64 characters naming the verifier layer.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "layer",
+        "count"
+      ],
+      "title": "Eval Layer Count",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EvalSeeded.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalSeeded is a defect planted in a case, by token. The defect itself is not in the set: the case stands for a recorded run on a change that has it.",
+      "properties": {
+        "caught_by": {
+          "description": "caught_by is required: a token naming the verifier layer expected to catch the defect; it must be among the case's expected failures.",
+          "type": "string"
+        },
+        "defect": {
+          "description": "defect is required: a token of 1 to 64 characters naming the planted defect.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "defect",
+        "caught_by"
+      ],
+      "title": "Eval Seeded",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EvalSet.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalSet is a versioned, reference-only set of replay cases (RFC-0004). A case names a recorded replay outcome by digest\n and states what that outcome must show; it holds no free text, ticket, code or person. An EvalSet is an alpha kind: its\n apiVersion is \"numinance.dev/v1alpha1\" and a loader reads it only when the caller turns alpha kinds on. It takes no part in\n profile resolution and is not an input to the profile digest.",
+      "properties": {
+        "apiVersion": {
+          "description": "api_version is required and is \"numinance.dev/v1alpha1\" (pre-GA; off unless the loader enables alpha kinds).",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/google.protobuf.Value.jsonschema.strict.json"
+          },
+          "description": "extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "description": "kind is required and is \"EvalSet\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+          "description": "metadata is required; the loader enforces it, the schema cannot."
+        },
+        "spec": {
+          "$ref": "#/$defs/numinance.kinds.v1.EvalSetSpec.jsonschema.strict.json",
+          "description": "spec is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind"
+      ],
+      "title": "Eval Set",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EvalSetSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EvalSetSpec holds the version of the set and its cases.",
+      "properties": {
+        "cases": {
+          "description": "cases is required: 1 to 256 cases, sorted by name without duplicates; the loader enforces the count and the order.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.EvalCase.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "version is required: a strict x.y.z version. Any change to a case is a new version, and a new version is a new bundle digest.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "title": "Eval Set Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "numinance.types.v1.Digest.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Digest is a sha256 content digest as \"sha256:\" plus 64 lowercase hex characters.",
+      "properties": {
+        "value": {
+          "description": "value is exactly \"sha256:\" plus 64 lowercase hex characters. Any other\n length, case or prefix, and an empty value in a present message, is\n rejected. Absence is the unset message.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Digest",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.EvalSet.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.EvalSet.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

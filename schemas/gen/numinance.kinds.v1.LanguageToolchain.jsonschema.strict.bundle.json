@@ -1,0 +1,147 @@
+{
+  "$defs": {
+    "google.protobuf.Struct.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Struct",
+      "type": "object"
+    },
+    "google.protobuf.Value.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Value"
+    },
+    "numinance.kinds.v1.LanguageToolchain.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "LanguageToolchain is the version and the deterministic verifiers for one language.",
+      "properties": {
+        "apiVersion": {
+          "description": "api_version is required and is \"numinance.dev/v1\".",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/google.protobuf.Value.jsonschema.strict.json"
+          },
+          "description": "extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "description": "kind is required and is \"LanguageToolchain\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+          "description": "metadata is required; the loader enforces it, the schema cannot."
+        },
+        "spec": {
+          "$ref": "#/$defs/numinance.kinds.v1.LanguageToolchainSpec.jsonschema.strict.json",
+          "description": "spec is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind"
+      ],
+      "title": "Language Toolchain",
+      "type": "object"
+    },
+    "numinance.kinds.v1.LanguageToolchainSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "LanguageToolchainSpec names a language version and its tools.",
+      "properties": {
+        "formatters": {
+          "description": "formatters names the formatters; a narrower scope adds to the wider scope's list. Each name resolves to a declared\n provider with a lockfile entry; a name is never executed as a command.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "language": {
+          "description": "language is required and matches ^[0-9A-Za-z.+-]{1,64}$ (the profile context enforces it).",
+          "type": "string"
+        },
+        "package_manager": {
+          "description": "package_manager is the package manager the toolchain uses: a name that resolves to a declared provider, never a command.",
+          "type": "string"
+        },
+        "verifiers": {
+          "description": "verifiers is required and non-empty; the loader enforces it, the schema cannot.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ToolchainVerifier.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "version is required: the language version, matching ^[0-9A-Za-z.+-]{1,64}$; toolchain artifacts are pinned by digest in the lockfile, never by this string.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "language",
+        "version"
+      ],
+      "title": "Language Toolchain Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ToolchainVerifier.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ToolchainVerifier is one deterministic verifier of the toolchain.",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/google.protobuf.Struct.jsonschema.strict.json",
+          "description": "config is passed to the verifier as is; the Engine never reads it."
+        },
+        "name": {
+          "description": "name is required and unique in the toolchain; playbook steps and pack checks reference it.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of a verifier port provider, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "provider"
+      ],
+      "title": "Toolchain Verifier",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.LanguageToolchain.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.LanguageToolchain.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

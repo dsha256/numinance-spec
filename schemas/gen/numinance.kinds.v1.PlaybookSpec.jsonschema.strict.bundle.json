@@ -1,0 +1,130 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.PlaybookSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "PlaybookSpec holds the steps and the bounds of one change type.",
+      "properties": {
+        "change_type": {
+          "description": "change_type is required: the change type the playbook handles.",
+          "type": "string"
+        },
+        "max_repair_attempts": {
+          "description": "max_repair_attempts bounds the repair loop, 0 to 10; absent means the default 2.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "qualification": {
+          "$ref": "#/$defs/numinance.kinds.v1.Qualification.jsonschema.strict.json",
+          "description": "qualification is what the playbook must show before autonomy is promoted. Absent means the playbook is not\n promotable unless the AutonomyPolicy floor qualifies it; it merges field by field, and a narrower scope may only tighten it."
+        },
+        "steps": {
+          "description": "steps is required and non-empty; the loader enforces it, the schema cannot.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.PlaybookStep.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "change_type"
+      ],
+      "title": "Playbook Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.PlaybookStep.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "PlaybookStep is one step of a playbook. A Change's risk class is the maximum over its steps.",
+      "properties": {
+        "capability_set": {
+          "description": "capability_set is required: the name of the capability set the step's grant is derived from.",
+          "type": "string"
+        },
+        "evidence": {
+          "description": "evidence names the evidence the step must record; missing declared evidence turns success into PARTIAL.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "name is required and unique in the playbook.",
+          "type": "string"
+        },
+        "rehearse": {
+          "description": "rehearse is true when the step is rehearsed in a disposable environment first.",
+          "type": "boolean"
+        },
+        "risk": {
+          "description": "risk is required: the step's declared risk class, which only raises; the resolved risk is the maximum of risk and\n the action risk of every RPC the capability set grants.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        },
+        "verifiers": {
+          "description": "verifiers names the verifiers that run on the step's output.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "capability_set",
+        "risk"
+      ],
+      "title": "Playbook Step",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Qualification.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Qualification is the record a playbook needs before its autonomy is\n promoted. Rates are in basis points, 0 to 10000 (10000 is every run); the\n profile context refuses a larger value. A narrower scope may only tighten a\n threshold: min_runs up, a max rate down, zero_security_escapes never to false; the reference implementation refuses a loosening.",
+      "properties": {
+        "max_regression_rate": {
+          "description": "max_regression_rate is the highest share of runs that caused a regression.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_rework_rate": {
+          "description": "max_rework_rate is the highest share of runs that needed rework.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_rollback_rate": {
+          "description": "max_rollback_rate is the highest share of releases rolled back.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "min_runs": {
+          "description": "min_runs is the minimum number of qualifying runs; absent means the AutonomyPolicy floor applies.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "zero_security_escapes": {
+          "description": "zero_security_escapes is true when one security escape blocks promotion; absent means true. Only an explicit false\n relaxes it, and a narrower scope may never set false over a wider scope's true or absent value.",
+          "type": "boolean"
+        }
+      },
+      "title": "Qualification",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.PlaybookSpec.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.PlaybookSpec.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

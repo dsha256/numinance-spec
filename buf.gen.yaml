@@ -1,0 +1,38 @@
+# Run via `just gen`, which verifies the buf CLI first (tools/scripts/verify-buf.sh).
+# Run from numinance-spec (just gen does): `../tools` is relative to the working directory. The Go
+# generators are pinned in tools/go.mod and run with `go tool`. The ES generator is pinned in
+# sdk/typescript/pnpm-lock.yaml; python runs the protoc bundled in grpcio-tools, pinned in
+# sdk/python/uv.lock. buf has no grpc_python builtin, so just gen runs that generator from the same
+# protoc over a `buf build` descriptor set. just gen installs both from their lockfiles first.
+# No plugin is remote.
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/numinance/numinance-spec/sdk/go/gen
+plugins:
+  - local: ["go", "-C", "../tools", "tool", "protoc-gen-go"]
+    out: sdk/go/gen
+    opt: paths=source_relative
+  - local: ["go", "-C", "../tools", "tool", "protoc-gen-go-grpc"]
+    out: sdk/go/gen
+    opt: paths=source_relative
+  - local: ["go", "-C", "../tools", "tool", "protoc-gen-connect-go"]
+    out: sdk/go/gen
+    opt: paths=source_relative
+  - protoc_builtin: python
+    protoc_path: ["sdk/python/.venv/bin/python", "-I", "-m", "grpc_tools.protoc"]
+    out: sdk/python/numinance_sdk/gen
+  - local: sdk/typescript/node_modules/.bin/protoc-gen-es
+    out: sdk/typescript/src/gen
+    opt: target=ts
+  # JSON Schema 2020-12 for the configuration kinds only.
+  # json-strict-bundle: JSON names (apiVersion; multi-word kind fields set json_name to their snake_case
+  # name), no aliases or string numbers, and every schema self-contained: message dependencies sit
+  # under $defs and every $ref is local (#/...).
+  - local: ["go", "-C", "../tools", "tool", "protoc-gen-jsonschema"]
+    out: schemas/gen
+    opt: target=json-strict-bundle
+    types:
+      - numinance.kinds.v1

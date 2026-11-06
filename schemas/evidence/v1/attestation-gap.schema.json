@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/attestation-gap.schema.json",
+  "title": "Evidence attestation gap",
+  "description": "attestation-gap.json in an evidence/v1 export: the statement that a Closed change has no attestation, with the reason. It is present exactly when attestation.json is absent. A gap is incomplete evidence, never a pass. Not expressible here and checked by the verifier: the file is the canonical JSON form; reason is 1 to 512 bytes of valid UTF-8 made of printable characters; the file is at most 1 MiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "change_id", "reason"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "reason": { "type": "string", "description": "Why the attestation was not made; 1 to 512 bytes of printable UTF-8." }
+  }
+}

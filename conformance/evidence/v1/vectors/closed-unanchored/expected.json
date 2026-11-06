@@ -1,0 +1,27 @@
+{
+  "vector": "closed-unanchored",
+  "description": "Runner key pinned and no log: the head was not proved under a pinned log.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "unanchored",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unanchored",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unanchored",
+    "exit:5"
+  ]
+}

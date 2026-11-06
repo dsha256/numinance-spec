@@ -1,0 +1,33 @@
+{
+  "vector": "open-prefix-allow-incomplete",
+  "description": "--allow-incomplete on an anchored prefix: verified, incomplete.",
+  "status": "shipped",
+  "export": "open-prefix",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, incomplete",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "incomplete"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, incomplete",
+    "exit:0"
+  ]
+}

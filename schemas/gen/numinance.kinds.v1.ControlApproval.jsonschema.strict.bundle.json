@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.ControlApproval.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlApproval is the approval a control requires. Policy enforces it at the release gate (and the plan gate where a\n stage declares one) whatever the StageRegistry contains; it only adds to the registry's gates. The loader refuses group\n or dual_control unless human is true.",
+      "properties": {
+        "dual_control": {
+          "description": "dual_control is true when two distinct human principals, neither the author nor acting in the author's run, must\n approve; absent means false.",
+          "type": "boolean"
+        },
+        "group": {
+          "description": "group names the approver group the approver must belong to; membership comes from the org's identity provider,\n never from repository files.",
+          "type": "string"
+        },
+        "human": {
+          "description": "human is true when a human principal must approve; absent means false.",
+          "type": "boolean"
+        }
+      },
+      "title": "Control Approval",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ControlApproval.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ControlApproval.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

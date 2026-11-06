@@ -1,0 +1,24 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyMatch selects changes; an absent key matches every value and an empty match matches every change, and a\n key the change has no value for counts as a match. Floors from the org and control packs all hold together.",
+      "properties": {
+        "component": {
+          "description": "component is the name of the component the change touches. It is not a security boundary until floors match only\n components of an org-owned SIGNED_POLICY registry, since a repo can rename one.",
+          "type": "string"
+        },
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        }
+      },
+      "title": "Residency Match",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ResidencyMatch.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

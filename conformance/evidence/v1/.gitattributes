@@ -1,0 +1,4 @@
+# The vectors are byte-exact data: a record line ended by CR LF, a file with no final line feed and a byte that is not UTF-8 are
+# the point of some of them. No end-of-line conversion and no whitespace check may touch them.
+exports/** -text -whitespace
+keys/** -text

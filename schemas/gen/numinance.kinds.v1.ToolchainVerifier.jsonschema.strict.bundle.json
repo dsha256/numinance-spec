@@ -1,0 +1,37 @@
+{
+  "$defs": {
+    "google.protobuf.Struct.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Struct",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ToolchainVerifier.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ToolchainVerifier is one deterministic verifier of the toolchain.",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/google.protobuf.Struct.jsonschema.strict.json",
+          "description": "config is passed to the verifier as is; the Engine never reads it."
+        },
+        "name": {
+          "description": "name is required and unique in the toolchain; playbook steps and pack checks reference it.",
+          "type": "string"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of a verifier port provider, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "provider"
+      ],
+      "title": "Toolchain Verifier",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ToolchainVerifier.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ToolchainVerifier.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

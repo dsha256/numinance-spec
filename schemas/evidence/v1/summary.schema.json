@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/summary.schema.json",
+  "title": "Evidence export summary",
+  "description": "summary.json in an evidence/v1 export: counts and the head of the exported chain. Not expressible here and checked by the verifier: the file is the canonical JSON form; last_sequence equals records; records, denied, head_record_hash and terminal_state re-derive from records.ndjson; terminal_state is present exactly when ended is true; a sealed chain has ended; the file is at most 1 MiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "export_version",
+    "change_id",
+    "records",
+    "first_sequence",
+    "last_sequence",
+    "head_record_hash",
+    "denied",
+    "ended",
+    "sealed"
+  ],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "records": { "type": "integer", "minimum": 1, "maximum": 9007199254740991, "description": "Number of records in records.ndjson." },
+    "first_sequence": { "type": "integer", "minimum": 1, "maximum": 1, "description": "Always 1: an export holds the chain from its first record." },
+    "last_sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "head_record_hash": { "$ref": "#/$defs/digest" },
+    "denied": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "description": "Number of records whose action_outcome is denied." },
+    "ended": { "type": "boolean" },
+    "terminal_state": { "type": "string", "enum": ["Closed", "Abandoned", "RolledBack"], "description": "Present exactly when ended is true." },
+    "sealed": { "type": "boolean", "description": "True when the chain ends with a seal record after the terminal record." }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    }
+  }
+}

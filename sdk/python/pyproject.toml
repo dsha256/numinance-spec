@@ -1,0 +1,16 @@
+# Numinance Python SDK. Only the codegen toolchain is pinned here: just gen runs the protoc bundled
+# in grpcio-tools from .venv for the python and grpc_python generators, so uv.lock pins both.
+# The generated stubs need grpcio>=1.84.0 and protobuf>=7.35.1 at runtime (the SDK package declares them).
+[project]
+name = "numinance-sdk"
+version = "0.0.0"
+description = "Numinance Python plugin SDK"
+license = "Apache-2.0"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = ["grpcio-tools==1.84.0"]
+
+[tool.uv]
+package = false

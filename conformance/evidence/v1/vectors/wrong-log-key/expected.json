@@ -1,0 +1,38 @@
+{
+  "vector": "wrong-log-key",
+  "description": "A pinned log key that is not the log's: the head proof and the attestation's proof fail.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/other-log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/other-log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "anchor_invalid",
+      "attestation_proof",
+      "manifest_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:anchor_invalid",
+    "finding:attestation_proof",
+    "finding:manifest_mismatch",
+    "rule:wrong-log-key"
+  ]
+}

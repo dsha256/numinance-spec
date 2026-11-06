@@ -1,0 +1,31 @@
+{
+  "vector": "closed-sealed-verified",
+  "description": "A sealed chain: the seal record follows the terminal record, the attestation and the head leaf end at the terminal record.",
+  "status": "shipped",
+  "export": "closed-sealed",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:sealed"
+  ]
+}

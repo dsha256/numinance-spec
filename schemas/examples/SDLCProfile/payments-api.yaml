@@ -1,0 +1,11 @@
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: payments-api, scope: SCOPE_COMPONENT}
+spec:
+  playbooks: [dependency-upgrade, bugfix-bounded, runtime-eol-upgrade]
+  architecture_packs: [layered-service]
+  toolchains: [go-1.27]
+  adapters:
+    scm: {provider: dev.numinance.official/github, instance: main}
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: ci-prod}
+    knowledge: [confluence-eng, jira-pay]

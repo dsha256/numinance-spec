@@ -1,0 +1,26 @@
+{
+  "vector": "skip-signatures-allow-flags-stay-unauthenticated",
+  "description": "Allowance flags never lift unauthenticated.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "skip_signatures": true,
+    "allow_unanchored": true,
+    "allow_incomplete": true,
+    "allow_unsigned": true
+  },
+  "keys": [],
+  "expect": {
+    "level": "unauthenticated",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unauthenticated",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unauthenticated",
+    "exit:5"
+  ]
+}

@@ -1,0 +1,70 @@
+// ReconciliationReport is the output of the scheduled reconciliation workflow that compares the evidence chain against the systems it describes and against the evidence store and transparency log (ADR-0020).
+// Anything the chain claims that a system does not show, or the reverse, is a mismatch.
+syntax = "proto3";
+
+package numinance.evidence.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+
+// ReconciledSystem names a system the chain is compared against. This enum may grow.
+enum ReconciledSystem {
+  // Zero value; it has no meaning and is rejected.
+  RECONCILED_SYSTEM_UNSPECIFIED = 0;
+  // The SCM: commits, PR events.
+  RECONCILED_SYSTEM_SCM = 1;
+  // The CI executor: run ids, results.
+  RECONCILED_SYSTEM_CI_EXECUTOR = 2;
+  // The cloud: deployment events.
+  RECONCILED_SYSTEM_CLOUD = 3;
+  // IAM: credential issuance.
+  RECONCILED_SYSTEM_IAM = 4;
+  // The evidence store: WORM copy of the records.
+  RECONCILED_SYSTEM_EVIDENCE_STORE = 5;
+  // The transparency log: checkpointed chain heads.
+  RECONCILED_SYSTEM_TRANSPARENCY_LOG = 6;
+}
+
+// MismatchDirection says which side holds the claim the other side lacks.
+enum MismatchDirection {
+  // Zero value; it has no meaning and is rejected.
+  MISMATCH_DIRECTION_UNSPECIFIED = 0;
+  // The chain claims it, the system does not show it.
+  MISMATCH_DIRECTION_CHAIN_ONLY = 1;
+  // The system shows it, the chain has no record.
+  MISMATCH_DIRECTION_SYSTEM_ONLY = 2;
+}
+
+// Mismatch is one disagreement between the chain and a system.
+message Mismatch {
+  // Which side holds the unmatched claim.
+  MismatchDirection direction = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Evidence record involved; empty for MISMATCH_DIRECTION_SYSTEM_ONLY.
+  string ev_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // System compared.
+  ReconciledSystem system = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // System-side identifier (commit SHA, run id, deployment id, credential issuance id), printable ASCII of at most 256 bytes; never vendor error text.
+  string system_reference = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Stable reason code defined by numinance-spec, UPPER_SNAKE of at most 64 bytes (for example COMMIT_NOT_FOUND); never free text or vendor error text.
+  string reason = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ReconciliationReport summarises one reconciliation run over a Change or a time window.
+message ReconciliationReport {
+  // Change reconciled; empty for a window-scoped report covering many Changes.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Start of the window compared.
+  google.protobuf.Timestamp window_start = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // End of the window compared.
+  google.protobuf.Timestamp window_end = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Systems compared in this run.
+  repeated ReconciledSystem systems_compared = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Number of evidence records checked.
+  uint64 records_checked = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Every mismatch found.
+  repeated Mismatch mismatches = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Records matched divided by records_checked, 0 to 1; 1 when records_checked is 0 and mismatches is empty.
+  double completeness = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the report was generated.
+  google.protobuf.Timestamp generated_at = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

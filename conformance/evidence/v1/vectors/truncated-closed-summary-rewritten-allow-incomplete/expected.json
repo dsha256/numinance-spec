@@ -1,0 +1,41 @@
+{
+  "vector": "truncated-closed-summary-rewritten-allow-incomplete",
+  "description": "The same truncated export under --allow-incomplete: still failed.",
+  "status": "shipped",
+  "export": "truncated-closed-summary-rewritten",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "anchor_invalid",
+      "attestation_mismatch",
+      "manifest_mismatch",
+      "view_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:anchor_invalid",
+    "finding:attestation_mismatch",
+    "finding:manifest_mismatch",
+    "finding:view_mismatch",
+    "rule:truncation-caught-by-manifest"
+  ]
+}

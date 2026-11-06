@@ -1,0 +1,35 @@
+{
+  "vector": "file-changed-after-manifest",
+  "description": "A file changed and the index rewritten after the manifest was signed.",
+  "status": "shipped",
+  "export": "file-changed-after-manifest",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "diff_mismatch",
+      "manifest_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:diff_mismatch",
+    "finding:manifest_mismatch"
+  ]
+}

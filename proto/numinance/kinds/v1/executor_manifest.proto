@@ -1,0 +1,60 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// ExecutorManifest declares an author executor: its adapter, capabilities, models and cost class. Profiles select it by metadata.name, the executor id; one adapter ships one manifest per data path.
+// Org-scoped only (the loader refuses another metadata.scope); authority only as the manifest pinned with its adapter in
+// the lockfile. residency waits for a later minor; a residency class is never declared.
+message ExecutorManifest {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "ExecutorManifest".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  ExecutorManifestSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ExecutorCostClass is the relative cost of one run; the router weighs it against the budget. This enum may grow.
+enum ExecutorCostClass {
+  // EXECUTOR_COST_CLASS_UNSPECIFIED is the zero value; a loader rejects it.
+  EXECUTOR_COST_CLASS_UNSPECIFIED = 0;
+  // EXECUTOR_COST_CLASS_LOW is the cheapest class.
+  EXECUTOR_COST_CLASS_LOW = 1;
+  // EXECUTOR_COST_CLASS_MEDIUM is the middle class.
+  EXECUTOR_COST_CLASS_MEDIUM = 2;
+  // EXECUTOR_COST_CLASS_HIGH is the most expensive class.
+  EXECUTOR_COST_CLASS_HIGH = 3;
+}
+
+// ExecutorManifestSpec is what the router reads to select an executor for a work unit. Every field is a claim of the
+// adapter author; the sandbox, egress proxy and broker enforce the request whatever the manifest says.
+message ExecutorManifestSpec {
+  // provider is required: the extension id of the authorexecutor adapter, which must resolve to a lockfile entry.
+  string provider = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // capabilities is required, non-empty and unique; playbook steps require capabilities by name.
+  repeated numinance.types.v1.ExecutorCapability capabilities = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // models is required, non-empty and unique by id: the models the executor may run.
+  repeated ExecutorModel models = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // cost_class is required.
+  ExecutorCostClass cost_class = 4 [json_name = "cost_class", (numinance.annotations.v1.field).since = "1.0.0"];
+  // Field 5 is kept for residency (ADR 0019), added in a later minor. Until then the class derived from the live
+  // configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it.
+}
+
+// ExecutorModel is one model the executor may run; a message, so per-model fields such as residency stay additive.
+message ExecutorModel {
+  // id is required: 1 to 253 bytes of ASCII letters, digits, ".", "_", "-", ":", "/" and "@", starting with a letter or digit.
+  string id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // max_context is required and at least 1: the most tokens of context the model accepts in one request.
+  uint32 max_context = 2 [json_name = "max_context", (numinance.annotations.v1.field).since = "1.0.0"];
+}

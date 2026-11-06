@@ -1,0 +1,76 @@
+// Attestation is produced at Close and binds the Change's identifiers, digests, actors and the evidence sequence range into one signed statement exported with the bundle.
+// Signed per the rule in record.proto with context "numinance.evidence.v1.Attestation" over the canonical form of version canon_version; head_record_hash is a bound field, never the signed value. Nested messages canonicalise recursively as objects keyed by proto field name with empty repeated fields absent; a types.v1.Reference is hashed as {ref, sha256} only (artifact_ref is carried under the key ref in the canonical form), its artifact_type lies outside the hashed form and is never decision-bearing (a verifier parses a checkpoint by the transparencylog port's declared type, not by that field); the exact hashed layout is pinned by golden files in the conformance suite.
+// Order at Close: the runner commits the per-Change checkpoint, then signs this message with checkpoint_ref naming it and inclusion_proof showing head_record_hash under it; both are inside the signed input and nothing is re-signed later. The attestation leaf, sha256(canonical Attestation with signature empty) tagged 0x41, is appended to the TransparencyLog immediately after signing and sealed by the next daily checkpoint; BundleManifest carries its proof.
+// Verification: `numi evidence verify` re-derives every field marked "re-derived" from the records in [first_sequence, last_sequence] and fails on any mismatch; a field marked "attestation leaf" has no source record and is protected only by the leaf's inclusion proof in the bundle. Every field but signature is under the leaf; "re-derived" adds the stronger check.
+// Bounds a decoder enforces before canonicalising or verifying: identifier strings (change_id, ticket, repository, base_commit, result_commit, ci_run_ids, deployment_ids, credential_scopes, approval_ev_ids, ActorIdentity.principal) are printable ASCII of at most 256 bytes with no leading or trailing space; executor_id and model_id follow the Record bound (at most 256 bytes of printable UTF-8); verifier_results, ci_run_ids, deployment_ids, actors, credential_scopes and approval_ev_ids hold at most 1024 entries each; signature is empty or 64 bytes.
+syntax = "proto3";
+
+package numinance.evidence.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/evidence/v1/inclusion_proof.proto";
+import "numinance/types/v1/types.proto";
+
+// ActorIdentity is one identity that acted on the Change, mirroring Record.actor_principal and actor_kind.
+message ActorIdentity {
+  // Principal of the actor, in clear by design.
+  string principal = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identity kind of the actor. PRINCIPAL_KIND_ENGINE is producer-only and never an actor: a consumer rejects it.
+  numinance.types.v1.PrincipalKind kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Attestation is the signed Close statement; the signature is raw Ed25519 by the runner key.
+message Attestation {
+  // Change this attestation covers, chg_ prefixed. Re-derived: Record.change_id of every record in the range.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Ticket identifier or locator only; never ticket text, never a URL carrying a token. Attestation leaf.
+  string ticket = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Repository identifier or locator only; same caveat as ticket. Attestation leaf; reconciliation checks it against the SCM.
+  string repository = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Commit the Change started from. Attestation leaf; reconciliation checks it against the SCM.
+  string base_commit = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Commit the Change produced. Attestation leaf; reconciliation checks it against the SCM.
+  string result_commit = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Executor that authored the Change. Re-derived: Record.executor_id of the records in the range whose actor_kind is PRINCIPAL_KIND_AUTHOR_AGENT; the non-empty values must agree, or verification fails; a non-empty executor_id must have the form <name>@sha256:<64 lowercase hex> (the name and the digest of its ExecutorManifest), otherwise no attestation is made; empty when no such record states one.
+  string executor_id = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Model the executor used. Re-derived: Record.model_id of the records in the range whose actor_kind is PRINCIPAL_KIND_AUTHOR_AGENT; the non-empty values must agree, or verification fails; empty when no such record states one.
+  string model_id = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the sandbox image the author ran in. Re-derived: Record.sandbox_image_digest of the records in the range whose actor_kind is PRINCIPAL_KIND_AUTHOR_AGENT and that carry an executor_id, or of all the AUTHOR_AGENT records when none does (a provider call made for the author states the image of the provider's sandbox); the non-empty values must agree, or verification fails; empty when no such record states one.
+  numinance.types.v1.Digest sandbox_image_digest = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the policy bundle in force. Re-derived: Record.policy_bundle_digest of the records in the range.
+  numinance.types.v1.Digest policy_bundle_digest = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the profile in force. Re-derived: Record.profile_digest of the records in the range.
+  numinance.types.v1.Digest profile_digest = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the toolchain used. Attestation leaf.
+  numinance.types.v1.Digest toolchain_digest = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Verifier results as claim-check references. Re-derived: Record.outputs of the records in the range whose action equals `verifier.run`.
+  repeated numinance.types.v1.Reference verifier_results = 12 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identifiers of the CI runs that verified the Change. Attestation leaf; reconciliation checks them against the CI executor.
+  repeated string ci_run_ids = 13 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identifiers of the deployments the Change produced. Attestation leaf; reconciliation checks them against the cloud.
+  repeated string deployment_ids = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Every identity that acted on the Change. Re-derived: the set of Record.actor_principal and actor_kind over the range.
+  repeated ActorIdentity actors = 15 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Credential scope names used; never credential material. Attestation leaf; reconciliation checks them against IAM.
+  repeated string credential_scopes = 16 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The egress allow-list in force, as a claim-check reference. Attestation leaf.
+  numinance.types.v1.Reference network_policy = 17 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // ev_id of each gate-decision record: the PlanGateDecided.v1 lifecycle record (adding a second lifecycle name is a later contract-additive comment change); the record carries the approver and the separation-of-duties facts. Re-derived: those lifecycle records in the range; a verifier fails on any ev_id that is not a known gate-decision record.
+  repeated string approval_ev_ids = 18 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // First sequence in the attested evidence range. Re-derived: the chain.
+  uint64 first_sequence = 19 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Last sequence in the attested evidence range: the terminal record of a sealed chain, whose seal record follows it. Re-derived: the chain.
+  uint64 last_sequence = 20 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the record at last_sequence (the terminal record, not the seal record that follows it); a bound field covered by the signature. Re-derived: the chain.
+  numinance.types.v1.Digest head_record_hash = 21 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Raw Ed25519 signature (64 bytes) by the runner key over the signing input.
+  bytes signature = 22 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the runner public key that made the signature; the key material travels in provenance/, which is not a trust anchor: a key is trusted only through the attestation leaf's checkpoint anchor or an out-of-band key registry, and a key outside the trusted set fails verification.
+  numinance.types.v1.Digest signing_key_id = 23 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Version of the canonical form used for the signing input; 1 for spec 1.0.0, 0 is rejected.
+  uint32 canon_version = 24 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The per-Change TransparencyLog checkpoint committing head_record_hash; required, set before signing. Verified against the checkpoint.
+  numinance.types.v1.Reference checkpoint_ref = 25 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Proof that the head leaf (0x48 || head_record_hash) is under checkpoint_ref; required, inside the signed input. Verified against the checkpoint.
+  InclusionProof inclusion_proof = 26 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

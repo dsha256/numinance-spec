@@ -1,0 +1,33 @@
+// Checkpoint is the TransparencyLog's signed statement of its tree at one moment. An InclusionProof is checked against its tree_size and root_hash; a per-Change checkpoint is the checkpoint taken after the Change's head leaf is appended, not a separate shape.
+// It lives in evidence/v1 under this exact name, never in a port package, because every stored signature carries the context "numinance.evidence.v1.Checkpoint". The transparencylog port declares the artifact type "numinance.evidence.v1.checkpoint" for the checkpoint_ref that points at it.
+// Canonical form and signing follow record.proto (canon_version 1): signature = Ed25519(log_key, context || sha256(canonical checkpoint with signature empty)); signing_key_id is the Digest of the raw 32-byte log public key and is inside the hash. The log key is not the runner key: a checkpoint is evidence only when the verifier holds the log origin and key in its own trust set.
+// Two forms share this message. A Numinance-signed checkpoint (the customer-local ledger before signed notes, and every checkpoint stored so far) leaves signed_note empty and is signed as above. A note-carrying checkpoint (ADR 0037 decision 4) holds the log's own C2SP signed note in signed_note, unchanged: no provider re-signs, so signature and signing_key_id are empty and the note's signature lines, checked against the origin and key in the verifier's own trust set, authenticate it. origin, tree_size, root_hash and, under the required timestamp rule, timestamp are claims that the verifier compares with the note body and the note's time extension line; the decoded timestamp of a note-carrying checkpoint is an unverified claim until the note verifier binds it. A decoder does not verify the note.
+// Time (ADR 0037 decision 4): a C2SP note carries no timestamp. timestamp is required for a Numinance-signed checkpoint and for the customer-local ledger, whose signing time is also written in an extension line of its signed note, covered by the note signature, and which never steps back; it is optional on the wire for the Rekor entry formats, where time comes from a witness cosignature or an RFC 3161 timestamp. Which rule applies is the verifier's, taken from its trust set for the log, never from the checkpoint or the provider: a decoder given the required rule refuses a checkpoint without a timestamp.
+// Bounds a decoder enforces: origin is 1 to 256 bytes of printable UTF-8 (no control, format or non-ASCII space characters) with no leading or trailing space; tree_size is 1 to 2^53-1 (an empty log has no checkpoint); a stored Numinance-signed checkpoint is signed, signature is 64 bytes; the note verifier checks the limit of 16 signature lines in a signed_note; the encoded checkpoint is at most 4096 bytes without a signed_note; signed_note is at most 65536 bytes and the encoded note-carrying checkpoint at most 90112 bytes; unknown, duplicate and case-variant keys are rejected.
+syntax = "proto3";
+
+package numinance.evidence.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// Checkpoint commits the first tree_size leaves of one log to root_hash, signed by the log key.
+message Checkpoint {
+  // Name of the log; a verifier compares it with the origin in its trust set.
+  string origin = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Number of leaves committed, 1 to 2^53-1 so the canonical JSON number is exact.
+  uint64 tree_size = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // RFC 6962 Merkle Tree Hash over the first tree_size leaves.
+  numinance.types.v1.Digest root_hash = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the log signed, UTC. Required for a Numinance-signed checkpoint and for the customer-local ledger; optional for the Rekor formats, where its absence means the log gave no time (see the file comment).
+  google.protobuf.Timestamp timestamp = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Version of the canonical form used for the signing input; 1 for spec 1.0.0, 0 is rejected.
+  uint32 canon_version = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Raw Ed25519 signature (64 bytes) by the log key over the signing input in the file comment.
+  bytes signature = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the log public key that made the signature; inside the signed hash.
+  numinance.types.v1.Digest signing_key_id = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The log's own C2SP signed note, byte for byte as the log served it, at most 65536 bytes. Empty for a Numinance-signed checkpoint. When set, signature and signing_key_id must be empty.
+  bytes signed_note = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

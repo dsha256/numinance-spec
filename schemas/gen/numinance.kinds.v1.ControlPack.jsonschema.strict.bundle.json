@@ -1,0 +1,394 @@
+{
+  "$defs": {
+    "google.protobuf.Value.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Value"
+    },
+    "numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloor caps the level of the changes it matches; when floors from the org and control packs match, the\n lowest max_level holds.",
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        },
+        "max_level": {
+          "description": "max_level is required: no rule, default or narrower scope resolves a matching change above it.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_level"
+      ],
+      "title": "Autonomy Floor",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "rules": {
+          "description": "rules is required and non-empty; the loader enforces it, the schema cannot.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Autonomy Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyMatch selects changes; an absent key matches every value and an empty match matches every change. In a\n rule, risk matches exactly and a key the change has no value for does not match. In a floor, risk matches that\n class and every higher one, and a key the change has no value for counts as a match.",
+      "properties": {
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        },
+        "playbook": {
+          "description": "playbook is the name of the change's playbook.",
+          "type": "string"
+        },
+        "risk": {
+          "description": "risk is the change's risk class, fixed at Classified.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        }
+      },
+      "title": "Autonomy Match",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Control.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Control is one requirement of the framework.",
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/numinance.kinds.v1.ControlApproval.jsonschema.strict.json",
+          "description": "approval is the human approval the control requires; absent requires none beyond the stage gates."
+        },
+        "id": {
+          "description": "id is required: the control's id within the pack, such as \"req-6.4.2\".",
+          "type": "string"
+        },
+        "requires_evidence": {
+          "description": "requires_evidence names the evidence a change the control applies to must record, unique; missing declared evidence\n turns success into PARTIAL.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Control",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ControlApproval.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlApproval is the approval a control requires. Policy enforces it at the release gate (and the plan gate where a\n stage declares one) whatever the StageRegistry contains; it only adds to the registry's gates. The loader refuses group\n or dual_control unless human is true.",
+      "properties": {
+        "dual_control": {
+          "description": "dual_control is true when two distinct human principals, neither the author nor acting in the author's run, must\n approve; absent means false.",
+          "type": "boolean"
+        },
+        "group": {
+          "description": "group names the approver group the approver must belong to; membership comes from the org's identity provider,\n never from repository files.",
+          "type": "string"
+        },
+        "human": {
+          "description": "human is true when a human principal must approve; absent means false.",
+          "type": "boolean"
+        }
+      },
+      "title": "Control Approval",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ControlFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlFloors is the set of floors a pack adds; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "autonomy": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloors.jsonschema.strict.json",
+          "description": "autonomy caps levels as AutonomyPolicy floors do; the lowest matching max_level of the org and every pack holds."
+        },
+        "residency": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyFloors.jsonschema.strict.json",
+          "description": "residency adds residency floors as ResidencyPolicy floors do; every floor of the org and every pack holds."
+        }
+      },
+      "title": "Control Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ControlPack.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlPack holds the controls of one compliance framework, the evidence and approvals each control requires, and the\n floors the pack adds. A pack only restricts: its floors add to the org's, never displace\n them. It has authority only when loaded from a protected path or a signed policy bundle; any other copy, even one\n claiming SCOPE_ORG, is RepositoryAuthored with no authority. The loader refuses a metadata.scope other than SCOPE_ORG.",
+      "properties": {
+        "apiVersion": {
+          "description": "api_version is required and is \"numinance.dev/v1\".",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/google.protobuf.Value.jsonschema.strict.json"
+          },
+          "description": "extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "description": "kind is required and is \"ControlPack\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+          "description": "metadata is required; the loader enforces it, the schema cannot."
+        },
+        "spec": {
+          "$ref": "#/$defs/numinance.kinds.v1.ControlPackSpec.jsonschema.strict.json",
+          "description": "spec is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind"
+      ],
+      "title": "Control Pack",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ControlPackSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlPackSpec says which framework the pack reads, when it applies, and what it requires.",
+      "properties": {
+        "applicability": {
+          "description": "applicability is a CEL expression over policy-computed facts of the change that selects the changes the pack's\n controls and floors apply to; absent means every change of a component whose resolved profile names the pack. One\n line of at most 4096 bytes; the profile context compiles it to a bool, and an evaluation error means the pack applies.",
+          "type": "string"
+        },
+        "controls": {
+          "description": "controls is required, non-empty and unique by id.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.Control.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "counsel_status": {
+          "description": "counsel_status is required.",
+          "enum": [
+            "COUNSEL_STATUS_UNSPECIFIED",
+            "COUNSEL_STATUS_NOT_REVIEWED",
+            "COUNSEL_STATUS_UNDER_REVIEW",
+            "COUNSEL_STATUS_REVIEWED"
+          ],
+          "title": "Counsel Status",
+          "type": "string"
+        },
+        "effective_date": {
+          "description": "effective_date is required: the day the framework version takes effect, as YYYY-MM-DD.",
+          "type": "string"
+        },
+        "export_views": {
+          "description": "export_views are the evidence export views the pack offers, unique by name.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ExportView.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "floors": {
+          "$ref": "#/$defs/numinance.kinds.v1.ControlFloors.jsonschema.strict.json",
+          "description": "floors are the floors the pack adds; they combine with the org's floors (or the shipped ones) and only tighten."
+        },
+        "framework": {
+          "description": "framework is required: the framework's name, such as \"pci-dss\".",
+          "type": "string"
+        },
+        "jurisdiction": {
+          "description": "jurisdiction is required: where the framework applies, such as \"global\" or \"eu\".",
+          "type": "string"
+        },
+        "sources": {
+          "description": "sources cite the texts the pack reads, unique; each is one line of at most 1024 bytes.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "description": "version is required: the framework's version, such as \"4.0.1\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "jurisdiction",
+        "framework",
+        "version",
+        "effective_date",
+        "counsel_status"
+      ],
+      "title": "Control Pack Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ExportView.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ExportView is a named selection of a change's evidence for one audience, such as one requirement of the framework.",
+      "properties": {
+        "controls": {
+          "description": "controls is required and non-empty: the ids of the pack's controls whose evidence the view exports, unique.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "name is required: the view's name, as numi evidence export --view takes it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Export View",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "floor": {
+          "description": "floor is required: it applies to every change, together with every matching rule's floor.",
+          "enum": [
+            "RESIDENCY_CLASS_UNSPECIFIED",
+            "RESIDENCY_CLASS_IN_ACCOUNT",
+            "RESIDENCY_CLASS_PRIVATE_ENDPOINT",
+            "RESIDENCY_CLASS_VENDOR_ZDR",
+            "RESIDENCY_CLASS_VENDOR_STANDARD",
+            "RESIDENCY_CLASS_AIRGAPPED"
+          ],
+          "title": "Residency Class",
+          "type": "string"
+        },
+        "rules": {
+          "description": "rules add floors per component and environment; a rule never relaxes floor.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ResidencyRule.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "floor"
+      ],
+      "title": "Residency Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyMatch selects changes; an absent key matches every value and an empty match matches every change, and a\n key the change has no value for counts as a match. Floors from the org and control packs all hold together.",
+      "properties": {
+        "component": {
+          "description": "component is the name of the component the change touches. It is not a security boundary until floors match only\n components of an org-owned SIGNED_POLICY registry, since a repo can rename one.",
+          "type": "string"
+        },
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        }
+      },
+      "title": "Residency Match",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyRule.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyRule adds a floor for the changes it matches.",
+      "properties": {
+        "floor": {
+          "description": "floor is required.",
+          "enum": [
+            "RESIDENCY_CLASS_UNSPECIFIED",
+            "RESIDENCY_CLASS_IN_ACCOUNT",
+            "RESIDENCY_CLASS_PRIVATE_ENDPOINT",
+            "RESIDENCY_CLASS_VENDOR_ZDR",
+            "RESIDENCY_CLASS_VENDOR_STANDARD",
+            "RESIDENCY_CLASS_AIRGAPPED"
+          ],
+          "title": "Residency Class",
+          "type": "string"
+        },
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "floor"
+      ],
+      "title": "Residency Rule",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ControlPack.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ControlPack.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

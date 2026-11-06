@@ -1,0 +1,34 @@
+{
+  "vector": "path-empty",
+  "description": "The empty string as the directory path: a usage error, never the working directory.",
+  "status": "shipped",
+  "materialize": [
+    {
+      "op": "empty_path"
+    }
+  ],
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2",
+    "rule:empty-path"
+  ]
+}

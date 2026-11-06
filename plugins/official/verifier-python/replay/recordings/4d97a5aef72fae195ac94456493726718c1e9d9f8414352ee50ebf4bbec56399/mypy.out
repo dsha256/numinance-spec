@@ -1,0 +1,2 @@
+{"file": "shop/domain/pricing.py", "line": 7, "column": 11, "end_line": 7, "end_column": 22, "message": "Incompatible return value type (got \"int\", expected \"str\")", "hint": null, "code": "return-value", "severity": "error"}
+{"file": "tests/test_pricing.py", "line": 5, "column": 11, "end_line": 5, "end_column": 37, "message": "Non-overlapping equality check (left operand type: \"str\", right operand type: \"Literal[4]\")", "hint": null, "code": "comparison-overlap", "severity": "error"}

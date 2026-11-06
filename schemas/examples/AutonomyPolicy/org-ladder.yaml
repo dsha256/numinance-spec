@@ -1,0 +1,11 @@
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {environment: production}, max_level: AUTONOMY_LEVEL_MERGE}

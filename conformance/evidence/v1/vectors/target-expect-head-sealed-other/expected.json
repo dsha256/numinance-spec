@@ -1,0 +1,35 @@
+{
+  "vector": "target-expect-head-sealed-other",
+  "description": "NEW: any other digest fails.",
+  "status": "target",
+  "export": "closed-sealed",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "expect_head": "sha256:cfe3d79b4663e5a178e3720a0f44c5503a79c7fe5c2230192fc3bdadb8e89393"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "expectation_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:expectation_mismatch",
+    "rule:expect-flags"
+  ]
+}

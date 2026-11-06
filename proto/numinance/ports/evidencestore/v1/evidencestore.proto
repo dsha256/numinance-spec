@@ -1,0 +1,152 @@
+// The evidencestore port (ADR 0020, refined by ADR 0037): the write-once store of record for every Change's evidence chain, on storage the customer already owns.
+// Callers: only the evidence context under the runner identity calls this port. Writes need the grant scope evidence.write and reads evidence.read; only a runner grant carries them, a kernel floors rule denies them to every other actor kind, and the plugin host refuses an Invoke without the scope and an allowing policy decision. The scope names evidence.write, evidence.read and transparencylog.append are reserved to this port and transparencylog: the host refuses to register any other service descriptor that declares them. The port is never a model tool, and no tool_groups are declared. Nothing is updated or deleted: every verb adds an object or reads one.
+// Objects: the store keeps opaque bytes. A record is its canonical form (evidence/v1 record.proto, canon_version 2), keyed by (change_id, sequence); the seal of a Change is its last record, an ordinary record whose action is EvidenceSealed.v1 and whose single output is the checkpoint_ref (sealing is a use case of the evidence context, not a verb of this port). The provider never parses, canonicalizes or repairs them, so it cannot tell a seal from another record.
+// Writers: the evidence context holds a fenced single-writer lease per Change across the cluster for every create; before each create it checks Head against its own head and the last anchored leaf, and after each create, the seal record included, it reads Head back. Waiting for the lease is normal; a lease not acquired by the step deadline, a lost or fenced lease, or a failed freshness or read-back check is an evidence-write failure and trips the circuit breaker. The provider's conditional create and digest comparisons are a second guard, not the lease.
+// Write-once: a create stores the object only if no object exists at its key. Bytes equal to the stored ones are a replay and succeed without writing; any other bytes at a taken key fail with ALREADY_EXISTS and leave the stored object unchanged. Of concurrent creates at one key exactly one is stored, and every create of the stored bytes succeeds. An object is visible to every read that starts after its create returns.
+// Order of checks on a create: first the bounds and the integrity rule (INVALID_ARGUMENT); then a taken key, where identical bytes are a replay and other bytes ALREADY_EXISTS, also after the seal record; only then, for a create at a free key, the order rule: FAILED_PRECONDITION for a record at sequence n above 1 unless the stored record at n-1 has previous_content_sha256 as its digest. The order check and the create are one atomic step per Change, so of two creates at one sequence that race, exactly one succeeds. That nothing follows the seal record is the evidence context's rule under its lease, not the provider's, which holds opaque bytes: every reader re-verifies the chain and treats a record after the seal as a provider fault.
+// Integrity: every object travels with content_sha256, the sha256 of its bytes. The provider refuses a create whose content_sha256 is absent, malformed or not the digest of its bytes; a write response returns the content_sha256 of the stored object; a provider whose stored bytes no longer hash to their digest answers DATA_LOSS, never the bytes.
+// Untrusted answers: the evidence context decodes every object it reads strictly and re-verifies the chain (record_hash, previous_record_hash, signatures, the seal record) before it trusts any of it. It also checks that a decoded record's change_id and sequence are the requested key, that HeadResponse.sequence is the decoded head record's sequence, and that each ListRange page continues the previous one (its first record's previous_record_hash is the record_hash of the last record read). A failed check is a provider fault, never a shorter chain.
+// Status codes: INVALID_ARGUMENT for a request that breaks a bound below or the integrity rule, ALREADY_EXISTS for a taken key with other bytes, FAILED_PRECONDITION for a create out of order, NOT_FOUND for an absent record, DATA_LOSS for stored bytes that fail their digest, UNAVAILABLE for a storage failure the caller may retry. A provider never reports a write it did not make.
+// Bounds: change_id matches ^chg_[0-9a-f]{32}$; sequence is 1 to 2^53-1; previous_content_sha256 is a well-formed digest, required above sequence 1 and absent at sequence 1; these bounds are checked first, before the taken-key step; a record object, the seal record included, is 1 to 3145728 bytes (3 MiB, the evidence domain's MaxRecordBytes, checked before signing); a ListRange span is at most 256 sequences. So every response fits one PluginService Invoke message of at most 4 MiB. Over-limit input is rejected, never truncated.
+// Dry run: no verb supports it, as each write RPC states. No verb declares evidence: the store is the evidence of record, and the evidence context records its own writes in the chain.
+// Every element is since 1.0.0.
+syntax = "proto3";
+
+package numinance.ports.evidencestore.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// EvidenceStoreService is the evidencestore port a storage provider serves.
+service EvidenceStoreService {
+  // AppendLocked creates the record object at (change_id, sequence) while the evidence context holds the Change's fenced single-writer lease; it is irreversible by design, hence HIGH; a replay of identical bytes succeeds without writing. No dry run: the record is fully built and checked by the caller before the call, there is no plan to preview, and a replay is a no-op.
+  rpc AppendLocked(AppendLockedRequest) returns (AppendLockedResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Stores one canonical evidence record write-once at its Change and sequence."
+      scopes: "evidence.write"
+    };
+  }
+  // GetRecord returns the record object at (change_id, sequence), or NOT_FOUND.
+  rpc GetRecord(GetRecordRequest) returns (GetRecordResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns one stored evidence record of a Change by sequence."
+      scopes: "evidence.read"
+    };
+  }
+  // ListRange returns the stored records from from_sequence to to_sequence in sequence order. The page stops early at the last stored sequence, or before the record that would take the page past 3145728 bytes of content; a non-empty page holds at least one record, and an early stop is not the end of the chain. A page is empty only when from_sequence is past the last stored sequence; an empty page below the head is a provider fault.
+  rpc ListRange(ListRangeRequest) returns (ListRangeResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns a page of stored evidence records of a Change in sequence order."
+      scopes: "evidence.read"
+    };
+  }
+  // Head returns the highest stored sequence of a Change, the record stored there (the seal record once the chain is sealed), both from one snapshot; the zero response for a Change with no records.
+  rpc Head(HeadRequest) returns (HeadResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the last stored record of a Change's evidence chain."
+      scopes: "evidence.read"
+    };
+  }
+}
+
+// StoredObject is one object as the store keeps it: its bytes and their digest.
+message StoredObject {
+  // Canonical bytes of the object, never parsed by the provider: 1 to 3145728 bytes.
+  bytes content = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // sha256 of content; required on a create, which is refused when it is absent, malformed or another digest; a reader refuses a mismatch.
+  numinance.types.v1.Digest content_sha256 = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AppendLockedRequest names the key of one record and carries its canonical bytes.
+message AppendLockedRequest {
+  // Change the record belongs to, ^chg_[0-9a-f]{32}$.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // 1-based position of the record in the chain, 1 to 2^53-1.
+  uint64 sequence = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The record in its canonical form.
+  StoredObject record = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // content_sha256 of the stored record at sequence-1, required above sequence 1 and absent at sequence 1, so the predecessor is compared by content, not only by presence.
+  numinance.types.v1.Digest previous_content_sha256 = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AppendLockedResponse reports that the record is stored, by this call or by an identical earlier one.
+message AppendLockedResponse {
+  // True when the call found identical bytes already stored and wrote nothing.
+  bool replayed = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // sha256 of the stored object; the caller refuses a response where it differs from the request's.
+  numinance.types.v1.Digest content_sha256 = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetRecordRequest names one record.
+message GetRecordRequest {
+  // Change the record belongs to, ^chg_[0-9a-f]{32}$.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // 1-based position of the record in the chain, 1 to 2^53-1.
+  uint64 sequence = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetRecordResponse carries one stored record.
+message GetRecordResponse {
+  // The stored record as kept.
+  StoredObject record = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListRangeRequest names a span of sequences of one Change.
+message ListRangeRequest {
+  // Change whose records are listed, ^chg_[0-9a-f]{32}$.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // First sequence of the span, 1 to 2^53-1.
+  uint64 from_sequence = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Last sequence of the span, at least from_sequence, less than from_sequence plus 256 and at most 2^53-1.
+  uint64 to_sequence = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListRangeResponse carries one page of stored records.
+message ListRangeResponse {
+  // Stored records from from_sequence on, consecutive and in sequence order.
+  repeated ListedRecord records = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListedRecord is one stored record with its sequence.
+message ListedRecord {
+  // 1-based position of the record in the chain.
+  uint64 sequence = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The stored record as kept.
+  StoredObject record = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// HeadRequest names one Change.
+message HeadRequest {
+  // Change whose head is read, ^chg_[0-9a-f]{32}$.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// HeadResponse is the stored state of one Change's chain.
+message HeadResponse {
+  // Highest stored sequence, 0 for a Change with no records.
+  uint64 sequence = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The record at sequence, unset when sequence is 0; the reader takes the head record_hash from it, never from a provider claim.
+  StoredObject head_record = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  reserved 3;
+  reserved "seal";
+}

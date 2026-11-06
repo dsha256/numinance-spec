@@ -1,0 +1,23 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.SeparationOfDuties.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "SeparationOfDuties names who may not approve; the author is always excluded.",
+      "properties": {
+        "distinct_from": {
+          "description": "distinct_from names the identities or roles the approver must differ from, beyond the author\n and the author's run: the approver is never the author and the approver's run_id is never the author's run_id.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Separation Of Duties",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.SeparationOfDuties.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.SeparationOfDuties.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

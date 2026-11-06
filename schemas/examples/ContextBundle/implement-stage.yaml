@@ -1,0 +1,29 @@
+apiVersion: numinance.dev/v1
+kind: ContextBundle
+spec:
+  change_id: chg_01JB2Q8W3N5M7K9P1R3T5V7X9Z
+  work_unit_id: wu_01JB2Q8Z4P6R8T0V2X4Z6B8D0F
+  stage: implement
+  context_generation: 1
+  authz_context_digest: {value: "sha256:5c2e8a1f3b7d9e0c4a6f8b2d1e3c5a7f9b0d2e4c6a8f1b3d5e7c9a0f2b4d6e8c"}
+  resolver: {model_id: eu.anthropic.claude-haiku-v1:0, prompt_version: resolver-3}
+  query_plan:
+    - {tool: searchConfluenceUsingCql, args_digest: {value: "sha256:7a9c1e3b5d7f9a2c4e6b8d0f1a3c5e7b9d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c"}, results: 6, truncated: false}
+  sources:
+    - {ref: confluence-eng/ENG/pages/4211, system: confluence-eng, title: Payments retry policy, source_version: "17", fetched_at: "2026-10-18T09:12:44Z",
+       digest: {value: "sha256:1e3c5a7f9b2d4e6c8a0f1b3d5e7c9a2f4b6d8e0c1a3f5b7d9e2c4a6f8b0d1e3c"}, rank: 1, selection_reason: Names the retry limits the task changes.,
+       classification: internal, redactions: 0, access_basis: KNOWLEDGE_AUTH_USER_DELEGATED, staleness: SOURCE_STALENESS_FRESH, trust: TRUST_CLASS_UNTRUSTED_RETRIEVED}
+  authored_constraints:
+    - {origin: ArchitecturePack/layered-service, id: no-domain-io, statement: The domain layer performs no I/O.,
+       origin_digest: {value: "sha256:9d1f3b5e7a9c2e4f6b8d0a1c3e5f7b9d2a4c6e8f0b1d3a5c7e9f2b4d6a8c0e1f"}, trust: TRUST_CLASS_SIGNED_POLICY}
+  cited_guidance:
+    - {ref: confluence-eng/ENG/pages/4211, section: retry-limits}
+  unresolved_questions:
+    - {question: "Does the new limit apply to card refunds?", blocking: false}
+  budget_used: {tokens: 5400, calls: 4, ms: 8200}
+  pinned_toolsets:
+    confluence-eng: {value: "sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f"}
+  receipts:
+    - {value: "sha256:6b8d0f2a4c6e8b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c5e7b9d"}
+  conflicts:
+    - {topic: refund retry limit, claims: [{ref: confluence-eng/ENG/pages/4211, section: retry-limits}, {ref: confluence-eng/ENG/pages/4211, section: refunds}]}

@@ -1,0 +1,30 @@
+{
+  "vector": "key-file-oversize-is-usage-error",
+  "description": "A key file over 1024 bytes whose first bytes are a valid key: refused, never read as a truncated key.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner-oversize.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner-oversize.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2",
+    "rule:key-file-forms"
+  ]
+}

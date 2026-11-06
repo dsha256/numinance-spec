@@ -1,0 +1,34 @@
+{
+  "vector": "closed-author-verified",
+  "description": "An author agent with an executor, a model and a sandbox; a plan; a gate decision; a verifier run; a verdict overruled by a second one; a repair; a correction record; a published commit; lifecycle objects; and a change.json that vouches for the author, the run ids, the repair counters and the plan.",
+  "status": "shipped",
+  "export": "closed-author",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "complete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:author-agent",
+    "rule:correction",
+    "rule:overrules"
+  ]
+}

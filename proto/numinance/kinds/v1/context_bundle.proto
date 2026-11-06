@@ -1,0 +1,169 @@
+// Key spelling and json_name: see meta.proto. ContextBundle is produced, not authored: the kind loader does not load it.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/knowledge_connection.proto";
+import "numinance/types/v1/types.proto";
+
+// ContextBundle is the knowledge selected for one stage of one work unit,
+// produced by the knowledge context, stored by digest and never mutated (a refresh opens a new context_generation). It
+// is never configuration: no metadata, no extensions, and the kind loader refuses it. Every text field is untrusted,
+// labelled as such in a prompt, one line of at most 1024 bytes without control or bidi characters (the knowledge decoder).
+message ContextBundle {
+  reserved 3, 5;
+  reserved "metadata", "extensions";
+
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "ContextBundle".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required.
+  ContextBundleSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// SourceStaleness says whether a source was current when the bundle was built. This enum may grow.
+enum SourceStaleness {
+  // SOURCE_STALENESS_UNSPECIFIED is the zero value; a decoder rejects it.
+  SOURCE_STALENESS_UNSPECIFIED = 0;
+  // SOURCE_STALENESS_FRESH means no newer source version was seen and the age is within the thresholds.
+  SOURCE_STALENESS_FRESH = 1;
+  // SOURCE_STALENESS_STALE means a newer source version exists or the age is past a threshold.
+  SOURCE_STALENESS_STALE = 2;
+  // SOURCE_STALENESS_UNKNOWN means the source reports no version or date.
+  SOURCE_STALENESS_UNKNOWN = 3;
+}
+
+// ContextBundleSpec is the bundle; relevance scores are not stored because they are not reproducible.
+message ContextBundleSpec {
+  // change_id is required: the Change the bundle was built for.
+  string change_id = 1 [json_name = "change_id", (numinance.annotations.v1.field).since = "1.0.0"];
+  // work_unit_id is required: the work unit the bundle was built for.
+  string work_unit_id = 2 [json_name = "work_unit_id", (numinance.annotations.v1.field).since = "1.0.0"];
+  // stage is required: the stage name the bundle serves.
+  string stage = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // context_generation is the resolution generation, from 1; a refresh opens a new one and never changes an earlier bundle.
+  uint32 context_generation = 4 [json_name = "context_generation", (numinance.annotations.v1.field).since = "1.0.0"];
+  // authz_context_digest is required: the AuthorizationContext digest every search and fetch ran under.
+  numinance.types.v1.Digest authz_context_digest = 5 [json_name = "authz_context_digest", (numinance.annotations.v1.field).since = "1.0.0"];
+  // resolver is required: the model and prompt that planned the queries and selected the sources.
+  BundleResolver resolver = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // query_plan lists the searches the resolver ran, in order.
+  repeated BundleQuery query_plan = 7 [json_name = "query_plan", (numinance.annotations.v1.field).since = "1.0.0"];
+  // sources lists the selected sources, unique by ref.
+  repeated BundleSource sources = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // authored_constraints come only from the resolved profile's policy and packs; enforcement comes from the grant.
+  repeated AuthoredConstraint authored_constraints = 9 [json_name = "authored_constraints", (numinance.annotations.v1.field).since = "1.0.0"];
+  // cited_guidance points at sections of the sources; it is advisory only and untrusted.
+  repeated CitedGuidance cited_guidance = 10 [json_name = "cited_guidance", (numinance.annotations.v1.field).since = "1.0.0"];
+  // unresolved_questions are what the sources did not answer; a model wrote them from untrusted input, so they are untrusted.
+  repeated UnresolvedQuestion unresolved_questions = 11 [json_name = "unresolved_questions", (numinance.annotations.v1.field).since = "1.0.0"];
+  // budget_used is required: what building the bundle consumed.
+  BundleBudgetUsed budget_used = 12 [json_name = "budget_used", (numinance.annotations.v1.field).since = "1.0.0"];
+  // pinned_toolsets maps each KnowledgeConnection name to the digest of the tool inventory pinned when it was read.
+  map<string, numinance.types.v1.Digest> pinned_toolsets = 13 [json_name = "pinned_toolsets", (numinance.annotations.v1.field).since = "1.0.0"];
+  // receipts holds the artifact digest of the retrieval receipt of every search and fetch; the bundle does not repeat them.
+  repeated numinance.types.v1.Digest receipts = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // conflicts lists sources that disagree; a conflict a pack's precedence resolves is left out, none silently.
+  repeated BundleConflict conflicts = 15 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BundleConflict is one disagreement between sources: what it is about and the source section of every claim.
+message BundleConflict {
+  // topic is required: what the sources disagree on.
+  string topic = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // claims has at least two entries, each the section of a source that makes one claim.
+  repeated CitedGuidance claims = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BundleResolver names the resolver model and prompt.
+message BundleResolver {
+  // model_id is required.
+  string model_id = 1 [json_name = "model_id", (numinance.annotations.v1.field).since = "1.0.0"];
+  // prompt_version is required.
+  string prompt_version = 2 [json_name = "prompt_version", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BundleQuery is one search: the tool, the digest of its arguments, how many results it returned and whether it was cut.
+message BundleQuery {
+  // tool is required: the tool name as the connection pins it.
+  string tool = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // args_digest is required: the digest of the canonical arguments, never the arguments.
+  numinance.types.v1.Digest args_digest = 2 [json_name = "args_digest", (numinance.annotations.v1.field).since = "1.0.0"];
+  // results is the number of results returned.
+  uint32 results = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // truncated is true when the results were cut at a cap.
+  bool truncated = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BundleSource is one selected source; its content is the artifact with this digest, delivered read-only to the worktree.
+message BundleSource {
+  // ref is required and unique: the canonical source reference, redacted, since a ref can hold a credential.
+  string ref = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // system is required: the KnowledgeConnection name the source was read through.
+  string system = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // title is the source's own title.
+  string title = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // source_version is the version or ETag the source reported; absent when it reports none.
+  optional string source_version = 4 [json_name = "source_version", (numinance.annotations.v1.field).since = "1.0.0"];
+  // fetched_at is required.
+  google.protobuf.Timestamp fetched_at = 5 [json_name = "fetched_at", (numinance.annotations.v1.field).since = "1.0.0"];
+  // digest is required: the digest of the redacted content delivered to the executor.
+  numinance.types.v1.Digest digest = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // rank is the source's position in the selection, from 1.
+  uint32 rank = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // selection_reason is required: why the resolver selected the source.
+  string selection_reason = 8 [json_name = "selection_reason", (numinance.annotations.v1.field).since = "1.0.0"];
+  // classification is the source's data classification as the source system reports it.
+  string classification = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // redactions is the number of secrets and PII spans redacted before persistence.
+  uint32 redactions = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // access_basis is required: whose authority the fetch ran under.
+  KnowledgeAuth access_basis = 11 [json_name = "access_basis", (numinance.annotations.v1.field).since = "1.0.0"];
+  // staleness is required.
+  SourceStaleness staleness = 12 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // trust is required and is TRUST_CLASS_UNTRUSTED_RETRIEVED; a decoder refuses any other value.
+  numinance.types.v1.TrustClass trust = 13 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AuthoredConstraint is one constraint with its provenance; a prompt labels its text untrusted.
+message AuthoredConstraint {
+  // origin is required: the kind and name of the object it comes from, such as "ArchitecturePack/company-python".
+  string origin = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // id is required: the rule or control id within origin.
+  string id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // statement is the constraint text as its origin states it, for display only.
+  string statement = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // origin_digest is required: the digest of the origin as the lockfile or the signed policy bundle pins it.
+  numinance.types.v1.Digest origin_digest = 4 [json_name = "origin_digest", (numinance.annotations.v1.field).since = "1.0.0"];
+  // trust is required and is TRUST_CLASS_SIGNED_POLICY or TRUST_CLASS_KERNEL; a decoder refuses any other value.
+  numinance.types.v1.TrustClass trust = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CitedGuidance points at one section of a source.
+message CitedGuidance {
+  // ref is required and is the ref of a source in the bundle.
+  string ref = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // section is the section id the bundle tool serves; absent means the whole source.
+  optional string section = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// UnresolvedQuestion is one question the sources did not answer.
+message UnresolvedQuestion {
+  // question is required.
+  string question = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // blocking is true when the Change cannot proceed without an answer; the question is then posted to the ticket.
+  bool blocking = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BundleBudgetUsed is what building the bundle consumed, checked against the stage budget of the profile.
+message BundleBudgetUsed {
+  // tokens is the bundle size in tokens.
+  uint32 tokens = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // calls is the number of resolver searches and fetches.
+  uint32 calls = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // ms is the wall-clock time in milliseconds.
+  uint32 ms = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

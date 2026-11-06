@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "google.protobuf.Struct.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Struct",
+      "type": "object"
+    },
+    "google.protobuf.Value.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Value"
+    },
+    "numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitectureCheck binds a rule to one verifier rule.",
+      "properties": {
+        "config": {
+          "$ref": "#/$defs/google.protobuf.Struct.jsonschema.strict.json",
+          "description": "config is passed to the verifier as is; the Engine never reads it."
+        },
+        "rule_id": {
+          "description": "rule_id is required: the verifier's id of the rule its findings carry.",
+          "type": "string"
+        },
+        "verifier": {
+          "description": "verifier is required: the name of the verifier that runs the check.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verifier",
+        "rule_id"
+      ],
+      "title": "Architecture Check",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ArchitecturePack.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitecturePack binds conventions to checks; a rule without a check fails validation.",
+      "properties": {
+        "apiVersion": {
+          "description": "api_version is required and is \"numinance.dev/v1\".",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/google.protobuf.Value.jsonschema.strict.json"
+          },
+          "description": "extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "description": "kind is required and is \"ArchitecturePack\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+          "description": "metadata is required; the loader enforces it, the schema cannot."
+        },
+        "spec": {
+          "$ref": "#/$defs/numinance.kinds.v1.ArchitecturePackSpec.jsonschema.strict.json",
+          "description": "spec is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind"
+      ],
+      "title": "Architecture Pack",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ArchitecturePackSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitecturePackSpec lists the rules of the pack.",
+      "properties": {
+        "rules": {
+          "description": "rules is required and non-empty; the loader enforces it, the schema cannot.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ArchitectureRule.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Architecture Pack Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ArchitectureRule.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ArchitectureRule is one convention and the check that enforces it.",
+      "properties": {
+        "check": {
+          "$ref": "#/$defs/numinance.kinds.v1.ArchitectureCheck.jsonschema.strict.json",
+          "description": "check is required; the loader enforces it, the schema cannot."
+        },
+        "id": {
+          "description": "id is required and unique in the pack.",
+          "type": "string"
+        },
+        "severity": {
+          "description": "severity is required: the severity of a finding of this rule.",
+          "enum": [
+            "FINDING_SEVERITY_UNSPECIFIED",
+            "FINDING_SEVERITY_INFO",
+            "FINDING_SEVERITY_LOW",
+            "FINDING_SEVERITY_MEDIUM",
+            "FINDING_SEVERITY_HIGH",
+            "FINDING_SEVERITY_CRITICAL"
+          ],
+          "title": "Finding Severity",
+          "type": "string"
+        },
+        "statement": {
+          "description": "statement is required: the convention in plain language. It is untrusted text, delimited and labelled as untrusted when it reaches a prompt.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "statement",
+        "severity"
+      ],
+      "title": "Architecture Rule",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ArchitecturePack.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ArchitecturePack.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

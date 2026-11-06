@@ -1,0 +1,30 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.ExportView.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ExportView is a named selection of a change's evidence for one audience, such as one requirement of the framework.",
+      "properties": {
+        "controls": {
+          "description": "controls is required and non-empty: the ids of the pack's controls whose evidence the view exports, unique.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "name is required: the view's name, as numi evidence export --view takes it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Export View",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ExportView.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ExportView.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

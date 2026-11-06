@@ -1,0 +1,12 @@
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: org-baseline, scope: SCOPE_ORG}
+spec:
+  stages: trunk-with-cab
+  control_packs: [controls/payments/pci-dss/4.0.1]
+  autonomy:
+    defaults: {level: AUTONOMY_LEVEL_PR}
+    rules:
+      - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  residency: {floors: {floor: RESIDENCY_CLASS_IN_ACCOUNT}, regions: [eu-central-1], cross_region: false}
+  budgets: {tokens: 400000, wall_clock: 7200s, tool_calls: 300, files_changed: 40}

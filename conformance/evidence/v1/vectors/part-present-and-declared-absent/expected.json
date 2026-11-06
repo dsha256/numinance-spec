@@ -1,0 +1,33 @@
+{
+  "vector": "part-present-and-declared-absent",
+  "description": "provenance/ is present and the index declares it absent.",
+  "status": "shipped",
+  "export": "part-present-and-absent",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "part_contradiction"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:part_contradiction"
+  ]
+}

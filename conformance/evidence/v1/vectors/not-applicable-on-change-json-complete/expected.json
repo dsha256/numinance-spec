@@ -1,0 +1,37 @@
+{
+  "vector": "not-applicable-on-change-json-complete",
+  "description": "The same with --complete: a claim that is refused counts as an absent part, so --complete refuses it too.",
+  "status": "shipped",
+  "export": "not-applicable-on-change-json",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "complete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "part_contradiction",
+      "parts_absent"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:part_contradiction",
+    "finding:parts_absent",
+    "rule:not-applicable-only-deployment-observation"
+  ]
+}

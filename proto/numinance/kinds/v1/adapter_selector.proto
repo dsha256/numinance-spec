@@ -1,0 +1,57 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+
+// AdapterSelector says which provider implements which port for this scope.
+message AdapterSelector {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "AdapterSelector".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  AdapterSelectorSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AdapterSelectorSpec holds the port bindings.
+message AdapterSelectorSpec {
+  // ports is required; the loader enforces it, the schema cannot. An empty ports binds nothing: a valid no-op.
+  AdapterPorts ports = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AdapterPorts binds the ports that reach customer systems; a port added later is a new
+// optional field. Each binding is replaced as a unit, never pairing one scope's provider with another's instance.
+message AdapterPorts {
+  // scm binds the scm port.
+  AdapterBinding scm = 1 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // ticketing binds the ticketing port.
+  AdapterBinding ticketing = 2 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // ciexecutor binds the ciexecutor port.
+  AdapterBinding ciexecutor = 3 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // cdprovider binds the cdprovider port.
+  AdapterBinding cdprovider = 4 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // cloud binds the cloud port.
+  AdapterBinding cloud = 5 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // database binds the database port.
+  AdapterBinding database = 6 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // observability binds the observability port.
+  AdapterBinding observability = 7 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.0.0"];
+  // knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.
+  repeated string knowledge = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AdapterBinding is one provider installation serving a port.
+message AdapterBinding {
+  // provider is required: the extension id of a provider of the port, which must resolve to a lockfile entry.
+  string provider = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // instance is required: the configured instance of the provider (one provider may serve several, such as two CI servers).
+  string instance = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.BundleResolver.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleResolver names the resolver model and prompt.",
+      "properties": {
+        "model_id": {
+          "description": "model_id is required.",
+          "type": "string"
+        },
+        "prompt_version": {
+          "description": "prompt_version is required.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model_id",
+        "prompt_version"
+      ],
+      "title": "Bundle Resolver",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.BundleResolver.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.BundleResolver.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

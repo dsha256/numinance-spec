@@ -1,0 +1,107 @@
+// The events the evals context publishes: OutcomeRecorded.v1, OutcomeCorrected.v1, QualificationUpdated.v1, PromotionProposed.v1, PromotionDecided.v1 (design section 9, row evals; section 19; ADR 0047).
+// Reference-only: ids, closed tokens (lowercase letters, digits and the characters . _ - , at most 64 bytes), counts, digests (numinance.types.v1.Digest) and enum codes. No code, prompt, diff, ticket, free text or identity of a person can enter, so an opt-in aggregate export cannot leak them.
+// Notifications only: a consumer deduplicates on the digests (delivery is at least once) and never changes an autonomy level, widens a grant or resumes a Change on one of these events alone. PromotionDecided.v1 with accepted set carries no authority; the policy context's gated SetAutonomyLevel path verifies the referenced decision itself.
+syntax = "proto3";
+
+package numinance.events.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// OutcomeOrigin says where an outcome came from. A replay outcome is never counted as production.
+enum OutcomeOrigin {
+  // OUTCOME_ORIGIN_UNSPECIFIED is the zero value; a consumer rejects it.
+  OUTCOME_ORIGIN_UNSPECIFIED = 0;
+  // OUTCOME_ORIGIN_PRODUCTION is the outcome of a closed Change.
+  OUTCOME_ORIGIN_PRODUCTION = 1;
+  // OUTCOME_ORIGIN_REPLAY is the outcome of a case of an eval set replayed with no model.
+  OUTCOME_ORIGIN_REPLAY = 2;
+}
+
+// OutcomeRecorded is the payload of OutcomeRecorded.v1: the outcome of one Change, or of one replayed case, was recorded.
+message OutcomeRecorded {
+  // Change the outcome is for, chg_ prefixed. For a replay outcome it is derived from the eval set, its version and the case.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Where the outcome came from; a consumer rejects OUTCOME_ORIGIN_UNSPECIFIED.
+  OutcomeOrigin origin = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Task class, a closed token.
+  string task_class = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Playbook, a closed token; with component it is the stratum a qualification is kept for.
+  string playbook = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Component, a closed token.
+  string component = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the outcome is a severity event (an unauthorized action, a critical escape or an evidence gap), so a consumer can reset a qualification without reading the record.
+  bool severe = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the canonical outcome record; the record is read through the evals context's driving port.
+  numinance.types.v1.Digest digest = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// OutcomeCorrected is the payload of OutcomeCorrected.v1: a severe signal that came after the outcome was recorded was stored beside it. The outcome keeps its digest and content; the correction is a new record that names it.
+message OutcomeCorrected {
+  // Change whose outcome is corrected, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Origin of the corrected outcome; a consumer rejects OUTCOME_ORIGIN_UNSPECIFIED. A correction of a replay outcome never counts toward a production qualification.
+  OutcomeOrigin origin = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Playbook of the corrected outcome, a closed token.
+  string playbook = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Component of the corrected outcome, a closed token.
+  string component = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the outcome that was corrected.
+  numinance.types.v1.Digest original_digest = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the correction record. The same correction delivered again has the same digest.
+  numinance.types.v1.Digest correction_digest = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// QualificationUpdated is the payload of QualificationUpdated.v1: the qualification of one stratum (playbook on a component) was computed from the stored outcomes. A severity reset shows as a rise of resets and a fall of runs to zero. Lowering an active autonomy level on a reset is owned by the policy context, not published here.
+message QualificationUpdated {
+  // Playbook, a closed token.
+  string playbook = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Component, a closed token.
+  string component = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Comparable production runs since the last severity reset; only outcomes bound to a closed Change and an evidence record count.
+  uint32 runs = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Severity resets of the stratum so far.
+  uint32 resets = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Replay outcomes of the stratum; reported apart and never counted in runs.
+  uint32 replay_runs = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Production outcomes with no closure; reported and not counted.
+  uint32 unbound = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Upper bound of the failure rate by the rule of three, in basis points (10000 when there are no runs).
+  uint32 upper_bound_basis_points = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the counted runs and the reset count, so a proposal names its evidence.
+  numinance.types.v1.Digest basis_digest = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PromotionProposed is the payload of PromotionProposed.v1: the verified runner recorded a proposal to promote a playbook on a component. The proposal is data; it changes no autonomy level and only a human-approver decides it.
+message PromotionProposed {
+  // Digest of the proposal content, which names the proposal.
+  numinance.types.v1.Digest proposal_digest = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Playbook, a closed token.
+  string playbook = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Component, a closed token.
+  string component = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Ladder level the proposal moves from, a closed token the core never interprets.
+  string from_level = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Ladder level the proposal moves to, a closed token the core never interprets.
+  string to_level = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the evidence the proposal rests on (the basis of the qualification).
+  numinance.types.v1.Digest basis_digest = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PromotionDecided is the payload of PromotionDecided.v1: a human-approver accepted or rejected a proposal. A decision is final. It names no person: the approver is in the evidence record the decision_digest cites. With accepted set it carries no authority: it is not a grant and not a level change, and a consumer re-reads the decision through the evals context's driving port before relying on it.
+message PromotionDecided {
+  // Digest of the proposal that was decided.
+  numinance.types.v1.Digest proposal_digest = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Playbook, a closed token.
+  string playbook = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Component, a closed token.
+  string component = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Ladder level the proposal moves from, a closed token.
+  string from_level = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Ladder level the proposal moves to, a closed token.
+  string to_level = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the proposal was accepted, false when it was rejected.
+  bool accepted = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the decision record, the one recorded in the evidence chain by the runner identity.
+  numinance.types.v1.Digest decision_digest = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

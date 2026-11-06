@@ -1,0 +1,33 @@
+{
+  "vector": "manifest-undecodable",
+  "description": "bundle-manifest.json does not decode.",
+  "status": "shipped",
+  "export": "manifest-undecodable",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "manifest_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:manifest_invalid"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.BundleQuery.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleQuery is one search: the tool, the digest of its arguments, how many results it returned and whether it was cut.",
+      "properties": {
+        "args_digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "args_digest is required: the digest of the canonical arguments, never the arguments."
+        },
+        "results": {
+          "description": "results is the number of results returned.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool": {
+          "description": "tool is required: the tool name as the connection pins it.",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "truncated is true when the results were cut at a cap.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "tool",
+        "results",
+        "truncated"
+      ],
+      "title": "Bundle Query",
+      "type": "object"
+    },
+    "numinance.types.v1.Digest.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Digest is a sha256 content digest as \"sha256:\" plus 64 lowercase hex characters.",
+      "properties": {
+        "value": {
+          "description": "value is exactly \"sha256:\" plus 64 lowercase hex characters. Any other\n length, case or prefix, and an empty value in a present message, is\n rejected. Absence is the unset message.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Digest",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.BundleQuery.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.BundleQuery.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

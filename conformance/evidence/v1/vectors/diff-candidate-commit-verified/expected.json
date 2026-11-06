@@ -1,0 +1,33 @@
+{
+  "vector": "diff-candidate-commit-verified",
+  "description": "An execution.diff record that carries the optional execution/candidate-commit output beside execution/candidate and execution/diff. The export verifies, and its provenance candidates and diff.digest are those of the same chain without the output.",
+  "status": "shipped",
+  "export": "closed-author-candidate-commit",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "complete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:candidate-commit",
+    "rule:diff-digest"
+  ]
+}

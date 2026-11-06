@@ -1,0 +1,10 @@
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: dependency-upgrade, scope: SCOPE_ORG}
+spec:
+  change_type: dependency-upgrade
+  steps:
+    - {name: bump, capability_set: scm-write, risk: RISK_CLASS_LOW, evidence: [diff, lockfile-digest], verifiers: [unit-tests, lint]}
+    - {name: open-pr, capability_set: scm-pr, risk: RISK_CLASS_MEDIUM, evidence: [pr-ref], rehearse: false}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}

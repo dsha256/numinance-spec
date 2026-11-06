@@ -1,0 +1,26 @@
+{
+  "vector": "key-mode-none-is-usage-error",
+  "description": "No key mode at all is a usage error: the verifier never defaults to trusting the directory.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2",
+    "rule:key-mode-required"
+  ]
+}

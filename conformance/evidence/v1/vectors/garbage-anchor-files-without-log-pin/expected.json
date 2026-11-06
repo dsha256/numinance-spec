@@ -1,0 +1,33 @@
+{
+  "vector": "garbage-anchor-files-without-log-pin",
+  "description": "Anchor files that are garbage, no log pinned: they are not decoded, the report says the anchor was not checked, and the allowances name the weaknesses.",
+  "status": "shipped",
+  "export": "abandoned-garbage-anchor",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_unanchored": true,
+    "allow_unsigned": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unanchored, unsigned export",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unanchored",
+        "unsigned export"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unanchored, unsigned export",
+    "exit:0",
+    "rule:anchor-files-decoded-only-with-a-pin"
+  ]
+}

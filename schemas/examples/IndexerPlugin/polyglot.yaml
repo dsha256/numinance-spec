@@ -1,0 +1,12 @@
+apiVersion: numinance.dev/v1
+kind: IndexerPlugin
+metadata: {name: polyglot, scope: SCOPE_REPO}
+spec:
+  indexers:
+    - provider: dev.numinance.official/scip-go
+      languages: [go]
+      edge_overlays: [http-routes]
+    - provider: dev.numinance.official/tree-sitter
+      languages: [python, typescript]
+extensions:
+  com.example.indexing: {nightly: true}

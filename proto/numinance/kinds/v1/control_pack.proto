@@ -1,0 +1,106 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/autonomy_policy.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/kinds/v1/residency_policy.proto";
+
+// ControlPack holds the controls of one compliance framework, the evidence and approvals each control requires, and the
+// floors the pack adds. A pack only restricts: its floors add to the org's, never displace
+// them. It has authority only when loaded from a protected path or a signed policy bundle; any other copy, even one
+// claiming SCOPE_ORG, is RepositoryAuthored with no authority. The loader refuses a metadata.scope other than SCOPE_ORG.
+message ControlPack {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "ControlPack".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  ControlPackSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CounselStatus is how far legal counsel has reviewed the pack's reading of its framework. This enum may grow.
+enum CounselStatus {
+  // COUNSEL_STATUS_UNSPECIFIED is the zero value; a loader rejects it, so the status is always stated.
+  COUNSEL_STATUS_UNSPECIFIED = 0;
+  // COUNSEL_STATUS_NOT_REVIEWED means no counsel has reviewed the pack.
+  COUNSEL_STATUS_NOT_REVIEWED = 1;
+  // COUNSEL_STATUS_UNDER_REVIEW means a review has started and not concluded.
+  COUNSEL_STATUS_UNDER_REVIEW = 2;
+  // COUNSEL_STATUS_REVIEWED means counsel has reviewed the pack at this version.
+  COUNSEL_STATUS_REVIEWED = 3;
+}
+
+// ControlPackSpec says which framework the pack reads, when it applies, and what it requires.
+message ControlPackSpec {
+  // jurisdiction is required: where the framework applies, such as "global" or "eu".
+  string jurisdiction = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // framework is required: the framework's name, such as "pci-dss".
+  string framework = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // version is required: the framework's version, such as "4.0.1".
+  string version = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // effective_date is required: the day the framework version takes effect, as YYYY-MM-DD.
+  string effective_date = 4 [json_name = "effective_date", (numinance.annotations.v1.field).since = "1.0.0"];
+  // sources cite the texts the pack reads, unique; each is one line of at most 1024 bytes.
+  repeated string sources = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // applicability is a CEL expression over policy-computed facts of the change that selects the changes the pack's
+  // controls and floors apply to; absent means every change of a component whose resolved profile names the pack. One
+  // line of at most 4096 bytes; the profile context compiles it to a bool, and an evaluation error means the pack applies.
+  optional string applicability = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // controls is required, non-empty and unique by id.
+  repeated Control controls = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // floors are the floors the pack adds; they combine with the org's floors (or the shipped ones) and only tighten.
+  ControlFloors floors = 8 [(merge) = MERGE_DIRECTIVE_FORBID, (numinance.annotations.v1.field).since = "1.0.0"];
+  // export_views are the evidence export views the pack offers, unique by name.
+  repeated ExportView export_views = 9 [json_name = "export_views", (numinance.annotations.v1.field).since = "1.0.0"];
+  // counsel_status is required.
+  CounselStatus counsel_status = 10 [json_name = "counsel_status", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Control is one requirement of the framework.
+message Control {
+  // id is required: the control's id within the pack, such as "req-6.4.2".
+  string id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // requires_evidence names the evidence a change the control applies to must record, unique; missing declared evidence
+  // turns success into PARTIAL.
+  repeated string requires_evidence = 2 [json_name = "requires_evidence", (numinance.annotations.v1.field).since = "1.0.0"];
+  // approval is the human approval the control requires; absent requires none beyond the stage gates.
+  ControlApproval approval = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ControlApproval is the approval a control requires. Policy enforces it at the release gate (and the plan gate where a
+// stage declares one) whatever the StageRegistry contains; it only adds to the registry's gates. The loader refuses group
+// or dual_control unless human is true.
+message ControlApproval {
+  // human is true when a human principal must approve; absent means false.
+  optional bool human = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // group names the approver group the approver must belong to; membership comes from the org's identity provider,
+  // never from repository files.
+  optional string group = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // dual_control is true when two distinct human principals, neither the author nor acting in the author's run, must
+  // approve; absent means false.
+  optional bool dual_control = 3 [json_name = "dual_control", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ControlFloors is the set of floors a pack adds; it is one message so the whole set carries the FORBID directive.
+message ControlFloors {
+  // autonomy caps levels as AutonomyPolicy floors do; the lowest matching max_level of the org and every pack holds.
+  AutonomyFloors autonomy = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // residency adds residency floors as ResidencyPolicy floors do; every floor of the org and every pack holds.
+  ResidencyFloors residency = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ExportView is a named selection of a change's evidence for one audience, such as one requirement of the framework.
+message ExportView {
+  // name is required: the view's name, as numi evidence export --view takes it.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // controls is required and non-empty: the ids of the pack's controls whose evidence the view exports, unique.
+  repeated string controls = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

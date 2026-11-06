@@ -1,0 +1,14 @@
+apiVersion: numinance.dev/v1
+kind: BudgetPolicy
+metadata: {name: org-default, scope: SCOPE_ORG}
+spec:
+  tokens: 400000
+  wall_clock: 7200s
+  tool_calls: 300
+  files_changed: 40
+  lines_changed: 2000
+  repositories: 1
+  services: 2
+  network_destinations: 5
+  retries: 3
+  max_risk_escalation: RISK_CLASS_MEDIUM

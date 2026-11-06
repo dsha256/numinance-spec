@@ -1,0 +1,128 @@
+{
+  "$defs": {
+    "google.protobuf.Timestamp.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "date-time",
+      "title": "Timestamp",
+      "type": "string"
+    },
+    "numinance.kinds.v1.BundleSource.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleSource is one selected source; its content is the artifact with this digest, delivered read-only to the worktree.",
+      "properties": {
+        "access_basis": {
+          "description": "access_basis is required: whose authority the fetch ran under.",
+          "enum": [
+            "KNOWLEDGE_AUTH_UNSPECIFIED",
+            "KNOWLEDGE_AUTH_USER_DELEGATED",
+            "KNOWLEDGE_AUTH_SERVICE_ACCOUNT"
+          ],
+          "title": "Knowledge Auth",
+          "type": "string"
+        },
+        "classification": {
+          "description": "classification is the source's data classification as the source system reports it.",
+          "type": "string"
+        },
+        "digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "digest is required: the digest of the redacted content delivered to the executor."
+        },
+        "fetched_at": {
+          "$ref": "#/$defs/google.protobuf.Timestamp.jsonschema.strict.json",
+          "description": "fetched_at is required."
+        },
+        "rank": {
+          "description": "rank is the source's position in the selection, from 1.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "redactions": {
+          "description": "redactions is the number of secrets and PII spans redacted before persistence.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ref": {
+          "description": "ref is required and unique: the canonical source reference, redacted, since a ref can hold a credential.",
+          "type": "string"
+        },
+        "selection_reason": {
+          "description": "selection_reason is required: why the resolver selected the source.",
+          "type": "string"
+        },
+        "source_version": {
+          "description": "source_version is the version or ETag the source reported; absent when it reports none.",
+          "type": "string"
+        },
+        "staleness": {
+          "description": "staleness is required.",
+          "enum": [
+            "SOURCE_STALENESS_UNSPECIFIED",
+            "SOURCE_STALENESS_FRESH",
+            "SOURCE_STALENESS_STALE",
+            "SOURCE_STALENESS_UNKNOWN"
+          ],
+          "title": "Source Staleness",
+          "type": "string"
+        },
+        "system": {
+          "description": "system is required: the KnowledgeConnection name the source was read through.",
+          "type": "string"
+        },
+        "title": {
+          "description": "title is the source's own title.",
+          "type": "string"
+        },
+        "trust": {
+          "description": "trust is required and is TRUST_CLASS_UNTRUSTED_RETRIEVED; a decoder refuses any other value.",
+          "enum": [
+            "TRUST_CLASS_UNSPECIFIED",
+            "TRUST_CLASS_UNTRUSTED_RETRIEVED",
+            "TRUST_CLASS_REPOSITORY_AUTHORED",
+            "TRUST_CLASS_SIGNED_SKILL",
+            "TRUST_CLASS_SIGNED_POLICY",
+            "TRUST_CLASS_KERNEL"
+          ],
+          "title": "Trust Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "system",
+        "title",
+        "rank",
+        "selection_reason",
+        "classification",
+        "redactions",
+        "access_basis",
+        "staleness",
+        "trust"
+      ],
+      "title": "Bundle Source",
+      "type": "object"
+    },
+    "numinance.types.v1.Digest.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Digest is a sha256 content digest as \"sha256:\" plus 64 lowercase hex characters.",
+      "properties": {
+        "value": {
+          "description": "value is exactly \"sha256:\" plus 64 lowercase hex characters. Any other\n length, case or prefix, and an empty value in a present message, is\n rejected. Absence is the unset message.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Digest",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.BundleSource.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.BundleSource.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

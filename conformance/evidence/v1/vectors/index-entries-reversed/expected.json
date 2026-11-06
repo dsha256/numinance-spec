@@ -1,0 +1,34 @@
+{
+  "vector": "index-entries-reversed",
+  "description": "The entries and the declared parts of the index are in reverse order: the exporter writes them sorted by path, and a verifier does not check the order, so the export verifies as it would sorted.",
+  "status": "shipped",
+  "export": "index-entries-reversed",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_unsigned": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unsigned export",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unsigned export"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unsigned export",
+    "exit:0",
+    "rule:index-order-not-checked"
+  ]
+}

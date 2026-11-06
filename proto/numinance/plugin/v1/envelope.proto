@@ -1,0 +1,161 @@
+// The Envelope is what PluginService.Invoke carries: the host-assigned ActionContext and one typed request; the plugin answers with ActionResult messages.
+// Every element is since 1.0.0. Enums are closed: a consumer rejects zero and unknown numbers. No field carries credential material or content; large data travels as types.v1.Reference (references and digests, never content).
+// Bounds: every string is at most 1024 bytes and every repeated field at most 256 entries unless stated; over-limit input is rejected, never truncated; duplicate entries are rejected, keyed as evidence_ids by value, side_effects by kind and target, diagnostics by all four fields; every repeated bound applies per invocation across the stream. Printable means Unicode categories L, M, N, P, S and U+0020; Cc, Cf, Cs, Co, Cn, Zl and Zp (including bidi and zero-width controls) are rejected. A rejection names an index-based field path and the violated bound, never the offending value.
+syntax = "proto3";
+
+package numinance.plugin.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/plugin/v1/manifest.proto";
+import "numinance/types/v1/types.proto";
+
+// InvokeStatus is how the plugin reports a call; the host derives the evidence/v1 ActionOutcome itself and never trusts the claim.
+enum InvokeStatus {
+  // INVOKE_STATUS_UNSPECIFIED is the zero value; it is rejected by the host.
+  INVOKE_STATUS_UNSPECIFIED = 0;
+  // INVOKE_STATUS_RUNNING marks a non-terminal message of an OPERATION call; it is rejected on any other call and on the last message; on a target whose method is server-streaming each RUNNING message carries one stream message in ActionResult.result.
+  INVOKE_STATUS_RUNNING = 1;
+  // INVOKE_STATUS_SUCCEEDED claims the action completed; PARTIAL is never claimed, the host derives it when declared evidence is missing.
+  INVOKE_STATUS_SUCCEEDED = 2;
+  // INVOKE_STATUS_FAILED claims the action did not complete.
+  INVOKE_STATUS_FAILED = 3;
+}
+
+// Severity is the severity of a diagnostic or log entry.
+enum Severity {
+  // SEVERITY_UNSPECIFIED is the zero value; it is rejected by the host.
+  SEVERITY_UNSPECIFIED = 0;
+  // SEVERITY_DEBUG is detail for troubleshooting.
+  SEVERITY_DEBUG = 1;
+  // SEVERITY_INFO is a normal event.
+  SEVERITY_INFO = 2;
+  // SEVERITY_WARNING is an event that needs attention but did not fail the call.
+  SEVERITY_WARNING = 3;
+  // SEVERITY_ERROR is an event that failed the call or part of it.
+  SEVERITY_ERROR = 4;
+}
+
+// Reason is the closed vocabulary of diagnostics, log entries and progress reports; there is no free text. The outcomes (REASON_DEPRECATED through REASON_CANCELLED) are valid in Diagnostic and Log; the phases (REASON_STARTED through REASON_COMPLETED) are valid in ReportProgress and Log; a value added later is placed in a subset by its name in this comment, never by its number; the host rejects a value outside the subset of its consumer. This enum may grow.
+enum Reason {
+  // REASON_UNSPECIFIED is the zero value; it is rejected by the host.
+  REASON_UNSPECIFIED = 0;
+  // REASON_DEPRECATED marks use of a deprecated element named by Diagnostic.subject.
+  REASON_DEPRECATED = 1;
+  // REASON_INVALID_ARGUMENT marks input that failed validation.
+  REASON_INVALID_ARGUMENT = 2;
+  // REASON_LIMIT_EXCEEDED marks input or output over a stated bound.
+  REASON_LIMIT_EXCEEDED = 3;
+  // REASON_NOT_FOUND marks a target that does not exist.
+  REASON_NOT_FOUND = 4;
+  // REASON_CONFLICT marks a target whose state prevents the action.
+  REASON_CONFLICT = 5;
+  // REASON_PERMISSION_DENIED marks a refusal by the upstream system.
+  REASON_PERMISSION_DENIED = 6;
+  // REASON_UPSTREAM_UNAVAILABLE marks an upstream system that could not be reached.
+  REASON_UPSTREAM_UNAVAILABLE = 7;
+  // REASON_UPSTREAM_ERROR marks an upstream system that answered with an error.
+  REASON_UPSTREAM_ERROR = 8;
+  // REASON_RATE_LIMITED marks a call slowed or refused by a rate limit.
+  REASON_RATE_LIMITED = 9;
+  // REASON_TIMEOUT marks a deadline that passed.
+  REASON_TIMEOUT = 10;
+  // REASON_CANCELLED marks a call cancelled by the host.
+  REASON_CANCELLED = 11;
+  // REASON_STARTED marks the start of work.
+  REASON_STARTED = 12;
+  // REASON_RUNNING marks work in progress.
+  REASON_RUNNING = 13;
+  // REASON_WAITING marks work blocked on an upstream system.
+  REASON_WAITING = 14;
+  // REASON_COMPLETED marks the end of work.
+  REASON_COMPLETED = 15;
+}
+
+// Envelope is one action dispatched to a plugin.
+message Envelope {
+  // method is the full method name /<package>.<Service>/<Method>; the method must be in a numinance.ports.* file the host serves and have a capability entry in the installed manifest, and a non-Core capability must be in the negotiated HandshakeResponse.capabilities, else the host does not dispatch.
+  string method = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // context is set by the host after the policy decision; the plugin never supplies or changes it.
+  ActionContext context = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // request is the typed request, at most 4 MiB serialized (rejected, never truncated); its type URL is type.googleapis.com/ plus the method's input type in the host's descriptor copy, any other type URL is rejected.
+  google.protobuf.Any request = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ActionContext is the authority under which one action runs; every field is set by the host.
+message ActionContext {
+  // invocation_id is host-assigned, inv_ plus 32 lowercase hex characters (128 bits of host randomness), unique per Invoke; the plugin quotes it in every HostService call, and the host rejects an id not in flight for the calling plugin, which it identifies by the connection it established at launch, never by request content.
+  string invocation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // change_id is the Change the action belongs to, chg_ prefixed.
+  string change_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // run_id is the run the action belongs to, run_ prefixed.
+  string run_id = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // actor_kind is the identity the action runs as; unspecified is rejected. PRINCIPAL_KIND_ENGINE is producer-only
+  // (ADR 0036): it names who publishes an Engine fact and is never an actor, so a host refuses it here.
+  numinance.types.v1.PrincipalKind actor_kind = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // actor_principal is the principal that acts, as in evidence/v1 Record.actor_principal.
+  string actor_principal = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // grant_id is the grant that allows the action, grant_ prefixed.
+  string grant_id = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // policy_decision_id is the policy decision that allowed the action, dec_ prefixed; the host never dispatches without one.
+  string policy_decision_id = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // plan_digest is the digest of the plan the action belongs to, whose value equals evidence/v1 Record.plan_digest; required for DECLARATIVE Apply.
+  numinance.types.v1.Digest plan_digest = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // profile_digest is the digest of the SDLC profile in force.
+  numinance.types.v1.Digest profile_digest = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // idempotency_key is the key a KEYED capability uses so a replay has no extra effect.
+  string idempotency_key = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // deadline is when the call must end; the host cancels it then.
+  google.protobuf.Timestamp deadline = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // budget is the effective resource budget, every field non-zero (the host resolves defaults before dispatch), min(declared, grant budget) under the policy ceiling.
+  ResourceBudget budget = 12 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // residency is the Change's residency class derived by the host at Change start (ADR 0019); informational, never a grant, and the plugin never declares it.
+  numinance.types.v1.ResidencyClass residency = 13 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // dry_run asks for no side effects; the host sets it only when the method's supports_dry_run is true, and then any reported side effect above READ fails the call and is recorded.
+  bool dry_run = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ActionResult is what the plugin reports for one action; every field is a claim the host checks or records, never trusts.
+message ActionResult {
+  // status is the reported status.
+  InvokeStatus status = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // result is the typed response, at most 4 MiB serialized (rejected, never truncated); its type URL is type.googleapis.com/ plus the method's output type in the host's descriptor copy; required when status is SUCCEEDED and absent otherwise, except on a target whose method is server-streaming (PluginService.Invoke): there every RUNNING message carries exactly one stream message here, the type URL names the method's output type, and the terminal message carries no result; a RUNNING message with a result is rejected for any other target.
+  google.protobuf.Any result = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // evidence_ids, side_effects and cost appear on the terminal message only, a RUNNING message carries status and diagnostics only (and the stream message in result on a server-streaming target); evidence_ids are the `ev_` prefixed ids HostService.EmitEvidence returned for this invocation; any other id is rejected.
+  repeated string evidence_ids = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // side_effects are the side effects the plugin observed; one above the capability's declared side_effect fails the call.
+  repeated ObservedSideEffect side_effects = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // compensation_token is opaque, at most 1024 bytes; the host stores it outside evidence (evidence carries only its sha256) and passes it back only in a compensation action with its own policy decision and grant, to the same plugin digest inside the same Change; the host deletes it when the Change closes or the breaker trips.
+  bytes compensation_token = 5 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    sensitive: true
+  }];
+  // cost is the consumption the plugin reports, in ResourceBudget units; informational and never an input to budget accounting, which uses the host's own measurement.
+  ResourceBudget cost = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // duration is the time the plugin reports it took; the host's own measurement is authoritative; negative is rejected.
+  google.protobuf.Duration duration = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // diagnostics are structured notes about the call, at most 64; a Diagnostic with a phase reason is rejected.
+  repeated Diagnostic diagnostics = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ObservedSideEffect is one side effect on one external target.
+message ObservedSideEffect {
+  // kind is the side effect; NONE is rejected.
+  SideEffect kind = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // target identifies the external resource, printable characters only; it is untrusted and rendered delimited and labelled.
+  string target = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Diagnostic is one structured note; it has no free text.
+message Diagnostic {
+  // reason is the reason code.
+  Reason reason = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // severity is the severity.
+  Severity severity = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // field_path is empty or starts with the literal request or response, resolves the rest against that type, and matches ^[a-z][a-z0-9_]*(\[[0-9]+\])?(\.[a-z][a-z0-9_]*(\[[0-9]+\])?)*$, at most 256 bytes, and resolves segment by segment against the method's input or output type in the host's descriptor copy (request.items[3].name); otherwise the Diagnostic is rejected, never rendered.
+  string field_path = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // subject is empty or a full name, at most 256 bytes, that resolves in the host's registry to an element of a numinance.ports.* or numinance.plugin.v1 file (numinance.ports.scm.v1.GetFileRequest.path); otherwise the Diagnostic is rejected, never rendered.
+  string subject = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

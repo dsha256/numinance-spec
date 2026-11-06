@@ -1,0 +1,24 @@
+{
+  "vector": "key-mode-trust-and-skip-exclusive",
+  "description": "--trust-bundle-keys together with --skip-signatures is a usage error.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "trust_bundle_keys": true,
+    "skip_signatures": true
+  },
+  "keys": [],
+  "expect": {
+    "level": null,
+    "exit_code": 2,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:2",
+    "rule:key-mode-exclusive"
+  ]
+}

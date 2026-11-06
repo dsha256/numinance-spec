@@ -1,0 +1,1 @@
+{"check":"mypy","candidate":"suppressed","exit_code":0,"directives":[{"name":"type-ignore","path":"shop/pricing.py","line":5}]}

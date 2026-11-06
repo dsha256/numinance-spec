@@ -1,0 +1,33 @@
+{
+  "vector": "attestation-checkpoint-swapped",
+  "description": "The attestation's checkpoint replaced by the head checkpoint: not the digest checkpoint_ref names.",
+  "status": "shipped",
+  "export": "attestation-checkpoint-swapped",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_proof"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_proof"
+  ]
+}

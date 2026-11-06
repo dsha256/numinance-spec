@@ -1,0 +1,15 @@
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: two-person-release, scope: SCOPE_ORG}
+# required_approvals is only preserved today; nothing enforces the count yet.
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: build, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [triage]}
+    - name: release-approval
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: release-managers
+        required_approvals: 2
+      requires: [build]

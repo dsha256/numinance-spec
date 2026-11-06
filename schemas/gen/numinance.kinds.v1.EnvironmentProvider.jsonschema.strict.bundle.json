@@ -1,0 +1,157 @@
+{
+  "$defs": {
+    "google.protobuf.Duration.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "duration",
+      "title": "Duration",
+      "type": "string"
+    },
+    "google.protobuf.Value.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Value"
+    },
+    "numinance.kinds.v1.EnvironmentBudget.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EnvironmentBudget bounds the environments of one provider.",
+      "properties": {
+        "max_concurrent": {
+          "description": "max_concurrent is the most environments alive at once; absent means 1. A Create above it waits or escalates.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "title": "Environment Budget",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EnvironmentProvider.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EnvironmentProvider is how disposable environments are created; provisioning is idempotent by change_id and tags with it.",
+      "properties": {
+        "apiVersion": {
+          "description": "api_version is required and is \"numinance.dev/v1\".",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/google.protobuf.Value.jsonschema.strict.json"
+          },
+          "description": "extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "description": "kind is required and is \"EnvironmentProvider\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+          "description": "metadata is required; the loader enforces it, the schema cannot."
+        },
+        "spec": {
+          "$ref": "#/$defs/numinance.kinds.v1.EnvironmentProviderSpec.jsonschema.strict.json",
+          "description": "spec is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind"
+      ],
+      "title": "Environment Provider",
+      "type": "object"
+    },
+    "numinance.kinds.v1.EnvironmentProviderSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "EnvironmentProviderSpec says which provider creates the environment, from what, and for how long.",
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/numinance.kinds.v1.EnvironmentBudget.jsonschema.strict.json",
+          "description": "budget bounds what the provider may hold at once."
+        },
+        "kind": {
+          "description": "kind is required.",
+          "enum": [
+            "ENVIRONMENT_KIND_UNSPECIFIED",
+            "ENVIRONMENT_KIND_DATABASE_CLONE",
+            "ENVIRONMENT_KIND_NAMESPACE",
+            "ENVIRONMENT_KIND_COMPOSE",
+            "ENVIRONMENT_KIND_VM"
+          ],
+          "title": "Environment Kind",
+          "type": "string"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of an environment port provider, which must resolve to a lockfile entry.",
+          "type": "string"
+        },
+        "seed": {
+          "description": "seed names the seed data sets the provider applies after creation; a name is never executed as a command.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "source": {
+          "description": "source names what is cloned (a database, a namespace template); the provider resolves the name and it never carries a credential.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "tags are set on every environment besides the change_id tag; the profile context refuses a change_id key.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "ttl": {
+          "$ref": "#/$defs/google.protobuf.Duration.jsonschema.strict.json",
+          "description": "ttl is required: the environment is destroyed when it expires; the profile context refuses a ttl that is not positive."
+        }
+      },
+      "required": [
+        "provider",
+        "kind"
+      ],
+      "title": "Environment Provider Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.EnvironmentProvider.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.EnvironmentProvider.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

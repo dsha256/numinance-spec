@@ -1,0 +1,33 @@
+{
+  "vector": "open-prefix-unanchored-allow-both",
+  "description": "Both allowances on a prefix with no anchor: the suffixes appear in the order unanchored, incomplete.",
+  "status": "shipped",
+  "export": "open-prefix-unanchored",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_unanchored": true,
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unanchored, incomplete",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unanchored",
+        "incomplete"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unanchored, incomplete",
+    "exit:0",
+    "rule:suffix-order"
+  ]
+}

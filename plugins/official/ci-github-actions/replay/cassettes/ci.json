@@ -1,0 +1,336 @@
+{
+ "redaction": "Hand-written from the GitHub REST documentation (2022-11-28), not recorded: repository, run and artifact names are invented (acme/shop, release.yml), commit ids are fixed test values, and no header, token, e-mail address or real person appears. Replace with recordings made by the live test once a token exists (README, Not done).",
+ "interactions": [
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/release.yml/runs?branch=main&event=workflow_dispatch&per_page=100",
+   "status": 200,
+   "body": {
+    "workflow_runs": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/release.yml/runs?branch=main&event=workflow_dispatch&per_page=100",
+   "status": 200,
+   "body": {
+    "workflow_runs": [
+     {
+      "id": 9001,
+      "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+      "status": "queued",
+      "conclusion": null,
+      "head_branch": "main",
+      "path": ".github/workflows/release.yml@refs/heads/main",
+      "html_url": "https://github.com/acme/shop/actions/runs/9001",
+      "run_started_at": "2026-11-01T10:00:00Z",
+      "updated_at": "2026-11-01T10:05:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop",
+   "status": 200,
+   "body": {
+    "default_branch": "main"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/release.yml",
+   "status": 200,
+   "body": {
+    "id": 1,
+    "path": ".github/workflows/release.yml"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/commits/c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+   "status": 200,
+   "body": {
+    "sha": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/actions/workflows/release.yml/dispatches",
+   "status": 204,
+   "request": {
+    "ref": "main",
+    "inputs": {
+     "numinance_operation_id": "df787cc1f9bd6c916e2bda8c0698c869",
+     "numinance_revision": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+     "environment": "staging"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/dry.yml/runs?branch=main&event=workflow_dispatch&per_page=100",
+   "status": 200,
+   "body": {
+    "workflow_runs": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/dry.yml",
+   "status": 200,
+   "body": {
+    "id": 2
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/missing",
+   "status": 404,
+   "body": {
+    "message": "Not Found"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9005",
+   "status": 200,
+   "body": {
+    "id": 9005,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "in_progress",
+    "conclusion": null,
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9005",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9005",
+   "status": 200,
+   "body": {
+    "id": 9005,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "completed",
+    "conclusion": "success",
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9005",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9006",
+   "status": 200,
+   "body": {
+    "id": 9006,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "completed",
+    "conclusion": "success",
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9006",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9006/artifacts?per_page=100",
+   "status": 200,
+   "body": {
+    "artifacts": [
+     {
+      "name": "release-notes",
+      "size_in_bytes": 120,
+      "digest": "sha256:abababababababababababababababababababababababababababababababab"
+     },
+     {
+      "name": "bundle",
+      "size_in_bytes": 9000
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9003",
+   "status": 200,
+   "body": {
+    "id": 9003,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "in_progress",
+    "conclusion": null,
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9003",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9003",
+   "status": 200,
+   "body": {
+    "id": 9003,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9003",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/actions/runs/9003/cancel",
+   "status": 202,
+   "body": {}
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9002",
+   "status": 200,
+   "body": {
+    "id": 9002,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "completed",
+    "conclusion": "failure",
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9002",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9007",
+   "status": 200,
+   "body": {
+    "id": 9007,
+    "display_title": "numinance df787cc1f9bd6c916e2bda8c0698c869 c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+    "status": "completed",
+    "conclusion": "timed_out",
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9007",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9004",
+   "status": 200,
+   "body": {
+    "id": 9004,
+    "display_title": "Deploy production",
+    "status": "completed",
+    "conclusion": "success",
+    "head_branch": "main",
+    "path": ".github/workflows/release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9004",
+    "run_started_at": "2026-11-01T10:00:00Z",
+    "updated_at": "2026-11-01T10:05:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/e2e-release.yml/runs?branch=main&event=workflow_dispatch&per_page=100",
+   "status": 200,
+   "body": {
+    "workflow_runs": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/e2e-release.yml/runs?branch=main&event=workflow_dispatch&per_page=100",
+   "status": 200,
+   "body": {
+    "workflow_runs": [
+     {
+      "id": 9101,
+      "display_title": "numinance 84f9a9d72cb3f18d60eb0c1cd6e8cd06 5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+      "status": "queued",
+      "conclusion": null,
+      "head_branch": "main",
+      "path": ".github/workflows/e2e-release.yml@refs/heads/main",
+      "html_url": "https://github.com/acme/shop/actions/runs/9101",
+      "run_started_at": "2026-11-01T11:10:00Z",
+      "updated_at": "2026-11-01T11:15:00Z"
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/workflows/e2e-release.yml",
+   "status": 200,
+   "body": {
+    "id": 3
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/commits/5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+   "status": 200,
+   "body": {
+    "sha": "5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/repos/acme/shop/actions/workflows/e2e-release.yml/dispatches",
+   "status": 204,
+   "request": {
+    "ref": "main",
+    "inputs": {
+     "numinance_operation_id": "84f9a9d72cb3f18d60eb0c1cd6e8cd06",
+     "numinance_revision": "5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+     "environment": "staging"
+    }
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9101",
+   "status": 200,
+   "body": {
+    "id": 9101,
+    "display_title": "numinance 84f9a9d72cb3f18d60eb0c1cd6e8cd06 5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+    "status": "in_progress",
+    "conclusion": null,
+    "head_branch": "main",
+    "path": ".github/workflows/e2e-release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9101",
+    "run_started_at": "2026-11-01T11:10:00Z",
+    "updated_at": "2026-11-01T11:15:00Z"
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/repos/acme/shop/actions/runs/9101",
+   "status": 200,
+   "body": {
+    "id": 9101,
+    "display_title": "numinance 84f9a9d72cb3f18d60eb0c1cd6e8cd06 5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed",
+    "status": "completed",
+    "conclusion": "success",
+    "head_branch": "main",
+    "path": ".github/workflows/e2e-release.yml@refs/heads/main",
+    "html_url": "https://github.com/acme/shop/actions/runs/9101",
+    "run_started_at": "2026-11-01T11:10:00Z",
+    "updated_at": "2026-11-01T11:15:00Z"
+   }
+  }
+ ]
+}

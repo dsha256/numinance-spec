@@ -1,0 +1,33 @@
+{
+  "vector": "rolled-back-allow-unsigned",
+  "description": "A RolledBack export under --allow-unsigned.",
+  "status": "shipped",
+  "export": "rolled-back",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_unsigned": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unsigned export",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unsigned export"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unsigned export",
+    "exit:0"
+  ]
+}

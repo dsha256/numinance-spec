@@ -1,0 +1,33 @@
+{
+  "vector": "directory-missing",
+  "description": "The path does not exist: exit 4, no report.",
+  "status": "shipped",
+  "materialize": [
+    {
+      "op": "no_directory"
+    }
+  ],
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": null,
+    "exit_code": 4,
+    "finding_codes": [],
+    "target": {
+      "level_enum": null,
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "exit:4"
+  ]
+}

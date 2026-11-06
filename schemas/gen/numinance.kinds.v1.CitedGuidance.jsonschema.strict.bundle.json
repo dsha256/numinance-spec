@@ -1,0 +1,27 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.CitedGuidance.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "CitedGuidance points at one section of a source.",
+      "properties": {
+        "ref": {
+          "description": "ref is required and is the ref of a source in the bundle.",
+          "type": "string"
+        },
+        "section": {
+          "description": "section is the section id the bundle tool serves; absent means the whole source.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "title": "Cited Guidance",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.CitedGuidance.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.CitedGuidance.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

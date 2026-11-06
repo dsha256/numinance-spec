@@ -1,0 +1,31 @@
+{
+  "vector": "attestation-proof-path-too-long",
+  "description": "The attestation's inclusion proof has one audit path entry more than its leaf index and tree size imply. Signed again by a holder of the runner key, no log pinned: the proof is refused when the attestation is decoded.",
+  "status": "shipped",
+  "export": "attestation-proof-path-too-long",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_invalid",
+    "rule:embedded-proof-shape"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "vector": "canon-control-escapes-verified",
+  "description": "An absent-part reason holding a control character, U+2028, a line feed, a tab, a quote, a backslash, backspace, form feed, a carriage return and DEL: written as the canonical encoder writes them (short escapes, U+2028 escaped, DEL raw).",
+  "status": "shipped",
+  "export": "closed-canon-control-escapes",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:canon-escapes"
+  ]
+}

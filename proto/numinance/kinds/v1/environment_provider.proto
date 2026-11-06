@@ -1,0 +1,61 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+
+// EnvironmentProvider is how disposable environments are created; provisioning is idempotent by change_id and tags with it.
+message EnvironmentProvider {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "EnvironmentProvider".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  EnvironmentProviderSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EnvironmentKind is what a disposable environment is. This enum may grow.
+enum EnvironmentKind {
+  // ENVIRONMENT_KIND_UNSPECIFIED is the zero value; a loader rejects it.
+  ENVIRONMENT_KIND_UNSPECIFIED = 0;
+  // ENVIRONMENT_KIND_DATABASE_CLONE is a clone of a database.
+  ENVIRONMENT_KIND_DATABASE_CLONE = 1;
+  // ENVIRONMENT_KIND_NAMESPACE is a namespace of a cluster. Every environment is ephemeral, since ttl is required.
+  ENVIRONMENT_KIND_NAMESPACE = 2;
+  // ENVIRONMENT_KIND_COMPOSE is a set of containers started from a compose file.
+  ENVIRONMENT_KIND_COMPOSE = 3;
+  // ENVIRONMENT_KIND_VM is a virtual machine.
+  ENVIRONMENT_KIND_VM = 4;
+}
+
+// EnvironmentProviderSpec says which provider creates the environment, from what, and for how long.
+message EnvironmentProviderSpec {
+  // provider is required: the extension id of an environment port provider, which must resolve to a lockfile entry.
+  string provider = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required.
+  EnvironmentKind kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // source names what is cloned (a database, a namespace template); the provider resolves the name and it never carries a credential.
+  optional string source = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // ttl is required: the environment is destroyed when it expires; the profile context refuses a ttl that is not positive.
+  google.protobuf.Duration ttl = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // seed names the seed data sets the provider applies after creation; a name is never executed as a command.
+  repeated string seed = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // budget bounds what the provider may hold at once.
+  EnvironmentBudget budget = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // tags are set on every environment besides the change_id tag; the profile context refuses a change_id key.
+  map<string, string> tags = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EnvironmentBudget bounds the environments of one provider.
+message EnvironmentBudget {
+  // max_concurrent is the most environments alive at once; absent means 1. A Create above it waits or escalates.
+  optional uint32 max_concurrent = 1 [json_name = "max_concurrent", (numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.AdapterBinding.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterBinding is one provider installation serving a port.",
+      "properties": {
+        "instance": {
+          "description": "instance is required: the configured instance of the provider (one provider may serve several, such as two CI servers).",
+          "type": "string"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of a provider of the port, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "instance"
+      ],
+      "title": "Adapter Binding",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.AdapterBinding.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/review.schema.json",
+  "title": "Evidence review view",
+  "description": "review/review.json in an evidence/v1 export: a view derived from records.ndjson that lists the plan gate decisions and the records made by reviewer agents. Not expressible here and checked by the verifier: the file is the canonical JSON form; the view equals what DeriveViews produces from the records (entries in chain order; each entry's sequence, ev_id and record_hash name a real record); the file exists only when there is at least one decision or reviewer record; at most 1 MiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "change_id"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "decisions": { "type": "array", "items": { "$ref": "#/$defs/entry" }, "description": "The PlanGateDecided.v1 records; absent when there are none." },
+    "reviewer_records": { "type": "array", "items": { "$ref": "#/$defs/entry" }, "description": "The records whose actor_kind is reviewer-agent; absent when there are none." }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "ev_id", "record_hash", "action", "actor", "actor_kind", "action_outcome"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "ev_id": { "type": "string", "pattern": "^ev_[0-9a-f]{32}$" },
+        "record_hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "action": {
+          "type": "string",
+          "pattern": "^(?:[a-z][a-z0-9]*\\.[a-z][a-z0-9_]*|[A-Z][A-Za-z0-9]*\\.v[1-9][0-9]*)$",
+          "description": "A capability name port.verb or a versioned lifecycle event name such as PlanGateDecided.v1."
+        },
+        "actor": { "type": "string", "pattern": "^[!-~](?:[ -~]*[!-~])?$", "description": "The actor principal name; printable ASCII, at most 256 bytes." },
+        "actor_kind": {
+          "type": "string",
+          "enum": ["author-agent", "reviewer-agent", "release-pipeline", "human-approver", "runner", "break-glass"]
+        },
+        "actor_run_id": { "type": "string", "pattern": "^run_[0-9a-f]{32}$" },
+        "action_outcome": { "type": "string", "enum": ["succeeded", "partial", "failed", "denied"] }
+      }
+    }
+  }
+}

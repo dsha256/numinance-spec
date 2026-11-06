@@ -1,0 +1,34 @@
+{
+  "vector": "closed-gap-allow-flags",
+  "description": "--allow-incomplete is for a chain with no terminal record; it does not cover an attestation gap.",
+  "status": "shipped",
+  "export": "closed-gap",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "allow_unanchored": true,
+    "allow_incomplete": true,
+    "allow_unsigned": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "incomplete",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "incomplete",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:incomplete",
+    "exit:5",
+    "rule:attestation-gap"
+  ]
+}

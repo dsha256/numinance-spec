@@ -1,0 +1,70 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+
+// Playbook is the procedure for one change type; it shapes grants and never widens them.
+message Playbook {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "Playbook".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  PlaybookSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PlaybookSpec holds the steps and the bounds of one change type.
+message PlaybookSpec {
+  // change_type is required: the change type the playbook handles.
+  string change_type = 1 [json_name = "change_type", (numinance.annotations.v1.field).since = "1.0.0"];
+  // steps is required and non-empty; the loader enforces it, the schema cannot.
+  repeated PlaybookStep steps = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // max_repair_attempts bounds the repair loop, 0 to 10; absent means the default 2.
+  optional uint32 max_repair_attempts = 3 [json_name = "max_repair_attempts", (numinance.annotations.v1.field).since = "1.0.0"];
+  // qualification is what the playbook must show before autonomy is promoted. Absent means the playbook is not
+  // promotable unless the AutonomyPolicy floor qualifies it; it merges field by field, and a narrower scope may only tighten it.
+  Qualification qualification = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PlaybookStep is one step of a playbook. A Change's risk class is the maximum over its steps.
+message PlaybookStep {
+  // name is required and unique in the playbook.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // capability_set is required: the name of the capability set the step's grant is derived from.
+  string capability_set = 2 [json_name = "capability_set", (numinance.annotations.v1.field).since = "1.0.0"];
+  // risk is required: the step's declared risk class, which only raises; the resolved risk is the maximum of risk and
+  // the action risk of every RPC the capability set grants.
+  numinance.annotations.v1.RiskClass risk = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // evidence names the evidence the step must record; missing declared evidence turns success into PARTIAL.
+  repeated string evidence = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // verifiers names the verifiers that run on the step's output.
+  repeated string verifiers = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // rehearse is true when the step is rehearsed in a disposable environment first.
+  optional bool rehearse = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Qualification is the record a playbook needs before its autonomy is
+// promoted. Rates are in basis points, 0 to 10000 (10000 is every run); the
+// profile context refuses a larger value. A narrower scope may only tighten a
+// threshold: min_runs up, a max rate down, zero_security_escapes never to false; the reference implementation refuses a loosening.
+message Qualification {
+  // min_runs is the minimum number of qualifying runs; absent means the AutonomyPolicy floor applies.
+  optional uint32 min_runs = 1 [json_name = "min_runs", (numinance.annotations.v1.field).since = "1.0.0"];
+  // max_rework_rate is the highest share of runs that needed rework.
+  optional uint32 max_rework_rate = 2 [json_name = "max_rework_rate", (numinance.annotations.v1.field).since = "1.0.0"];
+  // max_regression_rate is the highest share of runs that caused a regression.
+  optional uint32 max_regression_rate = 3 [json_name = "max_regression_rate", (numinance.annotations.v1.field).since = "1.0.0"];
+  // max_rollback_rate is the highest share of releases rolled back.
+  optional uint32 max_rollback_rate = 4 [json_name = "max_rollback_rate", (numinance.annotations.v1.field).since = "1.0.0"];
+  // zero_security_escapes is true when one security escape blocks promotion; absent means true. Only an explicit false
+  // relaxes it, and a narrower scope may never set false over a wider scope's true or absent value.
+  optional bool zero_security_escapes = 5 [json_name = "zero_security_escapes", (numinance.annotations.v1.field).since = "1.0.0"];
+}

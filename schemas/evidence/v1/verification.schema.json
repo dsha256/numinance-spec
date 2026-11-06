@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/verification.schema.json",
+  "title": "Evidence verification view",
+  "description": "verification/verdicts.json in an evidence/v1 export: a view derived from records.ndjson that lists the verdict records and the verifier run reports. Not expressible here and checked by the verifier: the file is the canonical JSON form; the view equals what DeriveViews produces from the records (entries in chain order; each entry's sequence, ev_id and record_hash name a real record); the file exists only when there is at least one verdict or report; at most 1 MiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "change_id"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "verdicts": { "type": "array", "items": { "$ref": "#/$defs/verdict" }, "description": "Absent when there are no verdict records." },
+    "reports": { "type": "array", "items": { "$ref": "#/$defs/report" }, "description": "Absent when there are no verifier.run records." }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    },
+    "verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "ev_id", "record_hash", "candidate", "status", "document"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "ev_id": { "type": "string", "pattern": "^ev_[0-9a-f]{32}$" },
+        "record_hash": { "$ref": "#/$defs/digest" },
+        "candidate": { "$ref": "#/$defs/digest" },
+        "status": { "type": "string", "enum": ["pass", "fail", "inconclusive"] },
+        "document": { "$ref": "#/$defs/digest" },
+        "overrules": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "ev_id", "record_hash", "action_outcome"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "ev_id": { "type": "string", "pattern": "^ev_[0-9a-f]{32}$" },
+        "record_hash": { "$ref": "#/$defs/digest" },
+        "action_outcome": { "type": "string", "enum": ["succeeded", "partial", "failed", "denied"] },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/artifact" }, "description": "Absent when the record has no outputs." }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {
+        "ref": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]*$",
+          "description": "A reference of at most 1024 bytes with no .. path segment; the length bound and the segment rule are not expressible here."
+        },
+        "sha256": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

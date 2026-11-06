@@ -1,0 +1,33 @@
+{
+  "vector": "truncated-abandoned-flags-visible",
+  "description": "The same export with no pinned log and both allowances passes, and the level says what was allowed: verified, unanchored, incomplete. This is the trust limit of an unsigned export: only the pin of a log, or the caller refusing the flags, detects the cut.",
+  "status": "shipped",
+  "export": "abandoned-truncated",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_unanchored": true,
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unanchored, incomplete",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unanchored",
+        "incomplete"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unanchored, incomplete",
+    "exit:0",
+    "rule:truncation-unsigned-trust-limit"
+  ]
+}

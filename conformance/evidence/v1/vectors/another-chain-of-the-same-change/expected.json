@@ -1,0 +1,31 @@
+{
+  "vector": "another-chain-of-the-same-change",
+  "description": "A whole export of another genuine chain of the same change, signed by the pinned keys and anchored: it is a different but internally consistent export, so it verifies (a verifier cannot tell it from the original without --expect-head).",
+  "status": "shipped",
+  "export": "closed-other-chain",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:expect-head-needed"
+  ]
+}

@@ -1,0 +1,79 @@
+// The events the evidence context publishes: EvidenceAppended.v1, EvidenceSealed.v1, ReconciliationMismatch.v1. SealRefused.v1 is not in that row; it is the audit of a refused seal. LogOriginTrusted.v1 is not in that row either; it comes from ADR 0037 decision 4 ("the first checkpoint of an origin is trusted on first use and logged in evidence").
+// Reference-only: ids, digests (numinance.types.v1.Digest), claim-check references, counts, enum codes. Ids and action follow the bounds stated in evidence/v1 record.proto. evidence/v1 never imports this package.
+syntax = "proto3";
+
+package numinance.events.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/evidence/v1/reconciliation_report.proto";
+import "numinance/types/v1/types.proto";
+
+// EvidenceAppended is the payload of EvidenceAppended.v1: one record was appended to a Change's chain.
+message EvidenceAppended {
+  // Change the record belongs to, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Evidence record id, ev_ prefixed.
+  string ev_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // 1-based position of the record in the chain.
+  uint64 sequence = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the appended record.
+  numinance.types.v1.Digest record_hash = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Capability name <port>.<verb> or lifecycle event name <Fact>.v1 the record describes.
+  string action = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EvidenceSealed is the payload of EvidenceSealed.v1: a Change reached a terminal state and the head of its chain, the terminal record, was checkpointed. The seal record, action EvidenceSealed.v1, is stored after the terminal record at last_sequence + 1 and names the checkpoint.
+message EvidenceSealed {
+  // Change whose chain was sealed, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // First sequence in the sealed chain.
+  uint64 first_sequence = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Sequence of the terminal record, the head the checkpoint committed. The seal record follows it at last_sequence + 1.
+  uint64 last_sequence = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the terminal record at last_sequence (not of the seal record that follows it).
+  numinance.types.v1.Digest head_record_hash = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The per-Change TransparencyLog checkpoint that committed the head, as a claim-check reference.
+  numinance.types.v1.Reference checkpoint_ref = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Terminal state: CHANGE_STATE_CLOSED, CHANGE_STATE_ABANDONED or CHANGE_STATE_ROLLED_BACK; a consumer rejects any other value.
+  numinance.types.v1.ChangeState terminal_state = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// SealRefused is the payload of SealRefused.v1: the evidence context refused a re-seal of a sealed chain at another terminal state. Nothing was written to the sealed chain; this event is the audit of the refusal and it trips the circuit breaker.
+message SealRefused {
+  // Change whose sealed chain the refused request named, chg_ prefixed.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the terminal record of the sealed chain, the head the seal committed; the seal record follows it.
+  numinance.types.v1.Digest head_record_hash = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the canonical EvidenceSealed payload equal to the stored seal with terminal_state replaced by the requested state, so a verifier re-derives it from the stored seal and the requested state. The refused request took no checkpoint, so this is not the digest of a seal that could have been stored.
+  numinance.types.v1.Digest attempted_seal_digest = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Principal that made the request: the OIDC sub or runtime identity name, printable ASCII of at most 256 bytes.
+  string actor_principal = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identity actor_principal acted as. PRINCIPAL_KIND_ENGINE is producer-only and never an actor: a consumer rejects it.
+  numinance.types.v1.PrincipalKind actor_kind = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Run the actor was executing, run_ prefixed; empty when the actor was in no run.
+  string actor_run_id = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// LogOriginTrusted is the payload of LogOriginTrusted.v1: the evidence context trusted the first checkpoint it saw for a TransparencyLog origin (trust on first use, ADR 0037 decision 4). Later checkpoints of the origin are proven consistent with it. The event is queued before the checkpoint is held, so it does not prove the checkpoint was held: the anchor of an origin is the event whose (tree_size, root_hash) equals the held record. Runners that race for the first checkpoint, or a retry after a failed hold, may publish several events for one origin. Only events with identical (origin, tree_size, root_hash) are duplicates; events that differ are a lost race, a forked first checkpoint or a reset of the held record, and a consumer compares them with the held record and alerts on them instead of deduping them away.
+message LogOriginTrusted {
+  // Log origin of the checkpoint, printable UTF-8 of 1 to 256 bytes.
+  string origin = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Tree size of the trusted checkpoint.
+  uint64 tree_size = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Root hash of the trusted checkpoint.
+  numinance.types.v1.Digest root_hash = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // signing_key_id of the log public key the checkpoint verified under.
+  numinance.types.v1.Digest log_key_id = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ReconciliationMismatch is the payload of ReconciliationMismatch.v1: a reconciliation run found disagreements.
+message ReconciliationMismatch {
+  // Change reconciled, chg_ prefixed; empty for a window-scoped report.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The ReconciliationReport as an artifact, by claim-check reference.
+  numinance.types.v1.Reference report = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Number of mismatches in the report.
+  uint32 mismatch_count = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Systems compared in the run.
+  repeated numinance.evidence.v1.ReconciledSystem systems_compared = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,30 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.ExecutorModel.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ExecutorModel is one model the executor may run; a message, so per-model fields such as residency stay additive.",
+      "properties": {
+        "id": {
+          "description": "id is required: 1 to 253 bytes of ASCII letters, digits, \".\", \"_\", \"-\", \":\", \"/\" and \"@\", starting with a letter or digit.",
+          "type": "string"
+        },
+        "max_context": {
+          "description": "max_context is required and at least 1: the most tokens of context the model accepts in one request.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "max_context"
+      ],
+      "title": "Executor Model",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ExecutorModel.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ExecutorModel.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

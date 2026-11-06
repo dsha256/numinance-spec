@@ -1,0 +1,78 @@
+// The events the policy context publishes: DecisionIssued.v1, GrantIssued.v1, GrantRevoked.v1, AutonomyLevelChanged.v1, BreakerTripped.v1, BreakerReset.v1.
+// Reference-only: ids, digests (numinance.types.v1.Digest), enum codes and timestamps; reasons, rule ids and principal names stay in policy.decisions and in evidence.
+// Notifications only: a consumer never issues a credential, resumes a paused Change or widens anything on one of these events alone; it re-reads the grant, decision, autonomy level or breaker position through the policy context's driving port first.
+syntax = "proto3";
+
+package numinance.events.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// DecisionIssued is the payload of DecisionIssued.v1, published for every decision, denied or allowed, after it is written to policy.decisions.
+message DecisionIssued {
+  // Decision, dec_ prefixed.
+  string policy_decision_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Change the decision is about, chg_ prefixed; empty for a decision outside a Change (SetAutonomyLevel, TripBreaker, ResetBreaker).
+  string change_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The decision; a consumer rejects DECISION_OUTCOME_UNSPECIFIED.
+  numinance.types.v1.DecisionOutcome outcome = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identity kind of the grant actor the decision was made for. PRINCIPAL_KIND_ENGINE is producer-only and never an actor: a consumer rejects it.
+  numinance.types.v1.PrincipalKind actor_kind = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the canonical policy input; unset only on a deny whose input never validated.
+  numinance.types.v1.Digest input_digest = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the policy bundle in force.
+  numinance.types.v1.Digest policy_bundle_digest = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GrantIssued is the payload of GrantIssued.v1: IssueGrant derived an immutable grant.
+message GrantIssued {
+  // Grant, grant_ prefixed.
+  string grant_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Change the grant is for, chg_ prefixed.
+  string change_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Work unit the grant is for, wu_ prefixed; empty for a Change-level grant.
+  string work_unit_id = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identity kind the grant is issued to. PRINCIPAL_KIND_ENGINE is producer-only and never an actor: a consumer rejects it.
+  numinance.types.v1.PrincipalKind actor_kind = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Autonomy level the grant was derived at.
+  numinance.types.v1.AutonomyLevel autonomy_level = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the grant expires, UTC.
+  google.protobuf.Timestamp expires_at = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GrantRevoked is the payload of GrantRevoked.v1: a grant was revoked before it expired.
+message GrantRevoked {
+  // Grant revoked, grant_ prefixed.
+  string grant_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Change the grant was for, chg_ prefixed.
+  string change_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AutonomyLevelChanged is the payload of AutonomyLevelChanged.v1: SetAutonomyLevel took effect for one scope of the autonomy policy.
+message AutonomyLevelChanged {
+  // Digest of the canonical scope the level applies to (organisation, repository, component, playbook, risk class, environment). It is a lookup key, not a secret: the scope names are low-entropy and can be confirmed by hashing guesses. A consumer resolves the scope through the policy context's driving port.
+  numinance.types.v1.Digest scope_digest = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The scope's own level before the change: the lower of the cap stored for exactly this scope and the configured level (the configured level when none is stored); never AUTONOMY_LEVEL_UNSPECIFIED, and a consumer rejects it. It is a fact about this scope only, not the level in force for a change: that is the minimum over every covering scope plus the breaker cap and the sandbox ceiling, which a consumer computes through the policy context's driving port. A consumer must not read level against previous_level of a narrower scope as a change of the effective level.
+  numinance.types.v1.AutonomyLevel previous_level = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The scope's own level after the change; a consumer rejects AUTONOMY_LEVEL_UNSPECIFIED. When restored is true it is the level the autonomy policy configures for the scope. A change that is not a restore sets a level that differs from previous_level; a restore sets one that is not below it.
+  numinance.types.v1.AutonomyLevel level = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the change restored the scope to its configured level: level is then the configured level and the cap this scope had is cleared. False (and absent) for a lowering or any other cap.
+  bool restored = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BreakerTripped is the payload of BreakerTripped.v1: the circuit breaker moved to a more restrictive position. A consumer rejects an event whose position is not more restrictive than previous_position.
+message BreakerTripped {
+  // Position before the trip.
+  numinance.types.v1.BreakerPosition previous_position = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Position in force after the trip.
+  numinance.types.v1.BreakerPosition position = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// BreakerReset is the payload of BreakerReset.v1: a human reset the circuit breaker to a less restrictive position; the reason is recorded in evidence. A consumer rejects an event whose position is not less restrictive than previous_position.
+message BreakerReset {
+  // Position before the reset.
+  numinance.types.v1.BreakerPosition previous_position = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Position in force after the reset.
+  numinance.types.v1.BreakerPosition position = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

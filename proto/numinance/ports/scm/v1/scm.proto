@@ -1,0 +1,482 @@
+// The scm port: reads a source repository and its pull requests, and opens, updates, comments on and merges pull requests. Any code host that has repositories, branches, pull requests, status checks and branch protection can implement every core verb (GitHub, GitLab, Bitbucket, Gitea); a vendor feature beyond them is a capability `scm.<feature>` negotiated at handshake, added in a later minor; there is no VendorCall in 1.0.0, because the host refuses a provider that does not declare every side-effecting RPC of its port, and an escape hatch no provider implements is a PRIVILEGED capability that does nothing.
+// Callers: the release context calls the write verbs, the profile and policy side read the base revision at intake through GetRepository, and the knowledge side may read files and trees. The host decides every call, on the exact request bytes, against the grant of the identity named in ActionContext: OpenPullRequest, UpdatePullRequest, CommentOnPullRequest and CreateBranch under the author-agent identity of the Change, MergePullRequest under the release-pipeline identity only. A call that comes from an identity that is neither, and a MergePullRequest from the author of the Change (the same principal or the same run_id as any author run), is refused by the policy floors before Invoke; the provider never decides who may merge. The port is never a model tool, and no tool_groups or scopes are declared.
+// Authority: every request names its repository in `repository`, which the Engine marks as the resource of the call (RFC-0002): a call on a repository outside the acting grant's resource scope is denied before dispatch. A provider holds no credential of its own: it asks the host for a credential handle for the intent its manifest declares and sends the handle to the egress proxy, never a raw token. A provider never reports an effect it did not make, and reconciles a retry before it acts: the host's idempotency key names the operation, and a replay answers the first result (an open pull request for the same head and base is returned, not opened again; a merge already done is answered as done).
+// Untrusted answers: every title, body, branch name, label, URL, check name, check output, commit message and file content that the host holds comes from the code host and is untrusted data, whoever wrote it on the host. The release context size-limits it, validates it against this file, stores it by digest and labels and delimits it as untrusted wherever it reaches a prompt, a ticket or a pull request, never as instructions. Nothing a provider answers changes policy, a grant, a tool list or an approval. A merge decision never rests on a field of a response that a pull request author controls (the text of a body or a comment).
+// Protected paths: branch protection is the second line behind the mount. GetBranchProtection reports what the host enforces so that the release context can refuse to merge a pull request whose base branch has no required review or no required check; the provider reports the host's state and never changes it, and no verb of this port edits protection, a workflow file or a ruleset.
+// Payloads: requests carry ids, names and bounded text; files are returned inline only up to max_bytes (a repository file is not a Reference because the scm host is the store). No verb returns a diff.
+// Status codes: INVALID_ARGUMENT for a request that breaks a bound; NOT_FOUND for a repository, revision, branch, file or pull request the host hides or lacks; PERMISSION_DENIED when the host refuses the credential openly; ALREADY_EXISTS for a CreateBranch whose name is taken at another revision; FAILED_PRECONDITION for a pull request that is not mergeable, not open or whose head moved from head_revision, and for a merge the base branch's protection refuses; RESOURCE_EXHAUSTED when the host rate-limits the call; UNAVAILABLE for a host that cannot be reached or a transient failure the caller may retry. A provider never invents a result: an outage is an error, never an empty answer.
+// Evidence: OpenPullRequest declares one record type, pr-ref: a provider emits exactly one per call that opened or found the pull request, through HostService.EmitEvidence, a compact receipt of the pull request's reference (repository, number, head and base revisions, never the title or body). A call that ends SUCCEEDED without it is PARTIAL. The other verbs declare no evidence in 1.0.0: the merge's record is the host's capability record, and the release context writes its own facts as events.
+// Bounds: every string is at most 1024 bytes unless stated; over-limit input is rejected, never truncated by the host; enums are closed, and zero and unknown numbers are rejected; a field unknown to the host's descriptor copy is rejected (plugin/v1 Invoke strict decoding), so a provider sends a field added in a later minor only when HandshakeRequest.spec_version is at least that minor or behind a negotiated capability. Printable means Unicode categories L, M, N, P, S and U+0020. A rejection names an index-based field path and the violated bound, never the offending value.
+// Formats: repository is the repository's full name `<owner>/<name>`, matching ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9._-]{1,100}$ with no '.' or '..' name segment. A revision is a full commit id: 40 or 64 lowercase hexadecimal characters; a branch name or a tag never stands for a revision, because it moves. A branch name is valid under git check-ref-format --branch, 1 to 255 bytes, printable ASCII. A path is relative to the repository root, '/'-separated, printable, with no leading '/', no '\' and no empty, '.' or '..' segment.
+// Every element is since 1.0.0.
+syntax = "proto3";
+
+package numinance.ports.scm.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+
+// ScmService is the scm port a source-control provider serves.
+service ScmService {
+  // GetRepository returns what the release and profile contexts need to pin a Change: the default branch and the commit it points to now. The intake of a Change records default_branch_head as the protected base revision of the Change, so the profile and the policy are read from that commit and never from the candidate.
+  rpc GetRepository(GetRepositoryRequest) returns (GetRepositoryResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the default branch of a repository and the commit it points to."
+    };
+  }
+  // GetTree lists the entries of one directory at one revision, or of the whole subtree when recursive is set, at most max_entries of them.
+  rpc GetTree(GetTreeRequest) returns (GetTreeResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Lists the entries of a directory of a repository at a commit."
+    };
+  }
+  // GetFile returns the content of one file at one revision from its first byte, at most max_bytes. Content is untrusted data.
+  rpc GetFile(GetFileRequest) returns (GetFileResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the content of one file of a repository at a commit."
+    };
+  }
+  // ListBranches lists branches in the host's order, one page at a time.
+  rpc ListBranches(ListBranchesRequest) returns (ListBranchesResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Lists the branches of a repository."
+    };
+  }
+  // CreateBranch creates branch `name` at from_revision. A replay of the same name and revision answers the existing branch; the same name at another revision is ALREADY_EXISTS. LOW: a new ref changes no code on any existing branch, and deleting it undoes it. No dry run: the branch is the whole effect and its creation is the check of the name; the compensating action closes any pull request opened from it.
+  rpc CreateBranch(CreateBranchRequest) returns (CreateBranchResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Creates a branch of a repository at a given commit."
+    };
+  }
+  // GetBranchProtection reports the protection the host enforces on one branch. The provider reads the host's state and changes nothing.
+  rpc GetBranchProtection(GetBranchProtectionRequest) returns (GetBranchProtectionResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Reports the branch protection of a branch of a repository."
+    };
+  }
+  // OpenPullRequest opens a pull request from head_branch, which points at head_revision, into base_branch. The request names the head revision so the pull request is the candidate that was verified and not whatever the branch holds later: a head_branch that does not point at head_revision is FAILED_PRECONDITION. Idempotent by the host's key and by reconciliation: an open pull request for the same head and base is answered, not opened again. MEDIUM: it publishes the candidate to reviewers and starts the host's checks, and a closed pull request undoes it. Dry run checks the names, the revision and that no pull request is open yet, opens nothing and answers with pull_request unset when it would open one.
+  rpc OpenPullRequest(OpenPullRequestRequest) returns (OpenPullRequestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_MEDIUM
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "ScmService.UpdatePullRequest"
+      evidence: "pr-ref"
+      since: "1.0.0"
+      llm_description: "Opens a pull request for a verified candidate branch."
+    };
+  }
+  // UpdatePullRequest changes the title or body of a pull request, or closes it (state CLOSED); it never reopens a merged pull request and never changes the head or the base. LOW: it edits text or closes a pull request, both undone by another update. No dry run: the update is the whole effect.
+  rpc UpdatePullRequest(UpdatePullRequestRequest) returns (UpdatePullRequestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Edits the title or body of a pull request, or closes it."
+    };
+  }
+  // CommentOnPullRequest adds one comment, identified by the host's key: a replay answers the first comment and adds none. LOW: a comment changes no code, though it is visible to reviewers. No dry run: the comment is the whole effect, and a dry run would be the call.
+  rpc CommentOnPullRequest(CommentOnPullRequestRequest) returns (CommentOnPullRequestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Adds one comment to a pull request."
+    };
+  }
+  // GetPullRequestStatus returns the state of a pull request, its head, its checks and the reviews it holds. It is also the reconciliation read of OpenPullRequest and MergePullRequest after a lost response. Review counts are the host's claim: the release context never merges on them alone.
+  rpc GetPullRequestStatus(GetPullRequestStatusRequest) returns (GetPullRequestStatusResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the state, checks and reviews of a pull request."
+    };
+  }
+  // MergePullRequest merges a pull request into its base branch. PRIVILEGED: it changes the protected branch every later Change is pinned to. It is allowed only to the release-pipeline identity under a grant of level Merge or above, after a ReleaseGate allow bound to this candidate; the policy floors refuse the author of the Change. expected_head_revision is the head the caller verified: a pull request whose head moved is FAILED_PRECONDITION, so the merge is of the verified candidate and no other. A merge already done under the same key is answered as done with the merge commit, never merged again. Dry run answers, with an empty merge_revision, that the pull request is open at expected_head_revision and not in conflict, or fails as the merge would, and merges nothing.
+  rpc MergePullRequest(MergePullRequestRequest) returns (MergePullRequestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_PRIVILEGED
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "ScmService.CommentOnPullRequest"
+      since: "1.0.0"
+      llm_description: "Merges a verified pull request into its base branch."
+    };
+  }
+  // SearchCode searches the default branch for text and returns paths, never content. The query is search text only, passed to the host as a parameter and never spliced into its query language.
+  rpc SearchCode(SearchCodeRequest) returns (SearchCodeResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Searches the code of a repository and returns matching paths."
+    };
+  }
+}
+
+// PullRequestState is the state of a pull request on the host.
+enum PullRequestState {
+  // PULL_REQUEST_STATE_UNSPECIFIED is the zero value; it is rejected.
+  PULL_REQUEST_STATE_UNSPECIFIED = 0;
+  // PULL_REQUEST_STATE_OPEN: open for review and merge.
+  PULL_REQUEST_STATE_OPEN = 1;
+  // PULL_REQUEST_STATE_CLOSED: closed without a merge.
+  PULL_REQUEST_STATE_CLOSED = 2;
+  // PULL_REQUEST_STATE_MERGED: merged into its base branch.
+  PULL_REQUEST_STATE_MERGED = 3;
+}
+
+// Mergeability is whether the host can merge a pull request now.
+enum Mergeability {
+  // MERGEABILITY_UNSPECIFIED is the zero value; it is rejected.
+  MERGEABILITY_UNSPECIFIED = 0;
+  // MERGEABILITY_MERGEABLE: the host reports no conflict.
+  MERGEABILITY_MERGEABLE = 1;
+  // MERGEABILITY_CONFLICTING: the head conflicts with the base.
+  MERGEABILITY_CONFLICTING = 2;
+  // MERGEABILITY_UNKNOWN: the host has not computed it yet; ask again.
+  MERGEABILITY_UNKNOWN = 3;
+}
+
+// CheckConclusion is the outcome of one status check on the head of a pull request.
+enum CheckConclusion {
+  // CHECK_CONCLUSION_UNSPECIFIED is the zero value; it is rejected.
+  CHECK_CONCLUSION_UNSPECIFIED = 0;
+  // CHECK_CONCLUSION_PENDING: queued or running.
+  CHECK_CONCLUSION_PENDING = 1;
+  // CHECK_CONCLUSION_SUCCESS: passed.
+  CHECK_CONCLUSION_SUCCESS = 2;
+  // CHECK_CONCLUSION_FAILURE: failed, timed out or needs action.
+  CHECK_CONCLUSION_FAILURE = 3;
+  // CHECK_CONCLUSION_NEUTRAL: ended with no verdict (neutral, skipped, cancelled).
+  CHECK_CONCLUSION_NEUTRAL = 4;
+}
+
+// GetRepositoryRequest names the repository.
+message GetRepositoryRequest {
+  // Required: the repository's full name, in the grammar of the file comment (Formats). Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+}
+
+// GetRepositoryResponse is the host's answer; every field is a claim.
+message GetRepositoryResponse {
+  // The repository's default branch name.
+  string default_branch = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The full commit id the default branch points to at the time of the call.
+  string default_branch_head = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the repository is private to its organisation.
+  bool private = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the host has archived the repository (read-only).
+  bool archived = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetTreeRequest names a directory at a revision.
+message GetTreeRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: a full commit id.
+  string revision = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The directory, in the path grammar; empty for the repository root.
+  string path = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True to list the whole subtree.
+  bool recursive = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required, 1 to 1024: the most entries to return.
+  uint32 max_entries = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// TreeEntry is one entry of a tree.
+message TreeEntry {
+  // The path from the repository root, in the path grammar.
+  string path = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the entry is a directory.
+  bool directory = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The object id of the entry on the host: 40 or 64 lowercase hexadecimal characters.
+  string object_id = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Size in bytes of a file; 0 for a directory.
+  uint64 size = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetTreeResponse lists a tree.
+message GetTreeResponse {
+  // At most max_entries entries, ordered by path.
+  repeated TreeEntry entries = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the host holds more entries than were returned.
+  bool truncated = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetFileRequest names a file at a revision.
+message GetFileRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: a full commit id.
+  string revision = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the file, in the path grammar.
+  string path = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required, 1 to 262144: the most content bytes to return.
+  uint32 max_bytes = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetFileResponse is a file's head.
+message GetFileResponse {
+  // The object id of the file on the host.
+  string object_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The size in bytes of the whole file.
+  uint64 size = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The first min(size, max_bytes) bytes; untrusted.
+  bytes content = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when size is above max_bytes.
+  bool truncated = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListBranchesRequest asks for one page of branches.
+message ListBranchesRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required, 1 to 256: the most branches to return.
+  uint32 page_size = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The token a previous answer returned, at most 1024 printable bytes; empty for the first page.
+  string page_token = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Branch is a branch and the commit it points to.
+message Branch {
+  // The branch name, in the branch grammar.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The full commit id the branch points to.
+  string head_revision = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListBranchesResponse is one page of branches.
+message ListBranchesResponse {
+  // At most page_size branches.
+  repeated Branch branches = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The token of the next page; empty at the last page. Opaque and untrusted.
+  string next_page_token = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CreateBranchRequest names the branch and its start.
+message CreateBranchRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the new branch's name.
+  string name = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the full commit id the branch starts at.
+  string from_revision = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CreateBranchResponse is the created or existing branch.
+message CreateBranchResponse {
+  // The branch as the host holds it after the call.
+  Branch branch = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetBranchProtectionRequest names a branch.
+message GetBranchProtectionRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the branch.
+  string branch = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetBranchProtectionResponse is the protection in force on a branch; every field is the host's claim.
+message GetBranchProtectionResponse {
+  // True when the host protects the branch at all.
+  bool protected = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The number of approving reviews the host requires before a merge; 0 when none.
+  uint32 required_reviews = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The names of the checks that must pass before a merge, at most 64, unique, each at most 256 bytes.
+  repeated string required_checks = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the rules bind repository administrators as well.
+  bool enforce_admins = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the host allows a force push to the branch.
+  bool allow_force_push = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// OpenPullRequestRequest is one pull request to open.
+message OpenPullRequestRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the branch that holds the candidate.
+  string head_branch = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the full commit id of the candidate; head_branch must point at it.
+  string head_revision = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the branch the pull request merges into.
+  string base_branch = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: 1 to 256 printable bytes. Text the Engine composes from the Change; rendered as data on the host.
+  string title = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // At most 16384 bytes of printable characters, U+0009 and U+000A. The Engine composes it from references and labels any untrusted quotation; never an instruction.
+  string body = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// PullRequest is a pull request as the host reports it.
+message PullRequest {
+  // The host's number of the pull request, at least 1 and at most 2^53-1.
+  uint64 number = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The pull request's state.
+  PullRequestState state = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The branch that holds the candidate.
+  string head_branch = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The full commit id of the head now.
+  string head_revision = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The branch the pull request merges into.
+  string base_branch = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The address of the pull request on the host: an absolute https URL of at most 1024 bytes, for people; untrusted, and never fetched by the Engine.
+  string url = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// OpenPullRequestResponse is the opened or found pull request.
+message OpenPullRequestResponse {
+  // The pull request.
+  PullRequest pull_request = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when an open pull request for the same head and base already existed and nothing was opened.
+  bool existing = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// UpdatePullRequestRequest names the fields to change.
+message UpdatePullRequestRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the pull request's number.
+  uint64 number = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The new title, 1 to 256 printable bytes; empty leaves it as it is.
+  string title = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The new body, at most 16384 bytes; empty leaves it as it is.
+  string body = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The new state: unspecified leaves it, CLOSED closes it; OPEN and MERGED are rejected.
+  PullRequestState state = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// UpdatePullRequestResponse is the pull request after the update.
+message UpdatePullRequestResponse {
+  // The pull request.
+  PullRequest pull_request = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CommentOnPullRequestRequest is one comment.
+message CommentOnPullRequestRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the pull request's number.
+  uint64 number = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: 1 to 16384 bytes of printable characters, U+0009 and U+000A.
+  string body = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CommentOnPullRequestResponse names the comment.
+message CommentOnPullRequestResponse {
+  // The host's id of the comment, at most 128 printable bytes; opaque.
+  string comment_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetPullRequestStatusRequest names a pull request.
+message GetPullRequestStatusRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the pull request's number.
+  uint64 number = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CheckRun is one status check on the head of a pull request.
+message CheckRun {
+  // The check's name, 1 to 256 printable bytes; untrusted.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The check's outcome.
+  CheckConclusion conclusion = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetPullRequestStatusResponse is the state of a pull request; every field is the host's claim.
+message GetPullRequestStatusResponse {
+  // The pull request as the host holds it now.
+  PullRequest pull_request = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Whether the host can merge it.
+  Mergeability mergeability = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The checks of the head, at most 256, unique by name.
+  repeated CheckRun checks = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The number of distinct reviewers whose latest review approves the head.
+  uint32 approvals = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when a reviewer's latest review requests changes.
+  bool changes_requested = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The merge commit's full id when state is MERGED; empty otherwise.
+  string merge_revision = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// MergePullRequestRequest is one merge.
+message MergePullRequestRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the pull request's number.
+  uint64 number = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the full commit id of the head the caller verified; a moved head is FAILED_PRECONDITION.
+  string expected_head_revision = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the branch the pull request was opened into; a pull request that now merges into another branch is FAILED_PRECONDITION, so the merge is into the base whose protection was read.
+  string expected_base_branch = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// MergePullRequestResponse is the merge outcome.
+message MergePullRequestResponse {
+  // The full commit id of the merge on the base branch; empty for a dry run.
+  string merge_revision = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when the pull request was already merged by an earlier call and nothing was merged now.
+  bool already_merged = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The time the host merged it; unset for a dry run.
+  google.protobuf.Timestamp merged_at = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The full commit id of the head the merge was of; equal to expected_head_revision, and empty for a dry run. The caller compares it: a merge already done at another head is not the release of the verified candidate.
+  string head_revision = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// SearchCodeRequest is one search.
+message SearchCodeRequest {
+  // Required, as in GetRepositoryRequest. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the search text, 1 to 256 printable bytes.
+  string query = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required, 1 to 100: the most paths to return.
+  uint32 max_results = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// SearchCodeResponse lists matching paths.
+message SearchCodeResponse {
+  // At most max_results paths on the default branch, in the path grammar.
+  repeated string paths = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,30 @@
+{
+  "vector": "open-prefix-incomplete",
+  "description": "A chain with no terminal record, anchored: the head of a prefix can be anchored, so the level is incomplete.",
+  "status": "shipped",
+  "export": "open-prefix",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "incomplete",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "incomplete",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:incomplete",
+    "exit:5"
+  ]
+}

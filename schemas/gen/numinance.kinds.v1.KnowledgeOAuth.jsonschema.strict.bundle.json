@@ -1,0 +1,20 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.KnowledgeOAuth.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "KnowledgeOAuth is the OAuth client of a connection. It never carries a secret, and no field of it may be added that does.",
+      "properties": {
+        "client_id": {
+          "description": "client_id identifies the client to the source. The loader refuses an empty one, one over 2048 bytes and any byte\n outside printable ASCII (so no whitespace, control or bidi character); one that starts with a scheme (\"name:\") or \"//\", contains \"://\" or a colon\n before its first \"/\", \"?\" or \"#\", or holds a backslash or \"%\", is read as a URL and must be an https URL that passes the endpoint rule of the loader-checks row of\n sdk/go/kindyaml/README.md; a \".\" or \"..\" path segment is refused.",
+          "type": "string"
+        }
+      },
+      "title": "KnowledgeO Auth",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.KnowledgeOAuth.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.KnowledgeOAuth.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

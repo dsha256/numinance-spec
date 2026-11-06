@@ -1,0 +1,43 @@
+{
+  "vector": "record-line-over-3-mib",
+  "description": "A records.ndjson whose last line is longer than 3 MiB (zero bytes appended): the line is refused before it is decoded.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "materialize": [
+    {
+      "op": "pad_file",
+      "path": "records.ndjson",
+      "size": 3149636
+    }
+  ],
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "digest_mismatch",
+      "record_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:digest_mismatch",
+    "finding:record_invalid",
+    "rule:size-bound"
+  ]
+}

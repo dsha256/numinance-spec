@@ -1,0 +1,31 @@
+{
+  "vector": "executor-id-bare-name-gap",
+  "description": "The author records state the executor_id claude-cli with no digest. The attestation is not made, a gap is recorded and the level is incomplete, never verified; there is no manifest to carry.",
+  "status": "shipped",
+  "export": "closed-author-bare-executor",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "incomplete",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "incomplete",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:incomplete",
+    "exit:5",
+    "rule:executor-id-form"
+  ]
+}

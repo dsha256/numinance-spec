@@ -1,0 +1,164 @@
+// HostService is served by the host and called by a plugin during an Invoke; it is never exposed as a model tool and never an action target. Every element is since 1.0.0.
+// Every request names an invocation_id the host assigned to this plugin process and still has in flight; any other id is rejected, so a plugin can act only inside the authority of the call it serves; the host identifies the calling plugin by the connection it established at launch, never by request content. Per invocation at most 256 EmitEvidence, 1024 Log, 1024 ReportProgress, 64 ResolveReference and 16 RequestCredential calls, 2048 HostService calls in total; a call over any count is rejected and the invocation is recorded FAILED.
+// No HostService RPC declares evidence: the host records each call and its outcome in the invocation's evidence. Bounds: every string is at most 1024 bytes and every repeated field at most 256 entries unless stated; over-limit input is rejected, never truncated; duplicate entries are rejected, keyed as fields by key and artifacts by artifact_ref. Printable means Unicode categories L, M, N, P, S and U+0020; Cc, Cf, Cs, Co, Cn, Zl and Zp (including bidi and zero-width controls) are rejected. A rejection names an index-based field path and the violated bound, never the offending value.
+syntax = "proto3";
+
+package numinance.plugin.v1;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/plugin/v1/envelope.proto";
+import "numinance/types/v1/types.proto";
+
+// HostService is the surface the host serves to a plugin.
+service HostService {
+  // Log records one structured log entry in the host's retained logs; no dry run: the entry is the whole effect.
+  rpc Log(LogRequest) returns (LogResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: false
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Records one structured log entry for the current invocation."
+    };
+  }
+  // EmitEvidence submits one evidence item; the host validates it and appends it under the runner identity, the plugin never appends; LOW because the plugin only submits and the host can refuse, while the append itself is the host's; no dry run: submitting is the whole effect and the host decides whether to append.
+  rpc EmitEvidence(EmitEvidenceRequest) returns (EmitEvidenceResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Submits one evidence item for the current invocation to the host."
+    };
+  }
+  // RequestCredential returns a handle for a declared credential intent, never credential material; no dry run: a handle is unusable outside the invocation and expires with it.
+  rpc RequestCredential(RequestCredentialRequest) returns (RequestCredentialResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_PRIVILEGED
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns a credential handle for a declared intent of the current invocation."
+    };
+  }
+  // ResolveReference streams the content of a referenced artifact in size-capped chunks; there are no presigned URLs. The host streams the exact bytes whose sha256 it verified before the first chunk (a pinned object version or a buffered copy): stores key by artifact_ref, and refusal by digest identity is only as strong as that check.
+  rpc ResolveReference(ResolveReferenceRequest) returns (stream ResolveReferenceResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Streams the content of an artifact referenced by the current invocation's request."
+    };
+  }
+  // ReportProgress reports the progress of the current invocation.
+  rpc ReportProgress(ReportProgressRequest) returns (ReportProgressResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Reports the progress of the current invocation."
+    };
+  }
+}
+
+// LogRequest is one structured log entry.
+message LogRequest {
+  // invocation_id is the ActionContext.invocation_id of the call being served.
+  string invocation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // severity is the severity.
+  Severity severity = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // reason is the reason code; there is no message text.
+  Reason reason = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // fields are structured attributes, at most 32, unique by key.
+  repeated LogField fields = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// LogField is one structured log attribute.
+message LogField {
+  // key matches ^[a-z][a-z0-9_]{0,63}$.
+  string key = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // value is untrusted, printable characters only, at most 256 bytes; the host escapes it, passes it through its redaction and writes it under a plugin-owned group; a key equal to a host-owned key is rejected.
+  string value = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// LogResponse has no fields; the reply confirms the entry was accepted.
+message LogResponse {}
+
+// EmitEvidenceRequest is one evidence item.
+message EmitEvidenceRequest {
+  // invocation_id is the ActionContext.invocation_id of the call being served.
+  string invocation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // emit_key is unique per item within the invocation, matching ^[a-z0-9][a-z0-9._-]{0,127}$; a replay with the same key, payload and artifacts returns the same evidence_id, with any difference it is rejected.
+  string emit_key = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_type is an evidence record type name in the capability's evidence_declared and in the host's allow-list of plugin-emittable types (provider-produced kinds such as verifier reports and operation logs); lifecycle, policy decision, gate, approval and credential-issuance kinds are host-authored, rejected at install in evidence_declared and rejected here; any other is rejected.
+  string record_type = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // payload is the typed evidence payload, never a source of record fields (ids, actor, policy decision, grant, risk class, digests, sandbox fields, timestamp come from the host's invocation state), at most 16 KiB serialized, with a type URL the host allows for record_type.
+  google.protobuf.Any payload = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // artifacts reference large content by digest, at most 64; each must exist in the artifact store with a matching sha256 and be readable under the invocation's grant, else the call is rejected and nothing is appended; v1 has no upload, so other content travels only in payload.
+  repeated numinance.types.v1.Reference artifacts = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EmitEvidenceResponse names the accepted item.
+message EmitEvidenceResponse {
+  // evidence_id is the `ev_` prefixed id of the Record the host appended for the accepted item; the plugin lists it in ActionResult.evidence_ids.
+  string evidence_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// RequestCredentialRequest names one credential intent.
+message RequestCredentialRequest {
+  // invocation_id is the ActionContext.invocation_id of the call being served.
+  string invocation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // intent is a credential intent in the capability's credential_intents that the grant allows; any other is rejected. When the invocation has ActionContext.dry_run set, the broker issues a handle only for a read-class intent and the egress proxy denies any non-read method on it; the host records dry_run on the invocation's evidence so a write that happened anyway is flagged on reconciliation.
+  string intent = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// RequestCredentialResponse carries a handle, never credential material.
+message RequestCredentialResponse {
+  // handle is the same for a repeated request for the same intent in the invocation (idempotent); it is opaque, at most 256 bytes, bound to the invocation and the intent, and usable only through the host's egress proxy; it is never logged or recorded.
+  string handle = 1 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    sensitive: true
+  }];
+  // expires_at is when the handle stops working; never later than the invocation deadline.
+  google.protobuf.Timestamp expires_at = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // egress_proxy is the "host:port" of the egress proxy listener of the invocation's step: the only address the provider sends a request carrying the handle to, as an absolute-form HTTP request for the destination its manifest declares (the proxy terminates it, applies the credential and re-originates it over TLS). It is an address, never credential material; empty when the host runs no egress proxy, and then a handle cannot be used.
+  string egress_proxy = 3 [(numinance.annotations.v1.field).since = "1.1.0"];
+}
+
+// ResolveReferenceRequest names one referenced artifact.
+message ResolveReferenceRequest {
+  // invocation_id is the ActionContext.invocation_id of the call being served.
+  string invocation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // reference must equal (proto.Equal on all three fields) a Reference in a field of the method's input type, found by walking the request with the host's descriptor copy; a Reference inside an Any is never resolvable; a reference whose sha256.value equals that of a field the port marks host_only ((numinance.annotations.v1.field).host_only, as authorexecutor worktree_ref and network_policy_ref), or of a Reference nested under one, is refused whatever its artifact_type or artifact_ref, also when a resolvable field holds the same value; the mark is inherited by every Reference nested under a marked message-typed field; any other is rejected as not found.
+  numinance.types.v1.Reference reference = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ResolveReferenceResponse is one chunk of content.
+message ResolveReferenceResponse {
+  // chunk is at most 64 KiB; the host verifies the object's sha256 against the reference before the first chunk and streams nothing on a mismatch; the total per invocation is at most ActionContext.budget.disk_bytes.
+  bytes chunk = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ReportProgressRequest is one progress report.
+message ReportProgressRequest {
+  // invocation_id is the ActionContext.invocation_id of the call being served.
+  string invocation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // completed is the units of work done; it never decreases within an invocation.
+  uint64 completed = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // total is the units of work expected, or zero when unknown; completed above a non-zero total is rejected.
+  uint64 total = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // reason is a phase reason (STARTED, RUNNING, WAITING, COMPLETED); any other is rejected; there is no message text.
+  Reason reason = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ReportProgressResponse has no fields; the reply confirms the report was accepted.
+message ReportProgressResponse {}

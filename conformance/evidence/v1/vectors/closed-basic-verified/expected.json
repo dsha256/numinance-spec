@@ -1,0 +1,33 @@
+{
+  "vector": "closed-basic-verified",
+  "description": "A Closed change with parts the product cannot produce declared absent in the index: a bare verified. The credential_scopes field is unsourced, which is a report note and never a level.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "credential_scopes": "unsourced",
+    "network_policy": "unsourced",
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:unsourced-note-is-not-a-weakness"
+  ]
+}

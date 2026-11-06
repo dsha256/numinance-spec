@@ -1,0 +1,85 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// StageRegistry maps the customer's stage names onto the fixed Change state machine; the states themselves never change.
+message StageRegistry {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "StageRegistry".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  StageRegistrySpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// StageRegistrySpec lists the customer's stages; the profile context checks
+// the DAG over requires and refuses PAUSED.
+message StageRegistrySpec {
+  // stages is required and non-empty; the loader enforces it, the schema cannot.
+  repeated StageRegistryEntry stages = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// StageRegistryEntry is one customer stage of the registry.
+message StageRegistryEntry {
+  // name is required: the customer's stage name, unique in the registry.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // maps_to is required: the Change state this stage is. A stage only names a state; the policy decision of the
+  // state machine's gate states (PLAN_GATE, RELEASE_GATE) is made whatever gate the stage declares.
+  numinance.types.v1.ChangeState maps_to = 2 [json_name = "maps_to", (numinance.annotations.v1.field).since = "1.0.0"];
+  // gate is the gate the stage passes through, if any; it only adds a decision, and an absent or weaker gate never removes one.
+  StageGate gate = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // requires names the stages that complete before this one; the order must agree with the state machine's order.
+  repeated string requires = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GateKind is what decides a gate. This enum may grow; a consumer that meets a value it does not know denies by default.
+enum GateKind {
+  // GATE_KIND_UNSPECIFIED is the zero value; a loader rejects it.
+  GATE_KIND_UNSPECIFIED = 0;
+  // GATE_KIND_PLAN is decided by policy on the plan.
+  GATE_KIND_PLAN = 1;
+  // GATE_KIND_RELEASE is decided by policy on all evidence.
+  GATE_KIND_RELEASE = 2;
+  // GATE_KIND_HUMAN is decided by a human approver. YAML spells it with the full proto name (GATE_KIND_HUMAN), not a short form.
+  GATE_KIND_HUMAN = 3;
+  // GATE_KIND_POLICY is decided by policy alone.
+  GATE_KIND_POLICY = 4;
+}
+
+// StageGate is the gate of a stage. It has two keys, kind and required_approvals; kind is GATE_KIND_PLAN or GATE_KIND_HUMAN (see GateKind).
+message StageGate {
+  // kind is required.
+  GateKind kind = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // approver_role is the customer role whose members may approve.
+  optional string approver_role = 2 [json_name = "approver_role", (numinance.annotations.v1.field).since = "1.0.0"];
+  // sod is the separation of duties the approval needs.
+  SeparationOfDuties sod = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // timeout is how long the gate waits for a decision before it escalates; absent means it waits without limit.
+  // Expiry only escalates; it never approves.
+  google.protobuf.Duration timeout = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // required_approvals is the number of distinct principals whose approval the gate needs (the author and the author's run never count, so it never relaxes
+  // approver != author). The loader refuses 0, and refuses the field on any gate kind other than GATE_KIND_HUMAN (only a human
+  // gate counts approvals). Absent means 1. It corresponds to approvers.count of the authority model;
+  // the count a gate needs is the largest of this value, the policy's approvers.count and any approval floor of a control
+  // pack, so this field only raises a requirement. Nothing enforces the count yet (a later release owns the rule and an upper bound);
+  // the loader and the profile context's KeepsGatesOf only preserve it.
+  optional uint32 required_approvals = 5 [json_name = "required_approvals", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// SeparationOfDuties names who may not approve; the author is always excluded.
+message SeparationOfDuties {
+  // distinct_from names the identities or roles the approver must differ from, beyond the author
+  // and the author's run: the approver is never the author and the approver's run_id is never the author's run_id.
+  repeated string distinct_from = 1 [json_name = "distinct_from", (numinance.annotations.v1.field).since = "1.0.0"];
+}

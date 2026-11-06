@@ -1,0 +1,11 @@
+apiVersion: numinance.dev/v1
+kind: EnvironmentProvider
+metadata: {name: postgres-clone, scope: SCOPE_REPO}
+spec:
+  provider: dev.numinance.official/aurora-clone
+  kind: ENVIRONMENT_KIND_DATABASE_CLONE
+  source: payments-primary
+  ttl: 14400s
+  seed: [synthetic-customers]
+  budget: {max_concurrent: 2}
+  tags: {team: payments}

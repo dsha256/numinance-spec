@@ -1,0 +1,562 @@
+{
+  "$defs": {
+    "google.protobuf.Duration.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "duration",
+      "title": "Duration",
+      "type": "string"
+    },
+    "google.protobuf.Value.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "title": "Value"
+    },
+    "numinance.kinds.v1.AdapterBinding.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterBinding is one provider installation serving a port.",
+      "properties": {
+        "instance": {
+          "description": "instance is required: the configured instance of the provider (one provider may serve several, such as two CI servers).",
+          "type": "string"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of a provider of the port, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "instance"
+      ],
+      "title": "Adapter Binding",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AdapterPorts.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterPorts binds the ports that reach customer systems; a port added later is a new\n optional field. Each binding is replaced as a unit, never pairing one scope's provider with another's instance.",
+      "properties": {
+        "cdprovider": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "cdprovider binds the cdprovider port."
+        },
+        "ciexecutor": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "ciexecutor binds the ciexecutor port."
+        },
+        "cloud": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "cloud binds the cloud port."
+        },
+        "database": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "database binds the database port."
+        },
+        "knowledge": {
+          "description": "knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "observability": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "observability binds the observability port."
+        },
+        "scm": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "scm binds the scm port."
+        },
+        "ticketing": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "ticketing binds the ticketing port."
+        }
+      },
+      "title": "Adapter Ports",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyDefaults.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyDefaults is the level used when no rule matches.",
+      "properties": {
+        "level": {
+          "description": "level is required.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "title": "Autonomy Defaults",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloor caps the level of the changes it matches; when floors from the org and control packs match, the\n lowest max_level holds.",
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        },
+        "max_level": {
+          "description": "max_level is required: no rule, default or narrower scope resolves a matching change above it.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_level"
+      ],
+      "title": "Autonomy Floor",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "rules": {
+          "description": "rules is required and non-empty; the loader enforces it, the schema cannot.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Autonomy Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyMatch selects changes; an absent key matches every value and an empty match matches every change. In a\n rule, risk matches exactly and a key the change has no value for does not match. In a floor, risk matches that\n class and every higher one, and a key the change has no value for counts as a match.",
+      "properties": {
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        },
+        "playbook": {
+          "description": "playbook is the name of the change's playbook.",
+          "type": "string"
+        },
+        "risk": {
+          "description": "risk is the change's risk class, fixed at Classified.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        }
+      },
+      "title": "Autonomy Match",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyPolicySpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyPolicySpec resolves a level: the lowest level of the matching rules, else the default; then no level\n above the lowest max_level of the matching floors.",
+      "properties": {
+        "defaults": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyDefaults.jsonschema.strict.json",
+          "description": "defaults is the level when no rule matches; absent everywhere means PR for READ, LOW and MEDIUM risk and\n Suggest for HIGH and PRIVILEGED."
+        },
+        "floors": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloors.jsonschema.strict.json",
+          "description": "floors cap the level; only an org-scoped kind or a control pack may set them. Absent in the org means the shipped\n floor (Suggest for HIGH and PRIVILEGED, PR for the rest); only org floors displace it, pack floors only add caps."
+        },
+        "rules": {
+          "description": "rules set levels for the changes they match; a narrower scope's list replaces the wider one, and no rule of any\n scope resolves a change above any control pack's floors or the org's floors (else the shipped floor).",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.AutonomyRule.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Autonomy Policy Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyRule.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyRule sets the level of the changes it matches.",
+      "properties": {
+        "level": {
+          "description": "level is required.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        },
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "title": "Autonomy Rule",
+      "type": "object"
+    },
+    "numinance.kinds.v1.BudgetPolicySpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BudgetPolicySpec holds the limits; an absent field is unset and comes from a wider scope.",
+      "properties": {
+        "files_changed": {
+          "description": "files_changed is the maximum number of files changed.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lines_changed": {
+          "description": "lines_changed is the maximum number of lines changed.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_risk_escalation": {
+          "description": "max_risk_escalation is the highest risk class a run may escalate to.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        },
+        "network_destinations": {
+          "description": "network_destinations is the maximum number of distinct network destinations.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "repositories": {
+          "description": "repositories is the maximum number of repositories touched.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retries": {
+          "description": "retries is the maximum number of retries.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "services": {
+          "description": "services is the maximum number of services touched.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tokens": {
+          "description": "tokens is the maximum model spend in tokens.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_calls": {
+          "description": "tool_calls is the maximum number of tool calls.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wall_clock": {
+          "$ref": "#/$defs/google.protobuf.Duration.jsonschema.strict.json",
+          "description": "wall_clock is the maximum elapsed time."
+        }
+      },
+      "title": "Budget Policy Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.Metadata.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Metadata names a kind object and fixes its scope.",
+      "properties": {
+        "name": {
+          "description": "name is required and unique per kind and scope; other kinds reference the object by it.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "scope is required and not SCOPE_UNSPECIFIED; the loader enforces the latter.",
+          "enum": [
+            "SCOPE_UNSPECIFIED",
+            "SCOPE_ORG",
+            "SCOPE_REPO",
+            "SCOPE_COMPONENT"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "scope"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "floor": {
+          "description": "floor is required: it applies to every change, together with every matching rule's floor.",
+          "enum": [
+            "RESIDENCY_CLASS_UNSPECIFIED",
+            "RESIDENCY_CLASS_IN_ACCOUNT",
+            "RESIDENCY_CLASS_PRIVATE_ENDPOINT",
+            "RESIDENCY_CLASS_VENDOR_ZDR",
+            "RESIDENCY_CLASS_VENDOR_STANDARD",
+            "RESIDENCY_CLASS_AIRGAPPED"
+          ],
+          "title": "Residency Class",
+          "type": "string"
+        },
+        "rules": {
+          "description": "rules add floors per component and environment; a rule never relaxes floor.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ResidencyRule.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "floor"
+      ],
+      "title": "Residency Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyMatch selects changes; an absent key matches every value and an empty match matches every change, and a\n key the change has no value for counts as a match. Floors from the org and control packs all hold together.",
+      "properties": {
+        "component": {
+          "description": "component is the name of the component the change touches. It is not a security boundary until floors match only\n components of an org-owned SIGNED_POLICY registry, since a repo can rename one.",
+          "type": "string"
+        },
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        }
+      },
+      "title": "Residency Match",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyPolicySpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyPolicySpec holds the floors and the data-handling limits. Floor is the ResidencyFloors message with the five ADR 0019 classes (no IN_REGION or ANY value);\n inference residency is carried by floors (the derived class covers inference, ADR 0019) together with cross_region.\n training_use is a separate optional enum.",
+      "properties": {
+        "cross_region": {
+          "description": "cross_region is true when inference may run in a region other than the source region; absent means false.",
+          "type": "boolean"
+        },
+        "floors": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyFloors.jsonschema.strict.json",
+          "description": "floors are the residency floors; only an org-scoped kind or a control pack may set them. Absent in the org means\n the floor IN_ACCOUNT, which pack floors add to and never displace; an org lowers it only by writing one."
+        },
+        "regions": {
+          "description": "regions is required and non-empty: the allowed source and destination regions, each one region name (\"*\" is\n refused). A list cannot carry FORBID, so the profile context refuses it below the org scope until tighten-only.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "require_customer_keying": {
+          "description": "require_customer_keying is true when data at rest must be encrypted with customer-managed keys; absent means false.",
+          "type": "boolean"
+        },
+        "retention_max": {
+          "$ref": "#/$defs/google.protobuf.Duration.jsonschema.strict.json",
+          "description": "retention_max is the longest a model vendor may retain prompts and responses; absent means no retention."
+        },
+        "training_use": {
+          "description": "training_use says whether a model vendor may train on prompts and responses (ADR 0019). Absent means TRAINING_USE_FORBIDDEN; it is optional so that no document that omits it changes meaning. Setting TRAINING_USE_ALLOWED\n widens what is permitted, so like the other limits it carries FORBID and only the org sets it.",
+          "enum": [
+            "TRAINING_USE_UNSPECIFIED",
+            "TRAINING_USE_FORBIDDEN",
+            "TRAINING_USE_ALLOWED"
+          ],
+          "title": "Training Use",
+          "type": "string"
+        }
+      },
+      "title": "Residency Policy Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyRule.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyRule adds a floor for the changes it matches.",
+      "properties": {
+        "floor": {
+          "description": "floor is required.",
+          "enum": [
+            "RESIDENCY_CLASS_UNSPECIFIED",
+            "RESIDENCY_CLASS_IN_ACCOUNT",
+            "RESIDENCY_CLASS_PRIVATE_ENDPOINT",
+            "RESIDENCY_CLASS_VENDOR_ZDR",
+            "RESIDENCY_CLASS_VENDOR_STANDARD",
+            "RESIDENCY_CLASS_AIRGAPPED"
+          ],
+          "title": "Residency Class",
+          "type": "string"
+        },
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "floor"
+      ],
+      "title": "Residency Rule",
+      "type": "object"
+    },
+    "numinance.kinds.v1.SDLCProfile.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "SDLCProfile binds a component to its stages, playbooks, control and architecture packs, toolchains, adapters,\n autonomy, residency and budgets. Other kinds are named; adapters, autonomy, residency and\n budgets are inline.",
+      "properties": {
+        "apiVersion": {
+          "description": "api_version is required and is \"numinance.dev/v1\".",
+          "type": "string"
+        },
+        "extensions": {
+          "additionalProperties": {
+            "$ref": "#/$defs/google.protobuf.Value.jsonschema.strict.json"
+          },
+          "description": "extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "kind": {
+          "description": "kind is required and is \"SDLCProfile\".",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/$defs/numinance.kinds.v1.Metadata.jsonschema.strict.json",
+          "description": "metadata is required; the loader enforces it, the schema cannot."
+        },
+        "spec": {
+          "$ref": "#/$defs/numinance.kinds.v1.SDLCProfileSpec.jsonschema.strict.json",
+          "description": "spec is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind"
+      ],
+      "title": "SDLC Profile",
+      "type": "object"
+    },
+    "numinance.kinds.v1.SDLCProfileSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "SDLCProfileSpec holds the bindings; an absent field is unset and comes from a wider scope. A policy-bearing field has\n authority only when the profile is loaded from a protected path or a signed policy bundle; any other copy, even one\n claiming SCOPE_ORG, is RepositoryAuthored with no authority. The loader also\n refuses a FORBID field in a document whose metadata.scope is not SCOPE_ORG.",
+      "properties": {
+        "adapters": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterPorts.jsonschema.strict.json",
+          "description": "adapters binds ports as AdapterSelector does; adapters.knowledge names the KnowledgeConnection objects the component\n may read."
+        },
+        "architecture_packs": {
+          "description": "architecture_packs names the ArchitecturePack objects that apply, unique; a narrower scope adds names.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "autonomy": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyPolicySpec.jsonschema.strict.json",
+          "description": "autonomy sets levels as AutonomyPolicy does, one more layer at the profile's scope after that scope's AutonomyPolicy;\n its floors carry FORBID, and no rule resolves a change above the org's and every pack's floors."
+        },
+        "budgets": {
+          "$ref": "#/$defs/numinance.kinds.v1.BudgetPolicySpec.jsonschema.strict.json",
+          "description": "budgets sets limits as BudgetPolicy does, in its units; only an org-scoped profile sets it until a tighten-only\n directive exists, since a narrower scope could otherwise raise a count or max_risk_escalation."
+        },
+        "control_packs": {
+          "description": "control_packs names the ControlPack objects that apply, unique; each name resolves only to a ControlPack. A narrower\n scope adds names, never removes one, so a repo cannot drop a pack the org applies.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "playbooks": {
+          "description": "playbooks names the Playbook objects the component may run, unique; a narrower scope adds names, never removes one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "residency": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyPolicySpec.jsonschema.strict.json",
+          "description": "residency sets limits as ResidencyPolicy does; its floors and limits carry FORBID and its required regions are\n refused below the org scope, so only an org-scoped profile sets it."
+        },
+        "stages": {
+          "description": "stages names the StageRegistry the component follows; only an org-scoped profile sets it, so a narrower scope cannot\n select a registry without the org's gates.",
+          "type": "string"
+        },
+        "toolchains": {
+          "description": "toolchains names the LanguageToolchain objects of the component, unique; a narrower scope adds names.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "SDLC Profile Spec",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.SDLCProfile.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.SDLCProfile.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

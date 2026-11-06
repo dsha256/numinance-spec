@@ -1,0 +1,87 @@
+{
+  "$defs": {
+    "google.protobuf.Duration.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "duration",
+      "title": "Duration",
+      "type": "string"
+    },
+    "numinance.kinds.v1.BudgetPolicySpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BudgetPolicySpec holds the limits; an absent field is unset and comes from a wider scope.",
+      "properties": {
+        "files_changed": {
+          "description": "files_changed is the maximum number of files changed.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lines_changed": {
+          "description": "lines_changed is the maximum number of lines changed.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_risk_escalation": {
+          "description": "max_risk_escalation is the highest risk class a run may escalate to.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        },
+        "network_destinations": {
+          "description": "network_destinations is the maximum number of distinct network destinations.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "repositories": {
+          "description": "repositories is the maximum number of repositories touched.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retries": {
+          "description": "retries is the maximum number of retries.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "services": {
+          "description": "services is the maximum number of services touched.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tokens": {
+          "description": "tokens is the maximum model spend in tokens.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tool_calls": {
+          "description": "tool_calls is the maximum number of tool calls.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "wall_clock": {
+          "$ref": "#/$defs/google.protobuf.Duration.jsonschema.strict.json",
+          "description": "wall_clock is the maximum elapsed time."
+        }
+      },
+      "title": "Budget Policy Spec",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.BudgetPolicySpec.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.BudgetPolicySpec.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

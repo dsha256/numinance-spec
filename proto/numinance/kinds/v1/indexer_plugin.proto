@@ -1,0 +1,38 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+
+// IndexerPlugin is how the code graph is built.
+message IndexerPlugin {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "IndexerPlugin".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  IndexerPluginSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// IndexerPluginSpec lists the indexers that build the code graph.
+message IndexerPluginSpec {
+  // indexers is required and non-empty; the loader enforces it, the schema cannot.
+  repeated Indexer indexers = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Indexer is one indexer provider and what it covers.
+message Indexer {
+  // provider is required: the extension id of an indexer port provider.
+  string provider = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // languages is the languages the provider indexes.
+  repeated string languages = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // edge_overlays is the edge overlays added to the graph.
+  repeated string edge_overlays = 3 [json_name = "edge_overlays", (numinance.annotations.v1.field).since = "1.0.0"];
+}

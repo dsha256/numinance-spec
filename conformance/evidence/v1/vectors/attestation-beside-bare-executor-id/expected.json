@@ -1,0 +1,31 @@
+{
+  "vector": "attestation-beside-bare-executor-id",
+  "description": "The author records state the executor_id claude-cli with no digest, and a runner-key holder wrote and signed an attestation anyway, stating the executor the name resolves to. No attestation is made for a bare executor_id: the re-derivation refuses it.",
+  "status": "shipped",
+  "export": "closed-author-bare-executor-attested",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_mismatch",
+    "rule:executor-id-form"
+  ]
+}

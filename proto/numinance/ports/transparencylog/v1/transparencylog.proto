@@ -1,0 +1,183 @@
+// The transparencylog port (ADR 0020, refined by ADR 0037): an append-only Merkle log that anchors chain heads and attestations, served by a log that signs its own checkpoints: a customer-local ledger, Rekor (public or private) or a Tessera-based C2SP log. No provider re-signs another log's checkpoints.
+// Callers: only the evidence context under the runner identity calls this port. Append needs the grant scope transparencylog.append and every read evidence.read; only a runner grant carries them, a kernel floors rule denies them to every other actor kind, and the plugin host refuses an Invoke without the scope and an allowing policy decision. The scope names are reserved (see the evidencestore port). The port is never a model tool, and no tool_groups are declared. Nothing is updated or deleted, and the leaf at an index never changes.
+// Leaves: a leaf is exactly 33 bytes, kind 0x48 (chain head) or 0x41 (attestation) then a raw 32-byte hash (evidence/v1 inclusion_proof.proto). The log's Merkle leaf is its own entry, not the 33-byte leaf, so Append and Prove return the exact entry bytes the log hashed and the format that names its encoding. The verifier computes the leaf hash itself from those bytes (RFC 6962 for numinance.leaf.v1, otherwise as the format says) and never takes a hash from the provider.
+// Entry formats are a closed list in this spec, one id per wire encoding, each with one strict decoder that rejects duplicate keys and unknown fields: numinance.leaf.v1 (the 33-byte leaf itself, for the customer-local ledger), dev.sigstore.hashedrekord.v0_0_1.json (the Rekor v1 canonical-JSON body) and dev.sigstore.hashedrekord.v0_0_2 (the Rekor v2 encoding). entry_format is compared as exact bytes: ASCII, at most 64 bytes, checked against the closed list before any decoding, and every entry of one log origin uses one format. A format the verifier does not hold is refused. Adding a format is contract-additive. A hashedrekord entry is signed by the separate anchoring key (ECDSA P-256, held in the customer's KMS under the runner identity) over the domain-separated input "numinance.evidence.v1.Anchor" || sha256(leaf); the decoder, not the provider, checks the entry's key, signature, hash algorithm (sha256) and digest. The anchoring key is never held, resolved or used by a provider: the evidence context signs under the runner identity and sends the signature and public key in Append (see AppendRequest); a provider that signs on its own behalf fails the kit.
+// Carries the leaf: for a provider, an entry carries a leaf when the leaf bytes (numinance.leaf.v1) or the anchor digest of the leaf (hashedrekord) match, nothing more; the key, signature and algorithm checks are the verifier's. On a shared log a foreign entry may sit at an index before ours, so a verifier's refusal of the entry at a Lookup index is not a provider fault and the index Append returned is the fallback. After an ambiguous Append failure (the call may or may not have written) the evidence context re-resolves through Lookup when the log offers it and otherwise accepts a duplicate entry (the retry rule is on Append); the plugin host never retries Append automatically.
+// Checkpoints: Checkpoint and Prove return the log's own checkpoint unchanged, as a C2SP signed note (bytes). The verifier checks it against a log origin and public key (Ed25519 or ECDSA P-256) from its own trust set, never from the provider. A signed note carries no timestamp: log freshness is tree-size monotonicity plus consistency, never a provider timestamp. Time comes from the format (the local ledger's signed extension line, a witness cosignature or an RFC 3161 timestamp). The verifier, not the provider, refuses a note whose tree size is below that of the last note it holds for the origin, since a stateless provider cannot know it. min_tree_size and the sizes of a consistency Prove refer to the tree of the origin of the last-held note the caller holds (a request names no origin; the provider is the caller's handle to one log); on first use the caller passes leaf_index + 1.
+// Older shapes: evidence/v1 InclusionProof and Checkpoint still describe the previous checkpoint shape (a Numinance-signed message with a timestamp) until a later release replaces them; this port does not use evidence/v1 Checkpoint.
+// Untrusted answers: every note, entry and proof is untrusted until verified. The evidence context accepts an inclusion proof only after its checkpoint is verified against the trust set and proven consistent, through a consistency Prove, with the last checkpoint it holds; a failed check is a fork and an evidence-write failure that trips the circuit breaker. leaf_index is only a hint until a verified Prove, and any verified entry carrying the leaf is enough.
+// Durability and growth: a leaf is in every checkpoint taken after Append returns. Every checkpoint extends the earlier ones (its tree holds theirs as a prefix); the tree size never decreases.
+// Capabilities, negotiated at handshake and not Core: transparencylog.lookup (the Lookup verb; Rekor v2 has no search index), transparencylog.dedup (a replayed Append returns the first index and writes nothing) and transparencylog.witness (checkpoints carry witness cosignatures, inside the note). Without dedup, a replayed Append may add a further entry with the same leaf and return its index.
+// Status codes: INVALID_ARGUMENT for a request that breaks a bound below, NOT_FOUND for Checkpoint on an empty log, for Prove when no entry carrying the leaf is at leaf_index below the returned tree size, and for Lookup of a leaf not in the log, UNAVAILABLE for a log failure the caller may retry and for a size the log does not (yet) serve, on Prove (min_tree_size or leaf_index + 1 above the log's size) and on a consistency Prove (new_tree_size above the log's size); transient, bounded by the caller's deadline and the circuit breaker. INVALID_ARGUMENT only for bound violations, never for a size merely not yet reached.
+// Bounds: a signed note is 1 to 65536 bytes with at most 16 signature lines; an entry is 1 to 65536 bytes; a signature is at most 72 bytes and a public key at most 128 bytes; a proof path has at most 64 entries and exactly the length its sizes and index imply; tree sizes are 1 to 2^53-1; leaf_index is 0 to 2^53-2; entry_format is one of the three ids above. Over-limit input is rejected before it is decoded, never truncated, so every response fits one PluginService Invoke message of at most 4 MiB.
+// Dry run: no verb supports it; a leaf is fully determined by the caller, there is nothing to preview, and the reads change nothing. No verb declares evidence: the log is itself evidence of record, and the evidence context records each anchor (log origin, entry format, witness status) in the chain.
+// Every element is since 1.0.0.
+syntax = "proto3";
+
+package numinance.ports.transparencylog.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/evidence/v1/inclusion_proof.proto";
+import "numinance/types/v1/types.proto";
+
+// TransparencyLogService is the transparencylog port a log provider serves.
+service TransparencyLogService {
+  // Append adds a leaf to the end of the log and returns its 0-based index (a hint until a verified Prove), the exact entry the log hashed and the entry's format; irreversible by design, hence HIGH. Idempotent by the caller's retry rule, not by the log: the caller records the leaf_index it received and never re-appends a recorded leaf; after an unknown outcome (the call may or may not have written) it calls Lookup first where transparencylog.lookup is offered, and appends again only when Lookup answers NOT_FOUND. Without transparencylog.dedup a further Append of the same leaf may add another entry carrying it, which is harmless to verification; with it a replay returns the first index and writes nothing. Where Lookup is not offered, the caller appends again and accepts a possible duplicate entry. idempotent: true here means replay-safe under the caller's retry rule above, as numinance.annotations.v1.ActionOptions.idempotent allows for a caller-owned rule; it must not be read as provider-side dedup, which only transparencylog.dedup declares. No dry run: the leaf is fully built by the caller, there is no plan to preview.
+  rpc Append(AppendRequest) returns (AppendResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Appends one 33-byte leaf to the transparency log and returns its index and log entry."
+      scopes: "transparencylog.append"
+    };
+  }
+  // Checkpoint returns the log's own latest checkpoint as a C2SP signed note, unchanged and never re-signed; NOT_FOUND for an empty log.
+  rpc Checkpoint(CheckpointRequest) returns (CheckpointResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the transparency log's signed checkpoint note as it stands."
+      scopes: "evidence.read"
+    };
+  }
+  // Prove returns one proof, as its request asks. An inclusion request returns the inclusion proof of the leaf at leaf_index, the entry stored there and the checkpoint the proof was made against, whose tree size is at least min_tree_size and above leaf_index. A consistency request returns the consistency proof from the tree of the first old_tree_size leaves to the tree of the first new_tree_size; old_tree_size 0, old_tree_size above new_tree_size or a size above 2^53-1 is INVALID_ARGUMENT, a new_tree_size past the log's size is UNAVAILABLE; equal sizes have the empty path. A request with no kind set is INVALID_ARGUMENT (a oneof cannot carry two). The consistency fields keep the names of ADR 0037 decision 4 and the domain code (old_tree_size, new_tree_size). Consistency lives under Prove, not as a verb of its own.
+  rpc Prove(ProveRequest) returns (ProveResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the inclusion proof, log entry and checkpoint for one leaf, or the consistency proof between two checkpoint tree sizes."
+      scopes: "evidence.read"
+    };
+  }
+  // Lookup returns the index of the first entry carrying the leaf, or NOT_FOUND. Gated by transparencylog.lookup: a log without a search index does not serve it, and the caller keeps the index Append returned.
+  rpc Lookup(LookupRequest) returns (LookupResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      capability: "transparencylog.lookup"
+      since: "1.0.0"
+      llm_description: "Finds the index of a leaf in the transparency log."
+      scopes: "evidence.read"
+    };
+  }
+}
+
+// AppendRequest carries one leaf.
+message AppendRequest {
+  // The leaf, exactly 33 bytes: kind 0x48 (chain head) or 0x41 (attestation), then the raw 32-byte hash.
+  bytes leaf = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // ECDSA P-256 signature, DER, at most 72 bytes, over sha256 of "numinance.evidence.v1.Anchor" || sha256(leaf), made by the evidence context under the runner identity with the anchoring key from the customer's KMS. Required by the hashedrekord formats and ignored by numinance.leaf.v1. It SHOULD be deterministic (RFC 6979) so a replayed Append yields the same entry and transparencylog.dedup can hold. The provider only forwards it and never holds, resolves or uses an anchoring key.
+  bytes anchor_signature = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The anchoring public key, SubjectPublicKeyInfo DER, at most 128 bytes, that verifies anchor_signature. Required by the hashedrekord formats and ignored by numinance.leaf.v1; the verifier accepts the entry only if this key is the anchoring key in its trust set.
+  bytes anchoring_public_key = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// AppendResponse names where the leaf is and what the log hashed.
+message AppendResponse {
+  // 0-based index of the entry in the log, 0 to 2^53-2; a hint until a verified Prove.
+  uint64 leaf_index = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The exact bytes the log hashed as its Merkle leaf, 1 to 65536 bytes, encoded as entry_format says; the verifier computes the leaf hash from them and checks that they carry the appended leaf.
+  bytes entry = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Id of the entry encoding, one of numinance.leaf.v1, dev.sigstore.hashedrekord.v0_0_1.json and dev.sigstore.hashedrekord.v0_0_2; the verifier refuses any other.
+  string entry_format = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CheckpointRequest asks for the current checkpoint; it has no fields.
+message CheckpointRequest {}
+
+// CheckpointResponse carries the log's own checkpoint.
+message CheckpointResponse {
+  // The C2SP signed note exactly as the log signed it, 1 to 65536 bytes with at most 16 signature lines; untrusted until checked against a trust-set origin and key.
+  bytes note = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ProveRequest asks for one proof: of a leaf's inclusion or of the consistency of two tree sizes.
+message ProveRequest {
+  // Exactly one kind is set.
+  oneof kind {
+    // The inclusion proof of one leaf.
+    InclusionRequest inclusion = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+    // The consistency proof between two checkpoint tree sizes the caller holds.
+    ConsistencyRequest consistency = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  }
+  // Numbers 1 to 3 were the flat inclusion fields of the earlier ProveRequest; they are never reused.
+  reserved 1 to 3;
+  reserved "leaf_index", "leaf", "min_tree_size";
+}
+
+// InclusionRequest names an entry by its index hint, its leaf and the smallest tree size the caller accepts.
+message InclusionRequest {
+  // 0-based index of the entry, 0 to 2^53-2, as returned by Append or Lookup.
+  uint64 leaf_index = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The leaf, exactly 33 bytes; the entry returned must carry it.
+  bytes leaf = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The returned checkpoint has at least this tree size, 1 to 2^53-1; the caller passes the size of the last checkpoint it holds, so a stale answer is detectable.
+  uint64 min_tree_size = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ConsistencyRequest names the tree sizes of two checkpoints the caller holds.
+message ConsistencyRequest {
+  // tree_size of the earlier checkpoint, 1 to new_tree_size.
+  uint64 old_tree_size = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // tree_size of the later checkpoint, at least old_tree_size and at most 2^53-1.
+  uint64 new_tree_size = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ProveResponse carries the proof that matches the request kind.
+message ProveResponse {
+  // Exactly one kind is set, the one the request named.
+  oneof kind {
+    // Answer to an inclusion request.
+    InclusionResult inclusion = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+    // Answer to a consistency request; its sizes equal the request's.
+    ConsistencyProof consistency = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  }
+  // Numbers 1 to 4 were the flat inclusion fields of the earlier ProveResponse; they are never reused.
+  reserved 1 to 4;
+  reserved "proof", "entry", "entry_format", "checkpoint";
+}
+
+// InclusionResult carries an inclusion proof with the entry and checkpoint it relates to.
+message InclusionResult {
+  // The proof; its tree_size equals the checkpoint's and its leaf_index is the entry's.
+  numinance.evidence.v1.InclusionProof proof = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The exact bytes the log hashed at leaf_index, 1 to 65536 bytes, encoded as entry_format says.
+  bytes entry = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Id of the entry encoding, as in AppendResponse.
+  string entry_format = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The log's own signed note the proof was made against, 1 to 65536 bytes with at most 16 signature lines; its tree size is at least min_tree_size.
+  bytes checkpoint = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ConsistencyProof shows that the tree of new_tree_size leaves holds the tree of old_tree_size leaves as a prefix (RFC 9162 section 2.1.4). No evidence record carries a consistency proof: the evidence context verifies it online against the last-held checkpoint of the origin and keeps nothing of it, so it is a message of this port, not of evidence/v1. It is unsigned and checked against two verified notes.
+message ConsistencyProof {
+  // tree_size of the earlier checkpoint, 1 to new_tree_size.
+  uint64 old_tree_size = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // tree_size of the later checkpoint.
+  uint64 new_tree_size = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Subtree hashes, at most 64 and exactly as many as the two sizes imply; empty when the sizes are equal.
+  repeated numinance.types.v1.Digest path = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// LookupRequest names a leaf.
+message LookupRequest {
+  // The leaf, exactly 33 bytes.
+  bytes leaf = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// LookupResponse names where the leaf is.
+message LookupResponse {
+  // 0-based index of the first entry carrying the leaf, a hint until a verified Prove.
+  uint64 leaf_index = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

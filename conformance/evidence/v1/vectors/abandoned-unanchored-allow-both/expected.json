@@ -1,0 +1,33 @@
+{
+  "vector": "abandoned-unanchored-allow-both",
+  "description": "An unanchored and unsigned export under --allow-unanchored and --allow-unsigned: the suffixes appear in the order unanchored, unsigned export.",
+  "status": "shipped",
+  "export": "abandoned",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_unanchored": true,
+    "allow_unsigned": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unanchored, unsigned export",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unanchored",
+        "unsigned export"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unanchored, unsigned export",
+    "exit:0",
+    "rule:suffix-order"
+  ]
+}

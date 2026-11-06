@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "google.protobuf.Duration.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "duration",
+      "title": "Duration",
+      "type": "string"
+    },
+    "numinance.kinds.v1.SeparationOfDuties.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "SeparationOfDuties names who may not approve; the author is always excluded.",
+      "properties": {
+        "distinct_from": {
+          "description": "distinct_from names the identities or roles the approver must differ from, beyond the author\n and the author's run: the approver is never the author and the approver's run_id is never the author's run_id.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Separation Of Duties",
+      "type": "object"
+    },
+    "numinance.kinds.v1.StageGate.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "StageGate is the gate of a stage. It has two keys, kind and required_approvals; kind is GATE_KIND_PLAN or GATE_KIND_HUMAN (see GateKind).",
+      "properties": {
+        "approver_role": {
+          "description": "approver_role is the customer role whose members may approve.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "kind is required.",
+          "enum": [
+            "GATE_KIND_UNSPECIFIED",
+            "GATE_KIND_PLAN",
+            "GATE_KIND_RELEASE",
+            "GATE_KIND_HUMAN",
+            "GATE_KIND_POLICY"
+          ],
+          "title": "Gate Kind",
+          "type": "string"
+        },
+        "required_approvals": {
+          "description": "required_approvals is the number of distinct principals whose approval the gate needs (the author and the author's run never count, so it never relaxes\n approver != author). The loader refuses 0, and refuses the field on any gate kind other than GATE_KIND_HUMAN (only a human\n gate counts approvals). Absent means 1. It corresponds to approvers.count of the authority model;\n the count a gate needs is the largest of this value, the policy's approvers.count and any approval floor of a control\n pack, so this field only raises a requirement. Nothing enforces the count yet (a later release owns the rule and an upper bound);\n the loader and the profile context's KeepsGatesOf only preserve it.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sod": {
+          "$ref": "#/$defs/numinance.kinds.v1.SeparationOfDuties.jsonschema.strict.json",
+          "description": "sod is the separation of duties the approval needs."
+        },
+        "timeout": {
+          "$ref": "#/$defs/google.protobuf.Duration.jsonschema.strict.json",
+          "description": "timeout is how long the gate waits for a decision before it escalates; absent means it waits without limit.\n Expiry only escalates; it never approves."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "Stage Gate",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.StageGate.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.StageGate.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

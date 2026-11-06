@@ -1,0 +1,30 @@
+{
+  "vector": "closed-allow-unanchored",
+  "description": "--allow-unanchored with no pinned log.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_unanchored": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified, unanchored",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": [
+        "unanchored"
+      ]
+    }
+  },
+  "covers": [
+    "level:verified, unanchored",
+    "exit:0"
+  ]
+}

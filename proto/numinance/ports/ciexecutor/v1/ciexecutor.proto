@@ -1,0 +1,189 @@
+// The ciexecutor port: starts, observes and cancels one run of a customer-owned pipeline (a CI job, a build or a release workflow) and reads its artifacts and log. Any CI system that has pipelines, runs, artifacts and logs can implement every core verb (GitHub Actions, Jenkins, GitLab CI, Buildkite). A run is an OPERATION: StartOperation starts it and returns at once, GetOperation is the get, CancelOperation the cancel.
+// Callers: only the release context calls this port, under the release-pipeline identity of the Change, for a Change at Releasing; the policy floors refuse every other identity kind, and the author of a Change is refused whatever kind it presents (the same principal or the same run_id as any author run). The pipeline is customer-owned and never defined by the Change: the pipeline name comes from the deployment's profile, a change to a pipeline definition is a change to a protected path, and the port has no verb that creates or edits one. The port is never a model tool, and no tool_groups or scopes are declared.
+// Authority: every request names its repository in `repository`, which the Engine marks as the resource of the call (RFC-0002). A provider holds no credential of its own: it asks the host for a credential handle for the intent its manifest declares and sends the handle through the egress proxy, never a raw token. StartOperation runs customer code with the customer's credentials in the customer's CI, so it is HIGH; what the pipeline then does is that CI's authority, which the customer configured and the host's checks bound, and the release context observes it with GetOperation.
+// Untrusted answers: every state, name, URL, log reference and artifact name comes from the CI system and is untrusted data. The release context size-limits it, validates it against this file and labels and delimits it as untrusted wherever it reaches a prompt, a ticket or a pull request. A run's success is a fact about the pipeline, never an instruction and never an approval, and nothing a provider answers changes policy, a grant or the Change's state: the lifecycle moves on the release context's own checks.
+// Idempotency: the host's idempotency key names the operation. A provider that cannot accept a key (a CI that starts a run on every dispatch) carries the key in a parameter the pipeline echoes and finds the run by it before it starts another; a replay answers the run the first call started, and a provider that cannot reconcile declares IDEMPOTENCY_NONE in its manifest, so a step that calls it needs a declared compensation or human approval.
+// Status codes: INVALID_ARGUMENT for a request that breaks a bound; NOT_FOUND for a repository, pipeline, revision or run the CI hides or lacks; PERMISSION_DENIED when the CI refuses the credential openly; FAILED_PRECONDITION for a pipeline that does not accept the parameters or a run that is not in the state the verb needs; RESOURCE_EXHAUSTED when the CI rate-limits or has no capacity; UNAVAILABLE for a CI that cannot be reached or a transient failure the caller may retry. A provider never invents a result: an outage is an error, never an empty answer or a state it did not read.
+// Evidence: StartOperation declares one record type, ci-run-ref: a provider emits exactly one per call that started or found the run, through HostService.EmitEvidence, a compact receipt of the run's reference (repository, pipeline, revision, operation_id, never parameters' values or the log). A call that ends SUCCEEDED without it is PARTIAL. The other verbs declare none in 1.0.0.
+// Bounds: every string is at most 1024 bytes unless stated; over-limit input is rejected, never truncated by the host; enums are closed, and zero and unknown numbers are rejected; a field unknown to the host's descriptor copy is rejected (plugin/v1 Invoke strict decoding). Printable means Unicode categories L, M, N, P, S and U+0020. A rejection names an index-based field path and the violated bound, never the offending value.
+// Formats: repository is the repository's full name `<owner>/<name>`, matching ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9._-]{1,100}$. A revision is a full commit id: 40 or 64 lowercase hexadecimal characters. A pipeline is the CI's own name of the pipeline, 1 to 256 bytes matching ^[A-Za-z0-9][A-Za-z0-9._/-]*$. An operation_id is opaque, 1 to 128 printable ASCII bytes without U+0020, issued by the provider.
+// Every element is since 1.0.0.
+syntax = "proto3";
+
+package numinance.ports.ciexecutor.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+
+// CiExecutorService is the ciexecutor port a CI provider serves.
+service CiExecutorService {
+  // StartOperation starts one run of pipeline at revision with params and returns once the CI has accepted it. HIGH: it runs customer code with the customer's credentials and, for a release pipeline, deploys. Idempotent by the host's key (see the file comment). Dry run checks that the repository, the pipeline and the revision exist and that the parameters fit the pipeline, starts nothing and answers with an empty operation_id. The compensating action cancels the run; what a cancelled pipeline already did is the customer's to undo, which is why the release context starts a pipeline only under a grant of level Stage or above.
+  rpc StartOperation(StartOperationRequest) returns (StartOperationResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_OPERATION
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "CiExecutorService.CancelOperation"
+      evidence: "ci-run-ref"
+      since: "1.0.0"
+      llm_description: "Starts one run of a customer pipeline at a given commit."
+    };
+  }
+  // GetOperation returns the state of one run. It is the reconciliation read of StartOperation and CancelOperation after a lost response.
+  rpc GetOperation(GetOperationRequest) returns (GetOperationResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the state of one pipeline run."
+    };
+  }
+  // CancelOperation asks the CI to cancel a run that has not ended; cancelling a run that has ended answers its state and changes nothing. MEDIUM: it stops customer work part way, which may leave it half done. No dry run: cancelling is the whole effect, and the state read before it is GetOperation.
+  rpc CancelOperation(CancelOperationRequest) returns (CancelOperationResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_MEDIUM
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Cancels a pipeline run that has not ended."
+    };
+  }
+  // ListArtifacts lists the artifacts a run produced: names, sizes and digests only, never content.
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Lists the artifacts a pipeline run produced."
+    };
+  }
+  // GetLogReference returns where the log of a run is kept, never the log. The address is for people and for the evidence of the run; the Engine never fetches it.
+  rpc GetLogReference(GetLogReferenceRequest) returns (GetLogReferenceResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.0.0"
+      llm_description: "Returns the address of the log of a pipeline run."
+    };
+  }
+}
+
+// OperationState is the state of one run.
+enum OperationState {
+  // OPERATION_STATE_UNSPECIFIED is the zero value; it is rejected.
+  OPERATION_STATE_UNSPECIFIED = 0;
+  // OPERATION_STATE_QUEUED: accepted, not yet running.
+  OPERATION_STATE_QUEUED = 1;
+  // OPERATION_STATE_RUNNING: running.
+  OPERATION_STATE_RUNNING = 2;
+  // OPERATION_STATE_SUCCEEDED: ended and the pipeline reports success.
+  OPERATION_STATE_SUCCEEDED = 3;
+  // OPERATION_STATE_FAILED: ended and the pipeline reports failure.
+  OPERATION_STATE_FAILED = 4;
+  // OPERATION_STATE_CANCELLED: ended because it was cancelled.
+  OPERATION_STATE_CANCELLED = 5;
+  // OPERATION_STATE_TIMED_OUT: ended because it ran past the CI's own limit.
+  OPERATION_STATE_TIMED_OUT = 6;
+}
+
+// StartOperationRequest names the run to start.
+message StartOperationRequest {
+  // Required, as in the file comment (Formats). Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the CI's name of the pipeline, from the deployment's profile.
+  string pipeline = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Required: the full commit id to run; a branch or tag never stands for it, because it moves.
+  string revision = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The pipeline's parameters: at most 32 entries, each key matching ^[a-z][a-z0-9_]{0,63}$ and each value at most 1024 printable bytes. Never a secret: a credential reaches the pipeline through the CI's own secret store.
+  map<string, string> params = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// StartOperationResponse names the run.
+message StartOperationResponse {
+  // The run's id, issued by the provider.
+  string operation_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The run's state when the call returned: QUEUED or RUNNING, or an end state when the run already ended.
+  OperationState state = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // True when a run for this key already existed and nothing was started.
+  bool existing = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetOperationRequest names a run.
+message GetOperationRequest {
+  // Required, as in the file comment. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the run's id.
+  string operation_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetOperationResponse is the state of a run; every field is the CI's claim.
+message GetOperationResponse {
+  // The run's state.
+  OperationState state = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The full commit id the run built; the release context compares it with the revision it started.
+  string revision = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the run started; unset while it is queued.
+  google.protobuf.Timestamp started_at = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the run ended; unset until it ends.
+  google.protobuf.Timestamp finished_at = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CancelOperationRequest names a run.
+message CancelOperationRequest {
+  // Required, as in the file comment. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the run's id.
+  string operation_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// CancelOperationResponse is the state after the call.
+message CancelOperationResponse {
+  // The run's state: CANCELLED, or the end state it had already reached.
+  OperationState state = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListArtifactsRequest names a run.
+message ListArtifactsRequest {
+  // Required, as in the file comment. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the run's id.
+  string operation_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Artifact is one artifact of a run.
+message Artifact {
+  // The artifact's name, 1 to 256 printable bytes; untrusted.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Size in bytes.
+  uint64 size_bytes = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The artifact's sha256 as "sha256:" and 64 lowercase hexadecimal characters when the CI reports one; empty otherwise.
+  string digest = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ListArtifactsResponse lists the artifacts of a run.
+message ListArtifactsResponse {
+  // At most 256 artifacts, unique by name.
+  repeated Artifact artifacts = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetLogReferenceRequest names a run.
+message GetLogReferenceRequest {
+  // Required, as in the file comment. Marked as the resource of the call.
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+  // Required: the run's id.
+  string operation_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// GetLogReferenceResponse says where the log is.
+message GetLogReferenceResponse {
+  // An absolute https URL of at most 1024 bytes; untrusted, for people, never fetched by the Engine.
+  string url = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

@@ -1,0 +1,2989 @@
+{
+  "format": "numinance.evidence.vectors/v1",
+  "vectors": [
+    {
+      "covers": [
+        "level:verified, unsigned export",
+        "exit:0",
+        "rule:allow-flag-suffixes-the-pass"
+      ],
+      "status": "shipped",
+      "vector": "abandoned-allow-unsigned"
+    },
+    {
+      "covers": [
+        "level:verified, unanchored, unsigned export",
+        "exit:0",
+        "rule:suffix-order"
+      ],
+      "status": "shipped",
+      "vector": "abandoned-unanchored-allow-both"
+    },
+    {
+      "covers": [
+        "level:unsigned",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "abandoned-unsigned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:manifest_missing",
+        "rule:presence-checks-need-no-chain"
+      ],
+      "status": "shipped",
+      "vector": "abandoned-with-an-attestation"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:expect-head-needed"
+      ],
+      "status": "shipped",
+      "vector": "another-chain-of-the-same-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signer_untrusted",
+        "rule:wrong-key-untrusted-signer"
+      ],
+      "status": "shipped",
+      "vector": "attacker-chain-pinned-key-untrusted"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-actors-dropped"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-ambiguity"
+      ],
+      "status": "shipped",
+      "vector": "attestation-ambiguous-author"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:chain_broken",
+        "finding:part_contradiction",
+        "rule:presence-checks-need-no-chain",
+        "rule:not-applicable-needs-a-verified-chain"
+      ],
+      "status": "shipped",
+      "vector": "attestation-and-gap-chain-broken"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:presence-checks-need-no-chain"
+      ],
+      "status": "shipped",
+      "vector": "attestation-and-manifest-removed-chain-broken"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "attestation-another-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "attestation-another-head"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:notes-read-the-signed-attestation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-another-head-sourced-notes"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-approval-ev-ids-dropped"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-approval-ev-ids-unknown"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:executor-id-form"
+      ],
+      "status": "shipped",
+      "vector": "attestation-beside-bare-executor-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-change-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_proof"
+      ],
+      "status": "shipped",
+      "vector": "attestation-checkpoint-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_proof"
+      ],
+      "status": "shipped",
+      "vector": "attestation-checkpoint-swapped"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-ci-run-ids-too-many"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-credential-scopes-entry-too-long"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-credential-scopes-no-digest-line"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-credential-scopes-unsorted"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-credential-scopes-wrong-digest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid"
+      ],
+      "status": "shipped",
+      "vector": "attestation-edited"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-executor-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-first-sequence"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-head-record-hash"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-last-sequence"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-model-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-network-policy-other-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-network-policy-wrong-prefix"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-policy-bundle-digest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-profile-digest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:embedded-proof-shape"
+      ],
+      "status": "shipped",
+      "vector": "attestation-proof-path-too-long"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_missing",
+        "finding:manifest_mismatch",
+        "finding:part_missing"
+      ],
+      "status": "shipped",
+      "vector": "attestation-removed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-repository-too-long"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation",
+        "rule:candidate-commit"
+      ],
+      "status": "shipped",
+      "vector": "attestation-result-commit-candidate-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-result-commit-unpublished"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-sandbox-image-digest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid"
+      ],
+      "status": "shipped",
+      "vector": "attestation-signed-by-other-key"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-ticket-empty"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-ticket-malformed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-ticket-reference-with-space"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid"
+      ],
+      "status": "shipped",
+      "vector": "attestation-undecodable"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-rederivation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-verifier-results-dropped"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:action-grammar"
+      ],
+      "status": "shipped",
+      "vector": "canon-action-lower-case-event"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:action-grammar"
+      ],
+      "status": "shipped",
+      "vector": "canon-action-major-leading-zero"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:action-grammar"
+      ],
+      "status": "shipped",
+      "vector": "canon-action-major-over-31-bits"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:action-grammar"
+      ],
+      "status": "shipped",
+      "vector": "canon-action-major-zero"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:canon-escapes",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "canon-backspace-written-long"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-blank-line"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-case-variant-key"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:canon-escapes"
+      ],
+      "status": "shipped",
+      "vector": "canon-control-escapes-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:canon-escapes",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "canon-control-written-raw"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-crlf"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:canon-escapes",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "canon-del-written-escaped"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-duplicate-key"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken"
+      ],
+      "status": "shipped",
+      "vector": "canon-empty-records"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:printable-text"
+      ],
+      "status": "shipped",
+      "vector": "canon-executor-format-character"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:printable-text"
+      ],
+      "status": "shipped",
+      "vector": "canon-executor-no-break-space"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:printable-text"
+      ],
+      "status": "shipped",
+      "vector": "canon-executor-non-character"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:printable-text"
+      ],
+      "status": "shipped",
+      "vector": "canon-executor-private-use"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:printable-text"
+      ],
+      "status": "shipped",
+      "vector": "canon-executor-unassigned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-html-escape-form"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-invalid-utf8"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-key-order"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-leading-space"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:canon-escapes",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "canon-line-feed-written-long"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:canon-lines"
+      ],
+      "status": "shipped",
+      "vector": "canon-no-final-newline-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-not-json"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-number-form"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-timestamp-trailing-zero"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:canon-timestamps"
+      ],
+      "status": "shipped",
+      "vector": "canon-timestamps-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:canon-escapes",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "canon-u2028-written-raw"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-unicode-escape-form"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:canon-unicode"
+      ],
+      "status": "shipped",
+      "vector": "canon-unicode-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-unknown-key"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-uppercase-hex"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid",
+        "rule:canon-strict"
+      ],
+      "status": "shipped",
+      "vector": "canon-whitespace"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-duplicate-ev-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-record-after-seal"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-record-after-terminal"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-record-names-another-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-seal-after-non-terminal"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-seal-after-seal"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-seal-with-a-correction"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-seal-with-an-input"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-seal-with-two-outputs"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid"
+      ],
+      "status": "shipped",
+      "vector": "chain-sequence-above-2-53"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:record_invalid"
+      ],
+      "status": "shipped",
+      "vector": "chain-sequence-zero"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:chain-rules"
+      ],
+      "status": "shipped",
+      "vector": "chain-unknown-corrects-record-hash"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-another-author"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:ticket-cross-check"
+      ],
+      "status": "shipped",
+      "vector": "change-json-another-ticket"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid"
+      ],
+      "status": "shipped",
+      "vector": "change-json-author-the-chain-lacks"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid"
+      ],
+      "status": "shipped",
+      "vector": "change-json-edited"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json-ticket"
+      ],
+      "status": "shipped",
+      "vector": "change-json-no-ticket"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-other-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-other-plan"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-other-repair-attempts"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-other-repair-bound"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:change_invalid",
+        "finding:manifest_mismatch",
+        "finding:part_contradiction",
+        "finding:summary_mismatch",
+        "rule:change-json-compared-with-the-chain",
+        "rule:not-applicable-needs-a-verified-chain"
+      ],
+      "status": "shipped",
+      "vector": "change-json-stale-summary"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-ticket-malformed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_invalid",
+        "rule:change-json"
+      ],
+      "status": "shipped",
+      "vector": "change-json-unknown-author-run"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:flag-given-but-not-needed"
+      ],
+      "status": "shipped",
+      "vector": "closed-allow-all-not-needed"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:flag-given-but-not-needed"
+      ],
+      "status": "shipped",
+      "vector": "closed-allow-incomplete-not-needed"
+    },
+    {
+      "covers": [
+        "level:verified, unanchored",
+        "exit:0"
+      ],
+      "status": "shipped",
+      "vector": "closed-allow-unanchored"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:flag-given-but-not-needed"
+      ],
+      "status": "shipped",
+      "vector": "closed-allow-unsigned-not-needed"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:attestation-fields"
+      ],
+      "status": "shipped",
+      "vector": "closed-attested-fields-verified"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:author-agent",
+        "rule:correction",
+        "rule:overrules"
+      ],
+      "status": "shipped",
+      "vector": "closed-author-verified"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:unsourced-note-is-not-a-weakness"
+      ],
+      "status": "shipped",
+      "vector": "closed-basic-verified"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:complete-accepts-not-applicable"
+      ],
+      "status": "shipped",
+      "vector": "closed-complete-verified"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "closed-gap-allow-flags"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:parts_absent"
+      ],
+      "status": "shipped",
+      "vector": "closed-gap-complete"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "closed-gap-incomplete"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:diff-digest"
+      ],
+      "status": "shipped",
+      "vector": "closed-no-diff-verified"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:sealed"
+      ],
+      "status": "shipped",
+      "vector": "closed-sealed-verified"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:ticket-none"
+      ],
+      "status": "shipped",
+      "vector": "closed-ticket-none-verified"
+    },
+    {
+      "covers": [
+        "level:unanchored",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "closed-unanchored"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:parts_absent"
+      ],
+      "status": "shipped",
+      "vector": "complete-refuses-absent-parts"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:candidate-commit"
+      ],
+      "status": "shipped",
+      "vector": "diff-candidate-commit-unpublished-verified"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:candidate-commit",
+        "rule:diff-digest"
+      ],
+      "status": "shipped",
+      "vector": "diff-candidate-commit-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "diff-digest-edited"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch",
+        "rule:diff-digest"
+      ],
+      "status": "shipped",
+      "vector": "diff-digest-one-newline"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch",
+        "finding:part_missing"
+      ],
+      "status": "shipped",
+      "vector": "diff-digest-removed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch",
+        "rule:diff-digest"
+      ],
+      "status": "shipped",
+      "vector": "diff-digest-without-diff-record"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch",
+        "finding:digest_mismatch",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "digest-mismatch"
+    },
+    {
+      "covers": [
+        "exit:4"
+      ],
+      "status": "shipped",
+      "vector": "directory-missing"
+    },
+    {
+      "covers": [
+        "exit:3",
+        "rule:links-refused"
+      ],
+      "status": "shipped",
+      "vector": "directory-path-is-a-link"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:directory_refused",
+        "rule:name-rules"
+      ],
+      "status": "shipped",
+      "vector": "directory-refused-control-character-name"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:directory_refused",
+        "rule:links-refused"
+      ],
+      "status": "shipped",
+      "vector": "directory-refused-link"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:directory_refused"
+      ],
+      "status": "shipped",
+      "vector": "directory-refused-subdirectory"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:directory_refused",
+        "rule:entry-bound"
+      ],
+      "status": "shipped",
+      "vector": "directory-refused-too-many-entries"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken"
+      ],
+      "status": "shipped",
+      "vector": "dropped-middle-record"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:executor-id-form"
+      ],
+      "status": "shipped",
+      "vector": "executor-id-bare-name-gap"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifest"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifest-name-mismatch"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifest"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifest-not-canonical"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "file-changed-after-manifest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:diff_mismatch",
+        "finding:file_missing",
+        "finding:manifest_mismatch",
+        "finding:part_missing"
+      ],
+      "status": "shipped",
+      "vector": "file-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:file_unlisted",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "file-unlisted"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken"
+      ],
+      "status": "shipped",
+      "vector": "forged-record"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "rule:allow-flags-never-rescue-a-failure"
+      ],
+      "status": "shipped",
+      "vector": "forged-record-allow-flags-stay-failed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "finding:part_missing",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "forged-record-and-missing-file"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "finding:summary_invalid",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "forged-record-and-missing-summary"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signature_invalid",
+        "rule:bad-signature-vs-untrusted-signer"
+      ],
+      "status": "shipped",
+      "vector": "forged-record-rehashed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "gap-beside-attestation"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "finding:chain_broken",
+        "rule:presence-checks-need-no-chain"
+      ],
+      "status": "shipped",
+      "vector": "gap-chain-broken"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "finding:manifest_missing",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "gap-for-another-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "gap-on-abandoned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "finding:manifest_missing",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "gap-reason-with-control-character"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_invalid",
+        "finding:manifest_missing",
+        "rule:attestation-gap"
+      ],
+      "status": "shipped",
+      "vector": "gap-undecodable"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid"
+      ],
+      "status": "shipped",
+      "vector": "garbage-anchor-files-with-log-pin"
+    },
+    {
+      "covers": [
+        "level:verified, unanchored, unsigned export",
+        "exit:0",
+        "rule:anchor-files-decoded-only-with-a-pin"
+      ],
+      "status": "shipped",
+      "vector": "garbage-anchor-files-without-log-pin"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:anchor-files-decoded-only-with-a-pin"
+      ],
+      "status": "shipped",
+      "vector": "garbage-head-checkpoint-closed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_missing",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "head-proof-absent-log-pinned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "head-proof-half-present"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "head-proof-non-verifying"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-65-entries"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-absent-part-unknown"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-absent-part-without-reason"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-absent-reason-too-long"
+    },
+    {
+      "covers": [
+        "level:verified, unsigned export",
+        "exit:0",
+        "rule:index-order-not-checked"
+      ],
+      "status": "shipped",
+      "vector": "index-entries-reversed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "index-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:change_mismatch",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "index-names-another-change"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-no-entries"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-absolute"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-backslash"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-control-character"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-dot-dot"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-lists-itself"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-lists-the-manifest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-twice"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:index_invalid",
+        "finding:manifest_mismatch",
+        "rule:index-decode",
+        "rule:cascade"
+      ],
+      "status": "shipped",
+      "vector": "index-path-unknown-file"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "index-size-beyond-2-53"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-file-forms"
+      ],
+      "status": "shipped",
+      "vector": "key-file-oversize-is-usage-error"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:key-file-forms"
+      ],
+      "status": "shipped",
+      "vector": "key-file-unicode-whitespace-accepted"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:key-file-forms"
+      ],
+      "status": "shipped",
+      "vector": "key-file-uppercase-hex-accepted"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-file-forms"
+      ],
+      "status": "shipped",
+      "vector": "key-file-wrong-length-is-usage-error"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-mode-required"
+      ],
+      "status": "shipped",
+      "vector": "key-mode-none-is-usage-error"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-mode-exclusive"
+      ],
+      "status": "shipped",
+      "vector": "key-mode-pinned-and-skip-exclusive"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-mode-exclusive"
+      ],
+      "status": "shipped",
+      "vector": "key-mode-pinned-and-trust-exclusive"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-mode-exclusive"
+      ],
+      "status": "shipped",
+      "vector": "key-mode-trust-and-skip-exclusive"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:key-file-forms"
+      ],
+      "status": "shipped",
+      "vector": "log-key-file-oversize-is-usage-error"
+    },
+    {
+      "covers": [
+        "exit:2"
+      ],
+      "status": "shipped",
+      "vector": "log-key-without-origin-is-usage-error"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-16-entries"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-65-entries"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-anchor-checkpoint-ref"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-anchor-head-proof-differs"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-attestation-proof-wrong"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-binding-change-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-binding-first-sequence"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-binding-head"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-binding-last-sequence"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid"
+      ],
+      "status": "shipped",
+      "vector": "manifest-edited"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:index-order-not-checked"
+      ],
+      "status": "shipped",
+      "vector": "manifest-entries-reversed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-entry-for-absent-file"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-entry-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-entry-wrong-digest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "rule:manifest-checks"
+      ],
+      "status": "shipped",
+      "vector": "manifest-entry-wrong-size"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:manifest_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "manifest-head-checkpoint-not-named"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_missing"
+      ],
+      "status": "shipped",
+      "vector": "manifest-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-no-entries"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-absolute"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-backslash"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-control-character"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-dot-dot"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-lists-itself"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-twice"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-twice-after-lowercasing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-path-unknown-file"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:embedded-proof-shape"
+      ],
+      "status": "shipped",
+      "vector": "manifest-proof-path-too-long"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "finding:manifest_missing",
+        "rule:presence-checks-need-no-chain"
+      ],
+      "status": "shipped",
+      "vector": "manifest-removed-chain-broken"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid"
+      ],
+      "status": "shipped",
+      "vector": "manifest-signed-by-other-key"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-spec-version-malformed"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid"
+      ],
+      "status": "shipped",
+      "vector": "manifest-undecodable"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_invalid",
+        "rule:manifest-decode"
+      ],
+      "status": "shipped",
+      "vector": "manifest-view-not-a-token"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-abandoned-allow-incomplete-pinned"
+    },
+    {
+      "covers": [
+        "level:unanchored",
+        "exit:5",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-abandoned-allow-incomplete-runner-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-abandoned-allow-unanchored-pinned"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-abandoned-allow-unanchored-runner-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-abandoned-allow-unsigned-pinned"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-abandoned-allow-unsigned-runner-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-closed-allow-incomplete-pinned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-closed-allow-incomplete-runner-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-closed-allow-unanchored-pinned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-closed-allow-unanchored-runner-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-closed-allow-unsigned-pinned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-matrix"
+      ],
+      "status": "shipped",
+      "vector": "matrix-truncated-closed-allow-unsigned-runner-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "finding:part_contradiction",
+        "rule:not-applicable-needs-a-verified-chain"
+      ],
+      "status": "shipped",
+      "vector": "not-applicable-chain-broken"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken",
+        "finding:part_contradiction",
+        "finding:parts_absent",
+        "rule:not-applicable-needs-a-verified-chain"
+      ],
+      "status": "shipped",
+      "vector": "not-applicable-chain-broken-complete"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_contradiction",
+        "rule:not-applicable-only-deployment-observation"
+      ],
+      "status": "shipped",
+      "vector": "not-applicable-on-change-json"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_contradiction",
+        "finding:parts_absent",
+        "rule:not-applicable-only-deployment-observation"
+      ],
+      "status": "shipped",
+      "vector": "not-applicable-on-change-json-complete"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_contradiction"
+      ],
+      "status": "shipped",
+      "vector": "not-applicable-the-chain-does-not-bear-out"
+    },
+    {
+      "covers": [
+        "level:verified, incomplete",
+        "exit:0"
+      ],
+      "status": "shipped",
+      "vector": "open-prefix-allow-incomplete"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "open-prefix-incomplete"
+    },
+    {
+      "covers": [
+        "level:verified, unanchored, incomplete",
+        "exit:0",
+        "rule:suffix-order"
+      ],
+      "status": "shipped",
+      "vector": "open-prefix-unanchored-allow-both"
+    },
+    {
+      "covers": [
+        "level:unanchored",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "open-prefix-unanchored-allow-incomplete-only"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "open-prefix-unanchored-allow-unanchored-only"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:level-precedence"
+      ],
+      "status": "shipped",
+      "vector": "open-prefix-unanchored-incomplete"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_contradiction"
+      ],
+      "status": "shipped",
+      "vector": "part-present-and-declared-absent"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing"
+      ],
+      "status": "shipped",
+      "vector": "part-required-and-not-declared"
+    },
+    {
+      "covers": [
+        "exit:2",
+        "rule:empty-path"
+      ],
+      "status": "shipped",
+      "vector": "path-empty"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:any-pinned-key-may-sign"
+      ],
+      "status": "shipped",
+      "vector": "pinned-keys-repeatable-any-may-sign"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "finding:record_invalid",
+        "rule:size-bound"
+      ],
+      "status": "shipped",
+      "vector": "record-line-over-3-mib"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:chain_broken"
+      ],
+      "status": "shipped",
+      "vector": "reordered-chain"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:rollback-json-only-when-rolled-back"
+      ],
+      "status": "shipped",
+      "vector": "rollback-json-declared-on-a-closed-change"
+    },
+    {
+      "covers": [
+        "level:verified, unsigned export",
+        "exit:0"
+      ],
+      "status": "shipped",
+      "vector": "rolled-back-allow-unsigned"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_contradiction",
+        "rule:rollback-json-only-when-rolled-back"
+      ],
+      "status": "shipped",
+      "vector": "rolled-back-rollback-json-not-applicable"
+    },
+    {
+      "covers": [
+        "level:unsigned",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "rolled-back-unsigned"
+    },
+    {
+      "covers": [
+        "exit:2"
+      ],
+      "status": "shipped",
+      "vector": "runner-key-file-missing-is-usage-error"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signature_invalid",
+        "rule:bad-signature-vs-untrusted-signer"
+      ],
+      "status": "shipped",
+      "vector": "signature-edited-in-place"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signers_invalid"
+      ],
+      "status": "shipped",
+      "vector": "signers-bad-key-id"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:file_missing",
+        "finding:part_missing",
+        "finding:signers_invalid",
+        "rule:signers-decoded-without-a-chain"
+      ],
+      "status": "shipped",
+      "vector": "signers-missing-no-records"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signer_untrusted",
+        "finding:signers_invalid"
+      ],
+      "status": "shipped",
+      "vector": "signers-missing-trust-bundle-keys"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "finding:summary_invalid",
+        "rule:size-bound"
+      ],
+      "status": "shipped",
+      "vector": "size-bound-document"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "finding:file_missing",
+        "rule:size-bound"
+      ],
+      "status": "shipped",
+      "vector": "size-bound-records"
+    },
+    {
+      "covers": [
+        "level:unauthenticated",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "skip-signatures-allow-flags-stay-unauthenticated"
+    },
+    {
+      "covers": [
+        "level:unauthenticated",
+        "exit:5",
+        "mode:skip-signatures"
+      ],
+      "status": "shipped",
+      "vector": "skip-signatures-unauthenticated"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:summary_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "summary-mismatch"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "finding:summary_invalid"
+      ],
+      "status": "shipped",
+      "vector": "summary-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:summary_mismatch",
+        "rule:rollback-json-only-when-rolled-back"
+      ],
+      "status": "shipped",
+      "vector": "summary-says-rolled-back-chain-open"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:summary_invalid"
+      ],
+      "status": "shipped",
+      "vector": "summary-undecodable"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-change-match"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:expectation_mismatch",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-change-mismatch"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:expectation_mismatch",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-head-catches-another-chain"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-head-match"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:expectation_mismatch",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-head-mismatch"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-head-sealed-last-record"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:expectation_mismatch",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-head-sealed-other"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:expect-flags"
+      ],
+      "status": "target",
+      "vector": "target-expect-head-sealed-terminal-record"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-blank-line"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-edited"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-emptied"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-event-edited"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-first-line-not-seq-1"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-line-not-an-object"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-line-without-seq"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-no-final-newline"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch",
+        "rule:tool-events-forms"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-seq-as-fraction"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:tool_events_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-streams-reordered"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:tool-events-seq-quirks",
+        "rule:tool-events-dedupe"
+      ],
+      "status": "shipped",
+      "vector": "tool-events-streams-verified"
+    },
+    {
+      "covers": [
+        "level:verified, unanchored, incomplete",
+        "exit:0",
+        "rule:truncation-unsigned-trust-limit"
+      ],
+      "status": "shipped",
+      "vector": "truncated-abandoned-flags-visible"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5"
+      ],
+      "status": "shipped",
+      "vector": "truncated-abandoned-no-flags"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "rule:truncation-caught-by-anchor"
+      ],
+      "status": "shipped",
+      "vector": "truncated-abandoned-pinned-log"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-caught-by-manifest"
+      ],
+      "status": "shipped",
+      "vector": "truncated-closed-allow-unanchored-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-caught-by-manifest"
+      ],
+      "status": "shipped",
+      "vector": "truncated-closed-summary-rewritten"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-caught-by-manifest"
+      ],
+      "status": "shipped",
+      "vector": "truncated-closed-summary-rewritten-allow-incomplete"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:view_mismatch",
+        "rule:truncation-caught-by-manifest"
+      ],
+      "status": "shipped",
+      "vector": "truncated-closed-summary-rewritten-runner-key-only"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_mismatch",
+        "finding:manifest_mismatch",
+        "finding:summary_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "truncated-closed-summary-stale"
+    },
+    {
+      "covers": [
+        "level:self-consistent",
+        "exit:5",
+        "rule:bundle-key-never-verified"
+      ],
+      "status": "shipped",
+      "vector": "trust-bundle-keys-attacker-chain"
+    },
+    {
+      "covers": [
+        "level:self-consistent",
+        "exit:5",
+        "mode:trust-bundle-keys"
+      ],
+      "status": "shipped",
+      "vector": "trust-bundle-keys-self-consistent"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:manifest_mismatch",
+        "finding:unknown_file"
+      ],
+      "status": "shipped",
+      "vector": "unknown-file"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signature_invalid",
+        "rule:unsigned-record"
+      ],
+      "status": "shipped",
+      "vector": "unsigned-records-pinned"
+    },
+    {
+      "covers": [
+        "level:unauthenticated",
+        "exit:5",
+        "rule:skip-accepts-unsigned-records"
+      ],
+      "status": "shipped",
+      "vector": "unsigned-records-skip-signatures"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signature_invalid"
+      ],
+      "status": "shipped",
+      "vector": "unsigned-records-trust-bundle-keys"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:view_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "view-edited"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "rule:parts-apply-whether-or-not-derivable"
+      ],
+      "status": "shipped",
+      "vector": "view-required-though-not-derivable"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_contradiction",
+        "finding:view_mismatch"
+      ],
+      "status": "shipped",
+      "vector": "view-with-nothing-to-derive"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_proof",
+        "finding:manifest_mismatch",
+        "rule:wrong-log-key"
+      ],
+      "status": "shipped",
+      "vector": "wrong-log-key"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:anchor_invalid",
+        "finding:attestation_proof",
+        "finding:manifest_mismatch",
+        "rule:wrong-log-origin"
+      ],
+      "status": "shipped",
+      "vector": "wrong-log-origin"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:signer_untrusted",
+        "rule:wrong-key-untrusted-signer"
+      ],
+      "status": "shipped",
+      "vector": "wrong-runner-key"
+    }
+  ]
+}

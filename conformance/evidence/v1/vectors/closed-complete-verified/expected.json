@@ -1,0 +1,32 @@
+{
+  "vector": "closed-complete-verified",
+  "description": "A Closed change closed at PR level with every part of the design list: the full pinned set verifies and --complete accepts it (deployment.json and observation.json are not applicable at PR level).",
+  "status": "shipped",
+  "export": "closed-complete",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "complete": true
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:complete-accepts-not-applicable"
+  ]
+}

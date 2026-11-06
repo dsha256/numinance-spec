@@ -1,0 +1,31 @@
+{
+  "vector": "closed-ticket-none-verified",
+  "description": "A Change opened with no ticket signs the explicit leaf none.",
+  "status": "shipped",
+  "export": "closed-ticket-none",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:ticket-none"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "vector": "canon-no-final-newline-verified",
+  "description": "A last record line without its line feed still decodes: a line ends at a line feed or at the end of the file.",
+  "status": "shipped",
+  "export": "closed-basic-no-final-newline",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:canon-lines"
+  ]
+}

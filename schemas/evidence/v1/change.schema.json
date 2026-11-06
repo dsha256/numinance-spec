@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/change.schema.json",
+  "title": "Evidence change context",
+  "description": "change.json in an evidence/v1 export: the change context the chain vouches for. Not expressible here and checked by the verifier: the file is the canonical JSON form; every field other than ticket equals what the records derive (state, plan_digest, author, author_runs, repair counters); ticket equals the ticket the attestation signs; state is at most 32 bytes; author is at most 256 bytes; at most 1024 author_runs; the file is at most 1 MiB. Zero values are omitted, never written.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "change_id"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "change_id": { "type": "string", "pattern": "^chg_[0-9a-f]{32}$" },
+    "state": { "type": "string", "pattern": "^[a-z_]{1,32}$", "description": "Lifecycle state token, such as closed, abandoned or rolled_back for an ended change." },
+    "plan_digest": { "$ref": "#/$defs/digest" },
+    "author": { "type": "string", "pattern": "^[!-~](?:[ -~]*[!-~])?$", "description": "Principal name of the single author agent; printable ASCII, at most 256 bytes." },
+    "author_kind": {
+      "type": "string",
+      "enum": ["author-agent", "reviewer-agent", "release-pipeline", "human-approver", "runner", "break-glass"],
+      "description": "Present exactly when author is."
+    },
+    "author_runs": { "type": "array", "items": { "type": "string", "pattern": "^run_[0-9a-f]{32}$" } },
+    "repair_attempts": { "type": "integer", "minimum": 1, "maximum": 9007199254740991, "description": "Absent when zero." },
+    "max_repair_attempts": { "type": "integer", "minimum": 1, "maximum": 4294967295, "description": "Absent when zero." },
+    "ticket": {
+      "type": "string",
+      "pattern": "^(?:none|[!-\"$-~]{1,128}#sha256:[0-9a-f]{64})$",
+      "description": "The ticket leaf: the literal none, or a reference of 1 to 128 printable ASCII characters without space or # followed by # and the digest of the ticket."
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "A SHA-256 digest: the prefix sha256: and 64 lowercase hex characters."
+    }
+  }
+}

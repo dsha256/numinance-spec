@@ -1,0 +1,28 @@
+{
+  "vector": "open-prefix-unanchored-allow-incomplete-only",
+  "description": "--allow-incomplete does not cover the missing anchor: unanchored.",
+  "status": "shipped",
+  "export": "open-prefix-unanchored",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "allow_incomplete": true
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "unanchored",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "unanchored",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:unanchored",
+    "exit:5"
+  ]
+}

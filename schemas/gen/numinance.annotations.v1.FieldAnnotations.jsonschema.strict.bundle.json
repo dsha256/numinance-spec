@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "numinance.annotations.v1.FieldAnnotations.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "FieldAnnotations carries lifecycle and sensitivity metadata for one field.\n Set it through the `field` field option.",
+      "properties": {
+        "deprecatedIn": {
+          "description": "deprecated_in is the strict x.y.z spec version in which the field was\n deprecated, or empty when it is not deprecated.",
+          "type": "string"
+        },
+        "hostOnly": {
+          "description": "host_only marks a types.v1.Reference field of a port request that only\n the host may resolve: HostService.ResolveReference refuses a reference equal\n to the value of such a field, even when the same value also sits in a field\n that is not host-only, and the mark applies to every Reference nested under\n a marked message-typed field. Allowed on a Reference field, or a wrapper of\n References, in a numinance.ports.* file only (annotation lint\n HOST_ONLY_INVALID). Added by numinance-spec/rfcs/0001-host-only-field-annotation.md.",
+          "type": "boolean"
+        },
+        "replacedBy": {
+          "description": "replaced_by names the field or RPC that supersedes a deprecated field.",
+          "type": "string"
+        },
+        "resourceName": {
+          "description": "resource_name marks a string or repeated string field of a port request whose values name resources the call\n touches (a repository, an environment, an artifact), in the spelling a grant's resource scope uses. The Engine\n reads the marks from the descriptor of the RPC's input and derives the policy input's action.resource_scope from\n the request message itself, never from a value the caller states beside it; a marked value outside the acting\n grant's resource scope is denied. The mark applies to a marked field at any depth of the input message, through\n singular, repeated, group and map-value message fields. A request that names no resource through a marked field is\n denied, and so is a request with an unknown field, so never mark an optional filter field: mark only fields a call\n must name. An empty marked string names nothing and is never defaulted to an implicit resource. Allowed on a string\n or repeated string field of a message that an RPC input reaches, in a numinance.ports.* file only (annotation lint\n RESOURCE_NAME_INVALID). Added by numinance-spec/rfcs/0002-resource-name-field-annotation.md.",
+          "type": "boolean"
+        },
+        "sensitive": {
+          "description": "sensitive marks a field that may hold a secret or personal data. It is\n redacted in logs and never copied into evidence in clear text.",
+          "type": "boolean"
+        },
+        "since": {
+          "description": "since is the strict x.y.z spec version in which the field was introduced.\n Required on every field added after 1.0.0.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "since",
+        "deprecatedIn",
+        "replacedBy",
+        "sensitive",
+        "hostOnly",
+        "resourceName"
+      ],
+      "title": "Field Annotations",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.annotations.v1.FieldAnnotations.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.annotations.v1.FieldAnnotations.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

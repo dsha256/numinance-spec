@@ -1,0 +1,33 @@
+{
+  "vector": "chain-sequence-above-2-53",
+  "description": "sequence 2^53+1: a record refuses a sequence a floating point reader would not keep exact.",
+  "status": "shipped",
+  "export": "chain-sequence-above-2-53",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "record_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:record_invalid"
+  ]
+}

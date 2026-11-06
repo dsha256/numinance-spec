@@ -1,0 +1,117 @@
+// Record is one append-only entry in a Change's evidence chain.
+//
+// Canonical form (canon_version 2, which is version 1 plus the optional lifecycle object, omitted when absent): a JSON object keyed by these field names (except that a types.v1.Reference in inputs and outputs is keyed {ref, sha256}: artifact_ref is carried under the key ref), object keys sorted bytewise over UTF-8, no insignificant whitespace, standard JSON string escaping without HTML escaping, no trailing newline; an empty optional field is an absent key; sequence is a JSON number; timestamp is RFC 3339 UTC with "Z" and fractional seconds trimmed of trailing zeros (the Go time.Time JSON form, never proto3 JSON's fixed-width fractions); digests are their "sha256:<hex>" strings and signature is base64. It is deterministic, not RFC 8785. Proto binary and proto3 JSON are never hashed.
+// record_hash = sha256(canonical record with record_hash and signature empty); previous_record_hash links records per Change; a checkpoint per Change and per day commits the head to the TransparencyLog.
+// Signing (Record, Attestation, BundleManifest): signature = Ed25519(runner_key, context || sha256(canonical message with signature empty)), where context is the message's fully qualified name, here "numinance.evidence.v1.Record". signing_key_id is inside the hash and set before hashing.
+// Every hash and digest is a numinance.types.v1.Digest, "sha256:" plus 64 lowercase hex characters. signing_key_id is the Digest of the runner public key; public keys travel in the bundle's provenance/ directory.
+// Corrections are new records that set corrects_record_hash; nothing is updated or deleted. Denied actions are recorded with the same schema and ACTION_OUTCOME_DENIED. Large artifacts are referenced, never embedded. Only the evidence context under the runner identity appends.
+// Bounds a decoder enforces: lifecycle.from and to are 1 to 32 bytes of [a-z_]; row_version is 1 to 2^53-1; ids and actor_principal are printable ASCII of at most 256 bytes with no leading or trailing space; action is at most 128 bytes; executor_id and model_id are at most 256 bytes of printable UTF-8 (no control, format or non-ASCII space characters) with no leading or trailing space; inputs and outputs hold at most 1024 entries each; signature is empty or 64 bytes.
+syntax = "proto3";
+
+package numinance.evidence.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/types/v1/types.proto";
+
+// SandboxProfile is the isolation profile the action ran under; each profile carries an authority ceiling and floors may mandate a minimum (ADR 0033). This enum may grow.
+enum SandboxProfile {
+  // Zero value; it has no meaning and is rejected.
+  SANDBOX_PROFILE_UNSPECIFIED = 0;
+  // Process-level isolation only; capped at Implement and LOW.
+  SANDBOX_PROFILE_PROCESS = 1;
+  // Container isolation; capped at PR and MEDIUM.
+  SANDBOX_PROFILE_CONTAINER = 2;
+  // User-space kernel isolation (gVisor class); no cap beyond policy.
+  SANDBOX_PROFILE_GVISOR = 3;
+  // Reserved for a later microVM adapter (ADR 0033). No adapter emits it and the sandbox provider and the policy decision point refuse it; evidence readers accept the number so later records stay readable. It satisfies no floor and carries no ceiling until the microVM ADR lands; floors compare profiles through an explicit table, never by number.
+  SANDBOX_PROFILE_MICROVM = 4;
+}
+
+// ActionOutcome is how the recorded action ended.
+enum ActionOutcome {
+  // Zero value; it has no meaning and is rejected.
+  ACTION_OUTCOME_UNSPECIFIED = 0;
+  // The action succeeded and all declared evidence is present.
+  ACTION_OUTCOME_SUCCEEDED = 1;
+  // The action succeeded but declared evidence is missing.
+  ACTION_OUTCOME_PARTIAL = 2;
+  // The action failed after dispatch.
+  ACTION_OUTCOME_FAILED = 3;
+  // Policy denied the action before dispatch; recorded like any other action.
+  ACTION_OUTCOME_DENIED = 4;
+}
+
+// Record is one evidence entry; see the file comment for the canonical form, chain and signing rules.
+message Record {
+  // Evidence record id, ev_ prefixed.
+  string ev_id = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Change this record belongs to, chg_ prefixed.
+  string change_id = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // 1-based position in the Change's chain; at most 2^53-1 so the canonical JSON number is exact.
+  uint64 sequence = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Capability name <port>.<verb> or lifecycle event name <Fact>.v1; at most 128 bytes.
+  string action = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Principal that acted, in clear by design: it is required on every record, so sensitive is unset.
+  string actor_principal = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Identity kind the principal acted as; the shared kernel-mirrored enum, never a local copy. PRINCIPAL_KIND_ENGINE is producer-only and never an actor: a consumer rejects it.
+  numinance.types.v1.PrincipalKind actor_kind = 6 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Run the actor was executing, run_ prefixed; required for agent kinds, optional otherwise.
+  string actor_run_id = 7 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Policy decision that allowed or denied the action, dec_ prefixed; required on every capability record.
+  string policy_decision_id = 8 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Grant under which the action ran, grant_ prefixed; empty only for lifecycle events and denied actions.
+  string grant_id = 9 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Risk class of the action as evaluated by policy.
+  numinance.annotations.v1.RiskClass risk_class = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the profile in force.
+  numinance.types.v1.Digest profile_digest = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the policy bundle in force.
+  numinance.types.v1.Digest policy_bundle_digest = 12 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the plan the action belongs to; unset for actions outside a plan.
+  numinance.types.v1.Digest plan_digest = 13 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Executor that performed the action; empty for non-executor actions.
+  string executor_id = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Model the executor used; empty when no model was involved.
+  string model_id = 15 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the sandbox image; set together with sandbox_profile, both required with executor_id.
+  numinance.types.v1.Digest sandbox_image_digest = 16 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Isolation profile the action ran under; unset for actions that did not run in a sandbox.
+  SandboxProfile sandbox_profile = 17 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Inputs the action consumed, as claim-check references; at most 1024. artifact_type is outside the hashed form and never feeds a decision.
+  repeated numinance.types.v1.Reference inputs = 18 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Outputs the action produced, as claim-check references; at most 1024.
+  repeated numinance.types.v1.Reference outputs = 19 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the previous record in this Change's chain; unset only for sequence 1.
+  numinance.types.v1.Digest previous_record_hash = 20 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Hash of this record per the chain rule in the file comment.
+  numinance.types.v1.Digest record_hash = 21 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // When the action happened, UTC.
+  google.protobuf.Timestamp timestamp = 22 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Raw Ed25519 signature (64 bytes) by the runner key per the signing rule in the file comment.
+  bytes signature = 23 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Digest of the runner public key that made the signature; inside record_hash.
+  numinance.types.v1.Digest signing_key_id = 24 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // How the action ended; denied actions are recorded too.
+  ActionOutcome action_outcome = 25 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // record_hash of the earlier record of the same Change this one corrects; unset for ordinary records.
+  numinance.types.v1.Digest corrects_record_hash = 26 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Version of the canonical form used for record_hash and the signing input; 2 for spec 1.0.0 (version 1 plus the optional lifecycle object), 0 and 1 are rejected.
+  uint32 canon_version = 27 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // The lifecycle edge this record receipts; unset on every other record. Accepted only when action is a lifecycle event (ADR 0042). Inside record_hash.
+  Lifecycle lifecycle = 28 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// Lifecycle is the lifecycle edge a record receipts (ADR 0042). States are opaque lowercase tokens, so evidence never imports the states of a producer.
+message Lifecycle {
+  // State the edge left: 1 to 32 bytes of [a-z_].
+  string from = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // State the edge entered: 1 to 32 bytes of [a-z_].
+  string to = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Newest author run, run_ prefixed, that the producer's own history held after the edge; unset while none existed.
+  string author_run_id = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // a per-change monotonic version the writer assigns; equal values name one edge (the writer's idempotency key)
+  uint64 row_version = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // Repair bound fixed by the edge; present only on the record that fixes it, where zero is a value.
+  optional uint32 max_repair_attempts = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}

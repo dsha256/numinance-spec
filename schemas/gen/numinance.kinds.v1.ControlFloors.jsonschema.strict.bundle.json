@@ -1,0 +1,180 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloor caps the level of the changes it matches; when floors from the org and control packs match, the\n lowest max_level holds.",
+      "properties": {
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        },
+        "max_level": {
+          "description": "max_level is required: no rule, default or narrower scope resolves a matching change above it.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_level"
+      ],
+      "title": "Autonomy Floor",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "rules": {
+          "description": "rules is required and non-empty; the loader enforces it, the schema cannot.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloor.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Autonomy Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AutonomyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyMatch selects changes; an absent key matches every value and an empty match matches every change. In a\n rule, risk matches exactly and a key the change has no value for does not match. In a floor, risk matches that\n class and every higher one, and a key the change has no value for counts as a match.",
+      "properties": {
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        },
+        "playbook": {
+          "description": "playbook is the name of the change's playbook.",
+          "type": "string"
+        },
+        "risk": {
+          "description": "risk is the change's risk class, fixed at Classified.",
+          "enum": [
+            "RISK_CLASS_UNSPECIFIED",
+            "RISK_CLASS_READ",
+            "RISK_CLASS_LOW",
+            "RISK_CLASS_MEDIUM",
+            "RISK_CLASS_HIGH",
+            "RISK_CLASS_PRIVILEGED"
+          ],
+          "title": "Risk Class",
+          "type": "string"
+        }
+      },
+      "title": "Autonomy Match",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ControlFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ControlFloors is the set of floors a pack adds; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "autonomy": {
+          "$ref": "#/$defs/numinance.kinds.v1.AutonomyFloors.jsonschema.strict.json",
+          "description": "autonomy caps levels as AutonomyPolicy floors do; the lowest matching max_level of the org and every pack holds."
+        },
+        "residency": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyFloors.jsonschema.strict.json",
+          "description": "residency adds residency floors as ResidencyPolicy floors do; every floor of the org and every pack holds."
+        }
+      },
+      "title": "Control Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyFloors.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyFloors is the set of floors; it is one message so the whole set carries the FORBID directive.",
+      "properties": {
+        "floor": {
+          "description": "floor is required: it applies to every change, together with every matching rule's floor.",
+          "enum": [
+            "RESIDENCY_CLASS_UNSPECIFIED",
+            "RESIDENCY_CLASS_IN_ACCOUNT",
+            "RESIDENCY_CLASS_PRIVATE_ENDPOINT",
+            "RESIDENCY_CLASS_VENDOR_ZDR",
+            "RESIDENCY_CLASS_VENDOR_STANDARD",
+            "RESIDENCY_CLASS_AIRGAPPED"
+          ],
+          "title": "Residency Class",
+          "type": "string"
+        },
+        "rules": {
+          "description": "rules add floors per component and environment; a rule never relaxes floor.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.ResidencyRule.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "floor"
+      ],
+      "title": "Residency Floors",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyMatch selects changes; an absent key matches every value and an empty match matches every change, and a\n key the change has no value for counts as a match. Floors from the org and control packs all hold together.",
+      "properties": {
+        "component": {
+          "description": "component is the name of the component the change touches. It is not a security boundary until floors match only\n components of an org-owned SIGNED_POLICY registry, since a repo can rename one.",
+          "type": "string"
+        },
+        "environment": {
+          "description": "environment is the name of the environment the change acts in.",
+          "type": "string"
+        }
+      },
+      "title": "Residency Match",
+      "type": "object"
+    },
+    "numinance.kinds.v1.ResidencyRule.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "ResidencyRule adds a floor for the changes it matches.",
+      "properties": {
+        "floor": {
+          "description": "floor is required.",
+          "enum": [
+            "RESIDENCY_CLASS_UNSPECIFIED",
+            "RESIDENCY_CLASS_IN_ACCOUNT",
+            "RESIDENCY_CLASS_PRIVATE_ENDPOINT",
+            "RESIDENCY_CLASS_VENDOR_ZDR",
+            "RESIDENCY_CLASS_VENDOR_STANDARD",
+            "RESIDENCY_CLASS_AIRGAPPED"
+          ],
+          "title": "Residency Class",
+          "type": "string"
+        },
+        "match": {
+          "$ref": "#/$defs/numinance.kinds.v1.ResidencyMatch.jsonschema.strict.json",
+          "description": "match is required; the loader enforces it, the schema cannot."
+        }
+      },
+      "required": [
+        "floor"
+      ],
+      "title": "Residency Rule",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.ControlFloors.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.ControlFloors.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

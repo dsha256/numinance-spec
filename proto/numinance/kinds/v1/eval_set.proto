@@ -1,0 +1,116 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// EvalSet is a versioned, reference-only set of replay cases (RFC-0004). A case names a recorded replay outcome by digest
+// and states what that outcome must show; it holds no free text, ticket, code or person. An EvalSet is an alpha kind: its
+// apiVersion is "numinance.dev/v1alpha1" and a loader reads it only when the caller turns alpha kinds on. It takes no part in
+// profile resolution and is not an input to the profile digest.
+message EvalSet {
+  // api_version is required and is "numinance.dev/v1alpha1" (pre-GA; off unless the loader enables alpha kinds).
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "EvalSet".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  EvalSetSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EvalAcceptance is how a case expects the human acceptance of the replayed change to end. This enum may grow.
+enum EvalAcceptance {
+  // EVAL_ACCEPTANCE_UNSPECIFIED is the zero value; a loader rejects it.
+  EVAL_ACCEPTANCE_UNSPECIFIED = 0;
+  // EVAL_ACCEPTANCE_ACCEPTED expects the change to be accepted.
+  EVAL_ACCEPTANCE_ACCEPTED = 1;
+  // EVAL_ACCEPTANCE_REJECTED expects the change to be rejected.
+  EVAL_ACCEPTANCE_REJECTED = 2;
+  // EVAL_ACCEPTANCE_ABANDONED expects the change to be abandoned before a decision.
+  EVAL_ACCEPTANCE_ABANDONED = 3;
+}
+
+// EvalCategory is the adversarial situation a case stands for (master section 19). This enum may grow.
+enum EvalCategory {
+  // EVAL_CATEGORY_UNSPECIFIED is the zero value; a loader rejects it. A case with no category leaves the field unset.
+  EVAL_CATEGORY_UNSPECIFIED = 0;
+  // EVAL_CATEGORY_HIDDEN_ACCEPTANCE is a ticket whose real acceptance criteria are not stated.
+  EVAL_CATEGORY_HIDDEN_ACCEPTANCE = 1;
+  // EVAL_CATEGORY_INCOMPLETE_TICKET is a ticket missing information the change needs.
+  EVAL_CATEGORY_INCOMPLETE_TICKET = 2;
+  // EVAL_CATEGORY_CONFLICTING_TICKET is a ticket that contradicts itself or another source.
+  EVAL_CATEGORY_CONFLICTING_TICKET = 3;
+  // EVAL_CATEGORY_POISONED_README is a repository document that carries instructions aimed at the agent.
+  EVAL_CATEGORY_POISONED_README = 4;
+  // EVAL_CATEGORY_MALICIOUS_COMMENT is a review or ticket comment that carries instructions aimed at the agent.
+  EVAL_CATEGORY_MALICIOUS_COMMENT = 5;
+  // EVAL_CATEGORY_STALE_DOCUMENTATION is documentation that no longer matches the code.
+  EVAL_CATEGORY_STALE_DOCUMENTATION = 6;
+  // EVAL_CATEGORY_FLAKY_TEST is a test that fails or passes without a code change.
+  EVAL_CATEGORY_FLAKY_TEST = 7;
+  // EVAL_CATEGORY_PLANTED_SECURITY_BUG is a change that carries a seeded security defect; the case must be seeded.
+  EVAL_CATEGORY_PLANTED_SECURITY_BUG = 8;
+  // EVAL_CATEGORY_MIGRATION_HAZARD is a change with a data migration hazard; the case must be seeded.
+  EVAL_CATEGORY_MIGRATION_HAZARD = 9;
+  // EVAL_CATEGORY_MISSING_PERMISSION is a change that needs a permission the run does not hold.
+  EVAL_CATEGORY_MISSING_PERMISSION = 10;
+  // EVAL_CATEGORY_ROLLBACK is a change that must be rolled back.
+  EVAL_CATEGORY_ROLLBACK = 11;
+}
+
+// EvalSetSpec holds the version of the set and its cases.
+message EvalSetSpec {
+  // version is required: a strict x.y.z version. Any change to a case is a new version, and a new version is a new bundle digest.
+  string version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // cases is required: 1 to 256 cases, sorted by name without duplicates; the loader enforces the count and the order.
+  repeated EvalCase cases = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EvalCase is one replay case: it names a recorded outcome by digest and states what the replay must show.
+message EvalCase {
+  // name is required: a token of 1 to 64 characters, lowercase letters, digits and ". _ -", starting with a letter or digit.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // outcome is required: the digest of the replay outcome record the recording produces under the set and this case.
+  numinance.types.v1.Digest outcome = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // expect is required: what the replayed outcome must show.
+  EvalExpectation expect = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // category is the adversarial situation the case stands for; absent for an ordinary case.
+  optional EvalCategory category = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // seeded names the defect planted in the case and the layer expected to catch it; it needs a category.
+  EvalSeeded seeded = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EvalExpectation is the closed facts a replay is compared on. It names no text.
+message EvalExpectation {
+  // acceptance is required: the expected human acceptance.
+  EvalAcceptance acceptance = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // merged is required: whether the change is expected to merge.
+  bool merged = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // severe is required: whether the outcome is expected to be a severity event (unauthorized action, critical escape or evidence gap).
+  bool severe = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // verification_failures lists the expected failures by layer, sorted by layer without duplicates; empty when none are expected.
+  repeated EvalLayerCount verification_failures = 4 [json_name = "verification_failures", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EvalLayerCount is the number of verification failures expected from one verifier layer.
+message EvalLayerCount {
+  // layer is required: a token of 1 to 64 characters naming the verifier layer.
+  string layer = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // count is required and at least 1.
+  uint32 count = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// EvalSeeded is a defect planted in a case, by token. The defect itself is not in the set: the case stands for a recorded run on a change that has it.
+message EvalSeeded {
+  // defect is required: a token of 1 to 64 characters naming the planted defect.
+  string defect = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // caught_by is required: a token naming the verifier layer expected to catch the defect; it must be among the case's expected failures.
+  string caught_by = 2 [json_name = "caught_by", (numinance.annotations.v1.field).since = "1.0.0"];
+}

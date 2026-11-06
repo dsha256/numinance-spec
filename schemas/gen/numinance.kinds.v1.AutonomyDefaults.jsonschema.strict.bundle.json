@@ -1,0 +1,35 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.AutonomyDefaults.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AutonomyDefaults is the level used when no rule matches.",
+      "properties": {
+        "level": {
+          "description": "level is required.",
+          "enum": [
+            "AUTONOMY_LEVEL_UNSPECIFIED",
+            "AUTONOMY_LEVEL_OBSERVE",
+            "AUTONOMY_LEVEL_SUGGEST",
+            "AUTONOMY_LEVEL_IMPLEMENT",
+            "AUTONOMY_LEVEL_PR",
+            "AUTONOMY_LEVEL_MERGE",
+            "AUTONOMY_LEVEL_STAGE",
+            "AUTONOMY_LEVEL_RELEASE",
+            "AUTONOMY_LEVEL_OPERATE"
+          ],
+          "title": "Autonomy Level",
+          "type": "string"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "title": "Autonomy Defaults",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.AutonomyDefaults.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.AutonomyDefaults.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

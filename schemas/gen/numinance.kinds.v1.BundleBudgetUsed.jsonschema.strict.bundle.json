@@ -1,0 +1,39 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.BundleBudgetUsed.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "BundleBudgetUsed is what building the bundle consumed, checked against the stage budget of the profile.",
+      "properties": {
+        "calls": {
+          "description": "calls is the number of resolver searches and fetches.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ms": {
+          "description": "ms is the wall-clock time in milliseconds.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tokens": {
+          "description": "tokens is the bundle size in tokens.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tokens",
+        "calls",
+        "ms"
+      ],
+      "title": "Bundle Budget Used",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.BundleBudgetUsed.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.BundleBudgetUsed.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

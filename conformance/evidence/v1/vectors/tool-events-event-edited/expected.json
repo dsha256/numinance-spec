@@ -1,0 +1,34 @@
+{
+  "vector": "tool-events-event-edited",
+  "description": "One event edited.",
+  "status": "shipped",
+  "export": "tool-events-event-edited",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "tool_events_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:tool_events_mismatch",
+    "rule:tool-events-forms"
+  ]
+}

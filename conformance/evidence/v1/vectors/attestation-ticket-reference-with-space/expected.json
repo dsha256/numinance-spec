@@ -1,0 +1,34 @@
+{
+  "vector": "attestation-ticket-reference-with-space",
+  "description": "A ticket reference with a space. Signed again by a holder of the runner key.",
+  "status": "shipped",
+  "export": "attestation-ticket-reference-with-space",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_invalid"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_invalid",
+    "rule:attestation-decode"
+  ]
+}

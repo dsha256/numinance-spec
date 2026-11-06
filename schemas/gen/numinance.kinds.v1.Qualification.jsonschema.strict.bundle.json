@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.Qualification.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Qualification is the record a playbook needs before its autonomy is\n promoted. Rates are in basis points, 0 to 10000 (10000 is every run); the\n profile context refuses a larger value. A narrower scope may only tighten a\n threshold: min_runs up, a max rate down, zero_security_escapes never to false; the reference implementation refuses a loosening.",
+      "properties": {
+        "max_regression_rate": {
+          "description": "max_regression_rate is the highest share of runs that caused a regression.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_rework_rate": {
+          "description": "max_rework_rate is the highest share of runs that needed rework.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_rollback_rate": {
+          "description": "max_rollback_rate is the highest share of releases rolled back.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "min_runs": {
+          "description": "min_runs is the minimum number of qualifying runs; absent means the AutonomyPolicy floor applies.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "zero_security_escapes": {
+          "description": "zero_security_escapes is true when one security escape blocks promotion; absent means true. Only an explicit false\n relaxes it, and a narrower scope may never set false over a wider scope's true or absent value.",
+          "type": "boolean"
+        }
+      },
+      "title": "Qualification",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.Qualification.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.Qualification.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

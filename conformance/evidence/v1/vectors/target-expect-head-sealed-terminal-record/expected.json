@@ -1,0 +1,32 @@
+{
+  "vector": "target-expect-head-sealed-terminal-record",
+  "description": "NEW: and the record_hash of the terminal record before the seal record, which the head leaf of the log and the attestation hold.",
+  "status": "target",
+  "export": "closed-sealed",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log",
+    "expect_head": "sha256:f660cbc6ee23d051bd40f405bc60f2947b10577324e15172e5f1464b624b0d8c"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:expect-flags"
+  ]
+}

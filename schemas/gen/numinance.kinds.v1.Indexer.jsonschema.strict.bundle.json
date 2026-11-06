@@ -1,0 +1,37 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.Indexer.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Indexer is one indexer provider and what it covers.",
+      "properties": {
+        "edge_overlays": {
+          "description": "edge_overlays is the edge overlays added to the graph.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "languages": {
+          "description": "languages is the languages the provider indexes.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of an indexer port provider.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "title": "Indexer",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.Indexer.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.Indexer.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

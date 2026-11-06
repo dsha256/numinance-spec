@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.AdapterBinding.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterBinding is one provider installation serving a port.",
+      "properties": {
+        "instance": {
+          "description": "instance is required: the configured instance of the provider (one provider may serve several, such as two CI servers).",
+          "type": "string"
+        },
+        "provider": {
+          "description": "provider is required: the extension id of a provider of the port, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "instance"
+      ],
+      "title": "Adapter Binding",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AdapterPorts.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterPorts binds the ports that reach customer systems; a port added later is a new\n optional field. Each binding is replaced as a unit, never pairing one scope's provider with another's instance.",
+      "properties": {
+        "cdprovider": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "cdprovider binds the cdprovider port."
+        },
+        "ciexecutor": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "ciexecutor binds the ciexecutor port."
+        },
+        "cloud": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "cloud binds the cloud port."
+        },
+        "database": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "database binds the database port."
+        },
+        "knowledge": {
+          "description": "knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "observability": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "observability binds the observability port."
+        },
+        "scm": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "scm binds the scm port."
+        },
+        "ticketing": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json",
+          "description": "ticketing binds the ticketing port."
+        }
+      },
+      "title": "Adapter Ports",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AdapterSelectorSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterSelectorSpec holds the port bindings.",
+      "properties": {
+        "ports": {
+          "$ref": "#/$defs/numinance.kinds.v1.AdapterPorts.jsonschema.strict.json",
+          "description": "ports is required; the loader enforces it, the schema cannot. An empty ports binds nothing: a valid no-op."
+        }
+      },
+      "title": "Adapter Selector Spec",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.AdapterSelectorSpec.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.AdapterSelectorSpec.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

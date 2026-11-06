@@ -1,0 +1,47 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+
+// LanguageToolchain is the version and the deterministic verifiers for one language.
+message LanguageToolchain {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // kind is required and is "LanguageToolchain".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  LanguageToolchainSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// LanguageToolchainSpec names a language version and its tools.
+message LanguageToolchainSpec {
+  // language is required and matches ^[0-9A-Za-z.+-]{1,64}$ (the profile context enforces it).
+  string language = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // version is required: the language version, matching ^[0-9A-Za-z.+-]{1,64}$; toolchain artifacts are pinned by digest in the lockfile, never by this string.
+  string version = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // verifiers is required and non-empty; the loader enforces it, the schema cannot.
+  repeated ToolchainVerifier verifiers = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // formatters names the formatters; a narrower scope adds to the wider scope's list. Each name resolves to a declared
+  // provider with a lockfile entry; a name is never executed as a command.
+  repeated string formatters = 4 [(merge) = MERGE_DIRECTIVE_APPEND, (numinance.annotations.v1.field).since = "1.0.0"];
+  // package_manager is the package manager the toolchain uses: a name that resolves to a declared provider, never a command.
+  optional string package_manager = 5 [json_name = "package_manager", (numinance.annotations.v1.field).since = "1.0.0"];
+}
+
+// ToolchainVerifier is one deterministic verifier of the toolchain.
+message ToolchainVerifier {
+  // name is required and unique in the toolchain; playbook steps and pack checks reference it.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // provider is required: the extension id of a verifier port provider, which must resolve to a lockfile entry.
+  string provider = 2 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // config is passed to the verifier as is; the Engine never reads it.
+  google.protobuf.Struct config = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
+}
