@@ -259,3 +259,31 @@ func TestRoot_Validate_CanceledContextIsNotUnavailable(t *testing.T) {
 		t.Errorf("validate with a canceled context = %d, want %d", code, cli.ExitInternal)
 	}
 }
+
+// TestRoot_Init_OutputIsReadByTheOpenBuild runs the open build end to end on what "numi init" wrote: the real working
+// tree source schema-checks every document and exits 7 (no resolver), and --files exits 0 after the schema check only.
+func TestRoot_Init_OutputIsReadByTheOpenBuild(t *testing.T) {
+	for _, ci := range []string{"github-actions", "jenkins", "both"} {
+		t.Run(ci, func(t *testing.T) {
+			dir := t.TempDir()
+			var out, errb bytes.Buffer
+			r := root("test")
+			r.Stdout, r.Stderr = &out, &errb
+			if code := r.Run(context.Background(), []string{"init", "--ci", ci, dir}); code != cli.ExitOK {
+				t.Fatalf("init = %d, stderr %q, want 0", code, errb.String())
+			}
+			out.Reset()
+			errb.Reset()
+			if code := r.Run(context.Background(), []string{"validate", dir}); code != cli.ExitUnavailable {
+				t.Errorf("validate = %d, want %d (stdout %q)", code, cli.ExitUnavailable, out.String())
+			}
+			if strings.Contains(out.String(), "invalid") || !strings.Contains(errb.String(), "engine build") {
+				t.Errorf("stdout %q stderr %q, want the schema pass and the engine-build message", out.String(), errb.String())
+			}
+			out.Reset()
+			if code := r.Run(context.Background(), []string{"validate", "--files", filepath.Join(dir, ".numinance")}); code != cli.ExitOK {
+				t.Errorf("validate --files = %d, want 0 (stdout %q)", code, out.String())
+			}
+		})
+	}
+}

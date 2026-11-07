@@ -14,6 +14,7 @@ The Numinance command line. This directory is the open build; the command logic 
 ```
 numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
 numi validate --files [--json] path
+numi init --ci github-actions|jenkins|both [--org-dir DIR] [--package-manager uv|pip|poetry] [--python-version 3.N] [--verifiers LIST] [--force] [path]
 numi version
 ```
 
@@ -24,6 +25,43 @@ numi version
 ## Example validator (`--files`)
 
 `numi validate --files PATH` schema-checks kind documents that are not a repository: `PATH` is one YAML file or a directory, and every `.yaml` or `.yml` file below it is a document. It checks each against its generated kind schema (unknown fields are errors unless under `extensions:`) and the loader checks, runs no resolver, and exits 0 when all pass, 3 when any fails, 4 when the path is missing or holds no document, 2 for a usage error (no path, more than one, or combined with `--rev`, `--org` or `--component`). A produced kind (`ContextBundle`) is never loaded as configuration; it is checked against its own strict schema, `apiVersion`, `spec`, the required fields of the spec and of `BundleSource`, digests, enums and the `BundleSource` trust pin instead; the other constraints of the bundle (`AuthoredConstraint` trust, origin and origin digest, `CitedGuidance.ref`, `UnresolvedQuestion.question`, unique `BundleSource.ref`, at least two claims per conflict) are left to the ContextBundle producer. This is a schema and loader check only: floors and profile resolution are not checked, and a pass is not a substitute for validating a repository. A single file must be named `*.yaml` or `*.yml` (exit 2 otherwise); in a directory, the repository mode ignores such files, this mode refuses them. The path is cleaned once (`a/../b` means `b`) and the directory opened is the one that was checked and walked. A link is refused for the path itself (a trailing slash does not hide it) and for everything below it; links in parent folders of the path are followed. In a directory, a name that mentions `.yaml` or `.yml` in any letter case but does not end exactly in lowercase `.yaml` or `.yml` (`.YAML`, `.Yml`, `.yaml.bak`, `.yaml-old`, a trailing space) is invalid (exit 3); other names (`README.md~`) are ignored. Reading has the limits of the working-tree source: `os.Root`, no links, regular files only, 4096 entries, 256 documents, 16 MiB, `kindyaml.MaxBytes` per document. `just schema-check` runs it on `schemas/examples`, so CI validates every example. The engine build does not set a files source and exits 2 for `--files`.
+
+## Init (`numi init`)
+
+`numi init --ci github-actions|jenkins|both [path]` writes a `.numinance/` template for a Python repository, so the first repository can be onboarded by hand and checked with `numi validate`. The command is in both builds (it needs no resolver) and is the public function `cli.RunInit`. It names no CI vendor in code: vendor names appear in the template data (`sdk/go/cli/initdata/*.tmpl`) and in the generated documents only.
+
+| Flag | Meaning |
+|---|---|
+| `--ci SYSTEM` | `github-actions`, `jenkins` or `both`. Required: absent is a usage error (exit 2), because a default CI would wire a system the repository may not have |
+| `--org-dir DIR` | also write the org-scoped documents into this organization policy repository (see below) |
+| `--package-manager NAME` | `uv`, `pip` or `poetry`. Default: detected from the target directory in this order: `uv.lock`, `poetry.lock`, `pyproject.toml` (`[tool.poetry]`, `[tool.uv]`), `requirements.txt`; with none of them `uv`. Two different managers named by the directory (for example `uv.lock` and `poetry.lock`) are a usage error until the flag decides |
+| `--python-version 3.N` | default: the first line of `.python-version` when it is a plain `3.N` or `3.N.P`, else `3.12` |
+| `--verifiers LIST` | comma-separated subset of `unit-tests`, `lint`, `typecheck` (pytest, ruff, mypy of the verifier provider); default all three |
+| `--force` | overwrite the files init writes in an existing `.numinance`; other files are never touched |
+
+It prints each choice with its source (`flag`, `detected from uv.lock`, `default`), the files it wrote and notes. Exit codes: 0 OK, 2 usage, 3 invalid (the path is not a directory, or the config directory, `policy/` or a document is a symbolic link or not a regular file), 4 the directory is missing, 5 conflict (`.numinance` already has any file and no `--force`; also a leftover `*.numi-init.tmp`), 1 internal.
+
+What it writes (`.numinance/policy/` is the protected location of section 12: a document there carries authority, so protect it with branch protection and CODEOWNERS):
+
+| File | Kind | Content |
+|---|---|---|
+| `policy/sdlc-profile.yaml` | SDLCProfile (repo) | `playbooks`, `toolchains`, `adapters.scm` (`dev.numinance.scm-github`) and the one `adapters.ciexecutor` |
+| `policy/autonomy.yaml` | AutonomyPolicy | `defaults.level: AUTONOMY_LEVEL_PR` |
+| `policy/stage-registry.yaml` | StageRegistry `pr-only` | triage, plan gate, implement, a static verify stage, one CI verify stage per CI system (both map to Verifying), a human `pr-gate` at the release gate state. No stage maps to Merging |
+| `policy/playbook-bugfix-bounded.yaml` | Playbook | `fix` (verifiers of the toolchain) and `open-pr` |
+| `policy/toolchain-python.yaml` | LanguageToolchain | language, version, `package_manager` and the verifiers with provider `dev.numinance.verifier-python` and `config.check` |
+| `ci-jenkins.yaml` | AdapterSelector | only for `--ci both` without `--org-dir`; outside `policy/`, so no authority |
+| `README.md` | | what the tree is |
+
+**PR only.** The ladder level is `AUTONOMY_LEVEL_PR` (the agent opens pull requests and never merges). `PR_ONLY` is a breaker state of the engine, not a ladder level. Floors are a ceiling and only the org scope and control packs may set them, so a floors block in a repository is refused by the loader and the resolver. With `--org-dir` the org tree gets an AutonomyPolicy whose floors cap every change at PR (`match: {risk: RISK_CLASS_READ}` matches every class; HIGH stays at SUGGEST); without it the engine applies its shipped floor, which is the same cap. The kernel floors (design section 12) are always on in the engine and no document can weaken them; a repository has no way to reference them, so the generated README says so instead.
+
+**Org tree (`--org-dir`).** Only the org scope selects the stage registry (`SDLCProfile.stages`) and grants playbook, toolchain and adapter-binding names to repositories; a repository that asks for an ungranted name gets it recorded as `ignored: "outside the org-granted set"` and not applied. `--org-dir DIR` therefore writes `DIR/.numinance/policy/{sdlc-profile,autonomy,stage-registry,playbook-bugfix-bounded,toolchain-python}.yaml` (and `ci-jenkins.yaml`, an org AdapterSelector that grants the Jenkins binding, for `--ci both`) and the repository keeps its own profile only. Without it all shared documents are repo-scoped, the registry is defined but not selected, and the engine build lists the names and bindings as not granted. Both directories are checked before either is written. `--org-dir` naming the repository under any spelling (dot, relative, symlink) is refused with exit 3, decided on the opened directories. The Jenkins grant is a grant only: the repository profile binds GitHub Actions, rebinding to the placeholder is the operator's explicit edit, and `numi validate` does not check that a provider is installed. Without `--force` a document is created by hard link so a file that appeared after the check is never replaced; where the file system has no hard links the writer falls back to rename and that small window remains.
+
+**CI support.** The adapter schema binds one `ciexecutor` per scope. `github-actions` binds `dev.numinance.ci-github-actions` (exists, replay and live builds, a live run is owed). `jenkins` binds the placeholder `dev.numinance.official/jenkins`: the ciexecutor port exists but no Jenkins provider does (documented in `ci-github-actions`, "Not done"), and `validate` does not check that a provider is installed, so a green validate never means Jenkins works. With `both` the effective binding is GitHub Actions and the Jenkins binding is kept as a grant (org tree) or as an inert document without authority (repository only). The note `init` prints names only the file it wrote in that mode. Error messages quote each value once (`directory "X" not found`); the escaping of `clean` is applied to the value, not again to the message.
+
+**Validating the output.** The open build schema-checks every document and exits 7 ("profile resolution needs the Numinance engine build"); `numi validate --files .numinance` of the open build exits 0 after the schema check only. The engine build (`numinance/cmd/numi`, reads a committed revision) exits 0 and prints the digest and provenance: commit the files first, then `numi validate .` (or `numi validate --org ORG_DIR .`). The `unit-tests` verifier is pytest, which runs candidate code and is UNAVAILABLE in the live verifier provider until its nested sandbox exists.
+
+Files are written with `os.Root` (no path leaves the directory), refusing links, with mode 0644 (directories 0755), each through a temporary name and a rename, and what a failed run created is removed again. Tests: `go test ./sdk/go/cli` (golden files `testdata/init_*.golden`, rewritten deliberately with `-update`).
 
 ## Exit codes (stable)
 

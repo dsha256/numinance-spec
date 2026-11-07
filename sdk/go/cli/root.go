@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Root dispatches the numi subcommands.
@@ -13,6 +14,9 @@ type Root struct {
 	// open build sets it to RunEvidence. When nil the command is unknown, so a
 	// build that has its own evidence command is unaffected.
 	Evidence func(ctx context.Context, args []string, stdout, stderr io.Writer) int
+	// Init runs "numi init ..." with the arguments after "init". Both builds set it to RunInit. When nil the
+	// command is unknown.
+	Init func(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	// Version is printed by "numi version".
 	Version string
 	// Stdout and Stderr receive the output and the errors; nil discards.
@@ -29,11 +33,15 @@ func (r Root) Run(ctx context.Context, args []string) int {
 		r.Stderr = io.Discard
 	}
 	if len(args) == 0 {
-		usage := "usage: numi <validate|version> [args]"
-		if r.Evidence != nil {
-			usage = "usage: numi <validate|evidence|version> [args]"
+		names := []string{"validate"}
+		if r.Init != nil {
+			names = append(names, "init")
 		}
-		_, _ = fmt.Fprintln(r.Stderr, usage)
+		if r.Evidence != nil {
+			names = append(names, "evidence")
+		}
+		names = append(names, "version")
+		_, _ = fmt.Fprintf(r.Stderr, "usage: numi <%s> [args]\n", strings.Join(names, "|"))
 		return ExitUsage
 	}
 	switch args[0] {
@@ -41,6 +49,10 @@ func (r Root) Run(ctx context.Context, args []string) int {
 		v := r.Validate
 		v.Stdout, v.Stderr = r.Stdout, r.Stderr
 		return v.Run(ctx, args[1:])
+	case "init":
+		if r.Init != nil {
+			return r.Init(ctx, args[1:], r.Stdout, r.Stderr)
+		}
 	case "evidence":
 		if r.Evidence != nil {
 			return r.Evidence(ctx, args[1:], r.Stdout, r.Stderr)

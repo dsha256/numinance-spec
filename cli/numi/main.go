@@ -4,7 +4,7 @@
 // pass, while "numi validate --files" checks example documents only and exits 0
 // when they all pass. "numi evidence verify DIR" checks an evidence export
 // offline with the open verifier, and reaches "verified" only with keys the
-// caller pins.
+// caller pins. "numi init" writes a .numinance template for a Python repository.
 package main
 
 import (
@@ -30,6 +30,7 @@ func root(version string) cli.Root {
 	return cli.Root{
 		Validate: cli.Validate{Source: workingTree{}, Files: fileTree{}},
 		Evidence: cli.RunEvidence,
+		Init:     cli.RunInit,
 		Version:  version,
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,

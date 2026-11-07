@@ -1,0 +1,20 @@
+# AutonomyPolicy "pr-only", written by "numi init". The ladder level is AUTONOMY_LEVEL_PR: the agent may open pull requests
+# and may never merge. (PR_ONLY is a breaker state of the engine, not a ladder level; this document is the ladder side.)
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: pr-only, scope: {{.Scope}}}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+{{- if .OrgMode}}
+  # Floors are a ceiling and only the org scope may set them. A floor matches the risk class it names and every higher
+  # one, and a match may not be empty, so risk READ (the lowest class) makes the PR cap apply to every change.
+  # HIGH risk stays at SUGGEST, the engine's own shipped floor for it.
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {risk: RISK_CLASS_READ}, max_level: AUTONOMY_LEVEL_PR}
+{{- else}}
+  # No floors block: a floor set below the org scope is refused. When no org document sets floors the engine applies its
+  # shipped floor (at most SUGGEST for HIGH risk and above, at most PR for the rest), which caps every change at PR.
+  # Run "numi init --org-dir DIR" to write an explicit floors block into an organization policy repository.
+{{- end}}

@@ -1,0 +1,19 @@
+# SDLCProfile of the organization policy repository, written by "numi init --org-dir". Only the org scope selects the
+# stage registry and grants playbook and toolchain names to repositories; a repository profile that asks for a name that
+# is not granted here gets it recorded as "outside the org-granted set" and not applied. The same holds for an adapter
+# binding: a repository may select only a binding (port, provider, instance) that an org document binds.
+#
+# CI: {{.CIText}}. The ciexecutor binding below is the one of {{.PrimaryCI.Stage}}.
+{{- if .Jenkins}}
+# No Jenkins provider exists yet; dev.numinance.official/jenkins is a placeholder id from the design examples.
+{{- end}}
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: org-baseline, scope: SCOPE_ORG}
+spec:
+  stages: pr-only
+  playbooks: [bugfix-bounded]
+  toolchains: [python-{{.PythonVersion}}]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: {{.PrimaryCI.Provider}}, instance: {{.PrimaryCI.Instance}}}

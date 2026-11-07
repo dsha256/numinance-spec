@@ -1,0 +1,160 @@
+=== .numinance/README.md ===
+# .numinance
+
+Written by `numi init`. Typed Numinance configuration for this repository (design section 8). Review it like code.
+
+- `policy/` is the protected location: a document there carries authority only when it is read from the protected
+  branch of the repository, so protect `.numinance/policy/**` with branch protection and CODEOWNERS. Agents cannot change
+  their own gates.
+- Toolchain: Python 3.11, package manager poetry, verifiers lint, typecheck.
+- CI: github-actions and jenkins.
+- Autonomy: PR only. The ladder level is `AUTONOMY_LEVEL_PR`: the agent opens pull requests and never merges.
+  `PR_ONLY` is a separate thing, a state of the engine's breaker.
+- The organization documents (stage registry, grants, floors) were written to the organization policy repository
+  you named with `--org-dir`. Validate with `numi validate --org THAT_DIR .` (engine build).
+
+The kernel floors (separation of duties, plan before side effects, evidence by the runner only, autonomy and residency
+ceilings and others) are part of the Numinance engine, always on, and no document in this tree or in an organization
+repository can weaken them. Nothing here references them, because there is nothing to reference.
+
+Jenkins: no Jenkins ciexecutor provider exists yet; see the comments in `policy/sdlc-profile.yaml`.
+The repository profile binds GitHub Actions. The Jenkins binding is only a grant (an org AdapterSelector) or an inert
+document, and a one-line edit of the profile could rebind to the placeholder provider. That rebinding is the operator's
+explicit edit, and `numi validate` does not check that a provider is installed, so it would pass and still run nothing.
+=== .numinance/policy/sdlc-profile.yaml ===
+# SDLCProfile of this repository, written by "numi init". It binds the names defined in this tree
+# (or granted by the organization policy repository) to this repository.
+#
+# CI: github-actions and jenkins
+#   github-actions: the ciexecutor provider dev.numinance.ci-github-actions exists in the open plugins (replay and live builds).
+#   It starts a workflow_dispatch workflow that the repository already defines on its default branch
+#   (the README of that provider says what the workflow must declare). A live run is not yet verified.
+#   jenkins: the ciexecutor port exists but NO Jenkins provider exists yet. The id dev.numinance.official/jenkins is
+#   a placeholder taken from the design examples; nothing resolves it, and validation does not check that a provider is installed.
+#
+# The adapter schema binds ONE ciexecutor per scope, so with both CI systems selected the binding below is the one that
+# takes effect: github-actions, the only CI provider that exists.
+# The organization policy repository also grants the Jenkins binding (AdapterSelector ci-jenkins), so a repository can
+# switch to it by editing the ciexecutor line below; two ciexecutor bindings at once are not possible yet.
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.11]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+##### organization policy repository
+=== .numinance/README.md ===
+# .numinance (organization policy repository)
+
+Written by `numi init --org-dir`. Org-scoped documents: the stage registry `pr-only`, the playbook and toolchain
+definitions, the grants of an SDLCProfile and the autonomy floors (a ceiling of PR for every change, SUGGEST for HIGH
+risk). Only the org scope sets these. Protect `.numinance/policy/**` on the default branch. Read it with
+`numi validate --org THIS_DIR REPOSITORY` (engine build).
+
+The kernel floors of the Numinance engine are always on and no document here can weaken them.
+=== .numinance/policy/autonomy.yaml ===
+# AutonomyPolicy "pr-only", written by "numi init". The ladder level is AUTONOMY_LEVEL_PR: the agent may open pull requests
+# and may never merge. (PR_ONLY is a breaker state of the engine, not a ladder level; this document is the ladder side.)
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: pr-only, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  # Floors are a ceiling and only the org scope may set them. A floor matches the risk class it names and every higher
+  # one, and a match may not be empty, so risk READ (the lowest class) makes the PR cap apply to every change.
+  # HIGH risk stays at SUGGEST, the engine's own shipped floor for it.
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {risk: RISK_CLASS_READ}, max_level: AUTONOMY_LEVEL_PR}
+=== .numinance/policy/ci-jenkins.yaml ===
+# Written by "numi init --org-dir" when both CI systems are selected. An AdapterSelector of the org scope grants the
+# Jenkins binding: a repository may select it as its ciexecutor. It is a grant only and is not bound today: the profiles
+# (sdlc-profile.yaml of the org and of the repository) bind GitHub Actions and are applied after this one, because one
+# ciexecutor binding is possible per scope. A repository could rebind to this placeholder by a one-line edit of its profile;
+# that is the operator's explicit edit, and validate does not check that a provider is installed.
+#
+# The provider id is a placeholder from the design examples. There is NO Jenkins ciexecutor provider yet; when one exists,
+# an on-prem Jenkins server needs an egress allow-list entry for its host and a credential handle from the broker.
+apiVersion: numinance.dev/v1
+kind: AdapterSelector
+metadata: {name: ci-jenkins, scope: SCOPE_ORG}
+spec:
+  ports:
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: jenkins-onprem}
+=== .numinance/policy/playbook-bugfix-bounded.yaml ===
+# Playbook "bugfix-bounded", written by "numi init": a bounded bug fix that ends in a pull request. The verifier names are
+# the ones of the LanguageToolchain python-3.11.
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: bugfix-bounded, scope: SCOPE_ORG}
+spec:
+  change_type: bugfix
+  steps:
+    - {name: fix, capability_set: scm-write, risk: RISK_CLASS_LOW, evidence: [diff], verifiers: [lint, typecheck]}
+    - {name: open-pr, capability_set: scm-pr, risk: RISK_CLASS_MEDIUM, evidence: [pr-ref], rehearse: false}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+=== .numinance/policy/sdlc-profile.yaml ===
+# SDLCProfile of the organization policy repository, written by "numi init --org-dir". Only the org scope selects the
+# stage registry and grants playbook and toolchain names to repositories; a repository profile that asks for a name that
+# is not granted here gets it recorded as "outside the org-granted set" and not applied. The same holds for an adapter
+# binding: a repository may select only a binding (port, provider, instance) that an org document binds.
+#
+# CI: github-actions and jenkins. The ciexecutor binding below is the one of ci-github-actions.
+# No Jenkins provider exists yet; dev.numinance.official/jenkins is a placeholder id from the design examples.
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: org-baseline, scope: SCOPE_ORG}
+spec:
+  stages: pr-only
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.11]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+=== .numinance/policy/stage-registry.yaml ===
+# StageRegistry "pr-only", written by "numi init": the stage names of this repository mapped onto the fixed Change state
+# machine. The registry names no stage for the Merging state, so no stage of it can merge; the last stage is the human
+# pr-gate. Each CI system has its own verify stage. Only the org scope selects a registry
+# (SDLCProfile.stages), so below the org this registry is defined but not selected.
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: pr-only, scope: SCOPE_ORG}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    # Static checks run by the verifier provider on the candidate.
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+    # GitHub Actions: runs the repository's own workflow through the ciexecutor port.
+    - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+    # Jenkins: the ciexecutor port exists, no Jenkins provider exists yet (placeholder id).
+    - {name: ci-jenkins, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+    - name: pr-gate
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: maintainer
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        required_approvals: 1
+      requires: [ci-github-actions, ci-jenkins]
+=== .numinance/policy/toolchain-python.yaml ===
+# LanguageToolchain for Python, written by "numi init". The toolchain is explicit: language, version, package manager and
+# the verifier set are the values chosen by the flags of "numi init" or detected in the repository; edit them here.
+# The verifier provider takes the check to run in "config.check". It may also take "settings", the text of the tool's own
+# settings file (ruff.toml, mypy.ini, pytest.ini); it never reads settings files of the candidate.
+apiVersion: numinance.dev/v1
+kind: LanguageToolchain
+metadata: {name: python-3.11, scope: SCOPE_ORG}
+spec:
+  language: python
+  version: "3.11"
+  verifiers:
+    - {name: lint, provider: dev.numinance.verifier-python, config: {check: ruff, timeout_seconds: 60}}
+    - {name: typecheck, provider: dev.numinance.verifier-python, config: {check: mypy, timeout_seconds: 120}}
+  package_manager: poetry

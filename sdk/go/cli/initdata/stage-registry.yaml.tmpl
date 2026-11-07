@@ -1,0 +1,26 @@
+# StageRegistry "pr-only", written by "numi init": the stage names of this repository mapped onto the fixed Change state
+# machine. The registry names no stage for the Merging state, so no stage of it can merge; the last stage is the human
+# pr-gate. Each CI system has its own verify stage. Only the org scope selects a registry
+# (SDLCProfile.stages), so below the org this registry is defined but not selected.
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: pr-only, scope: {{.Scope}}}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    # Static checks run by the verifier provider on the candidate.
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+{{- range .CI}}
+    # {{.Comment}}
+    - {name: {{.Stage}}, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+{{- end}}
+    - name: pr-gate
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: maintainer
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        required_approvals: 1
+      requires: [{{.CIStageList}}]

@@ -1,0 +1,14 @@
+# Written by "numi init --org-dir" when both CI systems are selected. An AdapterSelector of the org scope grants the
+# Jenkins binding: a repository may select it as its ciexecutor. It is a grant only and is not bound today: the profiles
+# (sdlc-profile.yaml of the org and of the repository) bind GitHub Actions and are applied after this one, because one
+# ciexecutor binding is possible per scope. A repository could rebind to this placeholder by a one-line edit of its profile;
+# that is the operator's explicit edit, and validate does not check that a provider is installed.
+#
+# The provider id is a placeholder from the design examples. There is NO Jenkins ciexecutor provider yet; when one exists,
+# an on-prem Jenkins server needs an egress allow-list entry for its host and a credential handle from the broker.
+apiVersion: numinance.dev/v1
+kind: AdapterSelector
+metadata: {name: ci-jenkins, scope: SCOPE_ORG}
+spec:
+  ports:
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: jenkins-onprem}

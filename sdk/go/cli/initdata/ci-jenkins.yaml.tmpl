@@ -1,0 +1,12 @@
+# NOT IN EFFECT. The adapter schema binds one ciexecutor per scope, and the binding of this repository is in
+# policy/sdlc-profile.yaml. This file records the Jenkins binding for the day the engine can bind a second ciexecutor
+# instance. It is outside policy/ on purpose: a document without authority is only listed as ignored.
+#
+# The provider id is a placeholder from the design examples. There is NO Jenkins ciexecutor provider yet; when one exists,
+# an on-prem Jenkins server needs an egress allow-list entry for its host and a credential handle from the broker.
+apiVersion: numinance.dev/v1
+kind: AdapterSelector
+metadata: {name: ci-jenkins, scope: SCOPE_REPO}
+spec:
+  ports:
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: jenkins-onprem}

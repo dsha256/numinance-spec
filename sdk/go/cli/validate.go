@@ -182,7 +182,7 @@ func (v Validate) parse(args []string) (req Request, asJSON bool, code int) {
 	fs.StringVar(&req.OrgDir, "org", "", "")
 	fs.BoolVar(&asJSON, "json", false, "")
 	fs.BoolVar(&req.Files, "files", false, "")
-	flagArgs, paths := splitArgs(args)
+	flagArgs, paths := splitArgs(args, validateTakesValue)
 	if err := fs.Parse(flagArgs); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			_, _ = io.WriteString(v.Stdout, usageText)
@@ -215,14 +215,16 @@ func (v Validate) parse(args []string) (req Request, asJSON bool, code int) {
 	return req, asJSON, proceed
 }
 
-// takesValue reports whether the named flag takes its value as the next argument.
-func takesValue(name string) bool { return name == "rev" || name == "component" || name == "org" }
+// validateTakesValue reports whether the named flag of validate takes its value as the next argument.
+func validateTakesValue(name string) bool {
+	return name == "rev" || name == "component" || name == "org"
+}
 
 // splitArgs separates flags (with their values) from paths, so flags may come
 // before or after a path. "--" ends flag parsing: everything after it is a
 // path, even if it starts with "-" or equals "--json". A value-taking flag
 // consumes the next argument whatever it looks like, including "--".
-func splitArgs(args []string) (flagArgs, paths []string) {
+func splitArgs(args []string, takesValue func(name string) bool) (flagArgs, paths []string) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {

@@ -1,0 +1,20 @@
+# LanguageToolchain for Python, written by "numi init". The toolchain is explicit: language, version, package manager and
+# the verifier set are the values chosen by the flags of "numi init" or detected in the repository; edit them here.
+# The verifier provider takes the check to run in "config.check". It may also take "settings", the text of the tool's own
+# settings file (ruff.toml, mypy.ini, pytest.ini); it never reads settings files of the candidate.
+{{- if .HasTests}}
+# unit-tests (pytest) runs candidate code, which the verifier provider refuses to do outside a nested sandbox that is not
+# built yet: today only the replaying build serves it, so a live run of unit-tests is UNAVAILABLE. lint and typecheck are
+# static and run.
+{{- end}}
+apiVersion: numinance.dev/v1
+kind: LanguageToolchain
+metadata: {name: python-{{.PythonVersion}}, scope: {{.Scope}}}
+spec:
+  language: python
+  version: "{{.PythonVersion}}"
+  verifiers:
+{{- range .Verifiers}}
+    - {name: {{.Name}}, provider: dev.numinance.verifier-python, config: {check: {{.Check}}, timeout_seconds: {{.Timeout}}}}
+{{- end}}
+  package_manager: {{.PackageManager}}

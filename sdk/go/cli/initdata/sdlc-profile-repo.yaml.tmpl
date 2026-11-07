@@ -1,0 +1,34 @@
+# SDLCProfile of this repository, written by "numi init". It binds the names defined in this tree
+# (or granted by the organization policy repository) to this repository.
+#
+# CI: {{.CIText}}
+{{- if .GitHub}}
+#   github-actions: the ciexecutor provider dev.numinance.ci-github-actions exists in the open plugins (replay and live builds).
+#   It starts a workflow_dispatch workflow that the repository already defines on its default branch
+#   (the README of that provider says what the workflow must declare). A live run is not yet verified.
+{{- end}}
+{{- if .Jenkins}}
+#   jenkins: the ciexecutor port exists but NO Jenkins provider exists yet. The id dev.numinance.official/jenkins is
+#   a placeholder taken from the design examples; nothing resolves it, and validation does not check that a provider is installed.
+{{- end}}
+{{- if .Both}}
+#
+# The adapter schema binds ONE ciexecutor per scope, so with both CI systems selected the binding below is the one that
+# takes effect: github-actions, the only CI provider that exists.
+{{- if .OrgMode}}
+# The organization policy repository also grants the Jenkins binding (AdapterSelector ci-jenkins), so a repository can
+# switch to it by editing the ciexecutor line below; two ciexecutor bindings at once are not possible yet.
+{{- else}}
+# The Jenkins binding is kept in ../ci-jenkins.yaml, outside policy/, so it carries no authority: validation lists it as
+# ignored, and it takes effect only when the engine can bind a second ciexecutor instance.
+{{- end}}
+{{- end}}
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-{{.PythonVersion}}]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: {{.PrimaryCI.Provider}}, instance: {{.PrimaryCI.Instance}}}

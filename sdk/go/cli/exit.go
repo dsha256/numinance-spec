@@ -79,6 +79,9 @@ func ExitCode(k Kind) int {
 type Error struct {
 	Kind Kind
 	Msg  string
+	// safe marks a message whose untrusted parts were already made printable by quote, so the printer must not
+	// escape it a second time.
+	safe bool
 }
 
 // Errorf returns an *Error of the given kind.
