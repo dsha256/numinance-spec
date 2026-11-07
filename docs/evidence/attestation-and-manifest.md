@@ -36,6 +36,7 @@ A change that ended `Closed` has an attestation, signed by the runner at Close, 
 | `canon_version` | integer | required | 1 |
 | `checkpoint_ref` | artifact | required | names the per-change checkpoint; the shipped writer sets `ref` to `checkpoints/<64 hex>.json`, a verifier requires a valid artifact whose `sha256` is the digest of the bytes of `attestation-checkpoint.json` |
 | `inclusion_proof` | inclusion proof | required | the head leaf under that checkpoint |
+| `postgres_transport` | string | optional | leaf field, added in 1.1.0: `verify-full` or `loopback-plaintext`, the weakest mode of the runner's Postgres connections; any other value does not decode (`attestation_invalid`); absent when the runner states nothing; it never changes the level |
 
 An artifact (a "Reference") is `{"ref": ..., "sha256": ...}`. Its `artifact_type` is outside the hashed form and is never decision-bearing. A "leaf field" has no source record: the signature, and the attestation leaf's inclusion proof, are all that bind it. The attestation covers the records from `first_sequence` to `last_sequence`. On a sealed chain the seal record that follows the terminal record is outside the range.
 

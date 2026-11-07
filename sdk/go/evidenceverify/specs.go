@@ -229,6 +229,7 @@ func attestationFields() []field {
 		uintf("canon_version", true, 1, 1),
 		objf("checkpoint_ref", true, artifactFields()),
 		objf("inclusion_proof", true, proofFields()),
+		str("postgres_transport", false, oneOf("verify-full", "loopback-plaintext")),
 	}
 }
 

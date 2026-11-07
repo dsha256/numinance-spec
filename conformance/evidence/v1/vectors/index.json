@@ -329,6 +329,16 @@
       "covers": [
         "level:failed",
         "exit:3",
+        "finding:attestation_invalid",
+        "rule:attestation-decode"
+      ],
+      "status": "shipped",
+      "vector": "attestation-postgres-transport-unknown"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
         "finding:attestation_mismatch",
         "rule:attestation-rederivation"
       ],

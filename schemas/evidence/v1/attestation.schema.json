@@ -62,7 +62,11 @@
     "signing_key_id": { "$ref": "#/$defs/digest" },
     "canon_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The checkpoint-family canonical-form version; 1 in evidence/v1." },
     "checkpoint_ref": { "$ref": "#/$defs/artifact" },
-    "inclusion_proof": { "$ref": "#/$defs/inclusionProof" }
+    "inclusion_proof": { "$ref": "#/$defs/inclusionProof" },
+    "postgres_transport": {
+      "enum": ["verify-full", "loopback-plaintext"],
+      "description": "Added in 1.1.0. How the runner's Postgres connections were configured: the weakest mode of its connections. Absent when the runner states nothing."
+    }
   },
   "$defs": {
     "digest": {

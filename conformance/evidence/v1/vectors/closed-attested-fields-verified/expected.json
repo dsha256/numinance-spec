@@ -1,6 +1,6 @@
 {
   "vector": "closed-attested-fields-verified",
-  "description": "An attestation with every leaf field sourced: ticket reference and digest, a published result commit, a CI run, the toolchain digest, the broker scope lines with their digest line, and the network policy reference.",
+  "description": "An attestation with every leaf field sourced: ticket reference and digest, a published result commit, a CI run, the toolchain digest, the broker scope lines with their digest line, the network policy reference and the Postgres transport mode of the runner (loopback-plaintext).",
   "status": "shipped",
   "export": "closed-attested-fields",
   "flags": {
