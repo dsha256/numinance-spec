@@ -74,7 +74,7 @@ class TicketingServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def SearchIssues(self, request, context):
-        """SearchIssues lists the issues of one project whose title or body contains the text, optionally in one state category, at most max_results of them, in the tracker's order. The text is a parameter: a provider matches it as plain text and never splices it into a query string or a query language, so text that looks like a JQL clause matches only an issue that contains those characters. Query languages are the capability ticketing.query_language, not this verb. Results are untrusted data.
+        """SearchIssues lists the issues of one project whose title or body contains the text, optionally in one state category, at most max_results of them, in the tracker's order. The text is a parameter: a provider matches it as plain text and never splices it into a query string or a query language, so text that looks like a JQL clause matches only an issue that contains those characters. Query languages are the capability ticketing.query_language, not this verb. Results are untrusted data. A project the credential may not use and a project that does not exist are one answer: NOT_FOUND with the one fixed message of the not-found paragraph, never PERMISSION_DENIED, so a search is not an oracle for the existence of a project.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

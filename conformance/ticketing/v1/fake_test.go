@@ -2,10 +2,12 @@ package ticketingkit_test
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -91,8 +93,22 @@ func fail(reason pluginv1.Reason, msg string) error {
 
 // invalid is the one INVALID_ARGUMENT of the fake. The conforming fake never names the offending value.
 func (p *fake) invalid(vals ...string) error {
-	if p.has("rejection-echoes-value") {
-		return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request: "+strings.Join(vals, " "))
+	joined := strings.Join(vals, " ")
+	parts := make([]string, 0, len(vals))
+	for _, v := range vals {
+		parts = append(parts, string([]rune(v)[:min(4, len([]rune(v)))]))
+	}
+	switch {
+	case p.has("rejection-echoes-value"):
+		return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request: "+joined)
+	case p.has("rejection-echoes-encoded"):
+		return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request: "+strconv.Quote(joined))
+	case p.has("rejection-echoes-casefolded"):
+		return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request: "+strings.ToLower(joined))
+	case p.has("rejection-echoes-base64"):
+		return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request: "+base64.RawURLEncoding.EncodeToString([]byte(joined)))
+	case p.has("rejection-echoes-partial"):
+		return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request: "+strings.Join(parts, " "))
 	}
 	return fail(pluginv1.Reason_REASON_INVALID_ARGUMENT, "invalid request")
 }
@@ -174,10 +190,17 @@ func (p *fake) find(verb, project, key string) (*fixtureIssue, error) {
 	}
 	switch {
 	case found == nil:
+		if p.has("dry-missing-message") && verb == "transition-dry" {
+			return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, "no such issue")
+		}
 		return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, msg)
 	case found.Hidden || p.isForbidden(found.Project):
 		forbiddenProject := p.isForbidden(found.Project)
 		switch {
+		case p.has("dry-forbidden-oracle") && verb == "transition-dry" && forbiddenProject:
+			return nil, fail(pluginv1.Reason_REASON_PERMISSION_DENIED, "permission denied")
+		case p.has("dry-forbidden-message") && verb == "transition-dry" && forbiddenProject:
+			return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, "forbidden project")
 		case p.has("comment-forbidden-allowed") && verb == "comment" && forbiddenProject:
 			return found, nil
 		case p.has("comment-forbidden-denied") && verb == "comment" && forbiddenProject,
@@ -195,7 +218,7 @@ func (p *fake) find(verb, project, key string) (*fixtureIssue, error) {
 		}
 		return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, msg)
 	case found.Project != project && !p.has("ignore-project"):
-		if p.has("moved-message") {
+		if p.has("moved-message") || (p.has("dry-moved-message") && verb == "transition-dry") {
 			return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, "moved")
 		}
 		return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, msg)
@@ -254,6 +277,19 @@ func (p *fake) SearchIssues(_ context.Context, _ ticketingkit.Options, r *ticket
 	if p.has("ignore-max-results") {
 		limit = 1000
 	}
+	// A project the credential may not use and a project that does not exist are one answer.
+	exists := false
+	for _, is := range p.issues {
+		exists = exists || is.Project == r.GetProject()
+	}
+	switch {
+	case p.isForbidden(r.GetProject()) && p.has("search-forbidden-oracle"):
+		return nil, fail(pluginv1.Reason_REASON_PERMISSION_DENIED, "permission denied")
+	case p.isForbidden(r.GetProject()) && p.has("search-forbidden-message"):
+		return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, "forbidden project")
+	case p.isForbidden(r.GetProject()), !exists && !p.has("search-missing-empty"):
+		return nil, fail(pluginv1.Reason_REASON_NOT_FOUND, notFoundMessage)
+	}
 	text := strings.ToLower(r.GetText())
 	spliced := p.has("splice-query") && strings.Contains(text, " or ")
 	var hits []*fixtureIssue
@@ -275,22 +311,47 @@ func (p *fake) SearchIssues(_ context.Context, _ ticketingkit.Options, r *ticket
 		if is.Hidden && p.has("search-counts-hidden") {
 			continue
 		}
-		resp.Issues = append(resp.Issues, &ticketingv1.IssueSummary{IssueKey: is.Key, Title: p.strip(is.Title, false), State: p.state[is.Key]})
+		title := p.strip(is.Title, false)
+		if p.has("search-raw-title") {
+			title = is.Title
+		}
+		resp.Issues = append(resp.Issues, &ticketingv1.IssueSummary{IssueKey: is.Key, Title: title, State: p.state[is.Key]})
 	}
 	return resp, nil
 }
 
 // evidence is the record of a write: the verb, the project, the key and the result, and never a title or a body.
-func (p *fake) evidence(o ticketingkit.Options, verb, project, key, result, leak string) []ticketingkit.Evidence {
+func (p *fake) evidence(o ticketingkit.Options, verb, project, key, result, leak, title string) []ticketingkit.Evidence {
 	if o.DryRun || p.has("no-evidence") {
 		return nil
 	}
 	p.next++
 	id := fmt.Sprintf("ev_%d", p.next)
-	if p.has("evidence-carries-body") {
+	fields := []string{"verb=" + verb, "project=" + project, "key=" + key, "result=" + result}
+	switch {
+	case p.has("evidence-carries-body"):
 		id += ":" + leak
+	case p.has("evidence-prefix"):
+		id = alnumPrefix(leak, 6) + "-" + id
+	case p.has("evidence-title-prefix"):
+		id = alnumPrefix(title, 5) + id
+	case p.has("evidence-extra-field"):
+		fields = append(fields, "note=ok")
+	case p.has("evidence-wrong-key"):
+		fields[2] = "key=" + project
 	}
-	return []ticketingkit.Evidence{{Type: ticketingkit.EvidenceType, ID: id, Fields: []string{"verb=" + verb, "project=" + project, "key=" + key, "result=" + result}}}
+	return []ticketingkit.Evidence{{Type: ticketingkit.EvidenceType, ID: id, Fields: fields}}
+}
+
+// alnumPrefix is the first n letters and digits of s.
+func alnumPrefix(s string, n int) string {
+	var b strings.Builder
+	for _, r := range s {
+		if b.Len() < n && (unicode.IsLetter(r) || unicode.IsDigit(r)) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 func (p *fake) CommentOnIssue(_ context.Context, o ticketingkit.Options, r *ticketingv1.CommentOnIssueRequest) (*ticketingv1.CommentOnIssueResponse, []ticketingkit.Evidence, error) {
@@ -323,7 +384,7 @@ func (p *fake) CommentOnIssue(_ context.Context, o ticketingkit.Options, r *tick
 			}
 		}
 	}
-	return &ticketingv1.CommentOnIssueResponse{CommentId: id, Existing: existing}, p.evidence(o, "comment", is.Project, is.Key, id, r.GetBody()), nil
+	return &ticketingv1.CommentOnIssueResponse{CommentId: id, Existing: existing}, p.evidence(o, "comment", is.Project, is.Key, id, r.GetBody(), is.Title), nil
 }
 
 // LastComment implements ticketingkit.Observer.
@@ -356,21 +417,29 @@ func (p *fake) TransitionIssue(_ context.Context, o ticketingkit.Options, r *tic
 	}
 	prev := p.state[is.Key]
 	resp := &ticketingv1.TransitionIssueResponse{Previous: prev, State: r.GetTarget(), Changed: prev != r.GetTarget()}
-	result := r.GetTarget().String()
+	result := strings.TrimPrefix(r.GetTarget().String(), "ISSUE_STATE_CATEGORY_")
 	if !resp.Changed {
-		return resp, p.evidence(o, "transition", is.Project, is.Key, result, is.Title), nil
+		return resp, p.evidence(o, "transition", is.Project, is.Key, result, is.Title, is.Title), nil
 	}
 	reachable := false
 	for _, c := range is.Reachable {
 		reachable = reachable || category(c) == r.GetTarget()
 	}
 	if !reachable && !p.has("silent-unreachable") {
+		switch {
+		case p.has("conflict-echo"):
+			return nil, nil, fail(pluginv1.Reason_REASON_CONFLICT, fmt.Sprintf("cannot move %s %s", is.Key, is.Title))
+		case p.has("conflict-dry-differs") && o.DryRun:
+			return nil, nil, fail(pluginv1.Reason_REASON_CONFLICT, "no transition reaches the category (dry run)")
+		case p.has("conflict-quoted"):
+			return nil, nil, fail(pluginv1.Reason_REASON_CONFLICT, "no transition reaches "+strconv.Quote(r.GetTarget().String()))
+		}
 		return nil, nil, fail(pluginv1.Reason_REASON_CONFLICT, "no transition reaches the category")
 	}
 	if !o.DryRun || p.has("dry-run-mutates") {
 		p.state[is.Key] = r.GetTarget()
 	}
-	return resp, p.evidence(o, "transition", is.Project, is.Key, result, is.Title), nil
+	return resp, p.evidence(o, "transition", is.Project, is.Key, result, is.Title, is.Title), nil
 }
 
 func (p *fake) LinkIssue(_ context.Context, o ticketingkit.Options, r *ticketingv1.LinkIssueRequest) (*ticketingv1.LinkIssueResponse, []ticketingkit.Evidence, error) {
@@ -396,5 +465,5 @@ func (p *fake) LinkIssue(_ context.Context, o ticketingkit.Options, r *ticketing
 	k := blocker.Key + ">" + blocked.Key
 	existing := p.links[k] && !p.has("link-twice")
 	p.links[k] = true
-	return &ticketingv1.LinkIssueResponse{Existing: existing}, p.evidence(o, "link", blocker.Project, blocker.Key, blocked.Key, blocker.Title), nil
+	return &ticketingv1.LinkIssueResponse{Existing: existing}, p.evidence(o, "link", blocker.Project, blocker.Key, blocked.Key, blocker.Title, blocker.Title), nil
 }

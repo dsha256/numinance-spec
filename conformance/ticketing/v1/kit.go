@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
@@ -77,8 +78,11 @@ type Subject struct {
 	// Long is an issue whose body is at least 64 bytes and holds a multi-byte character within its first 32 bytes.
 	Long string
 	// Dirty is an issue whose raw text in the tracker holds control, bidirectional and zero-width characters in its
-	// title, body, type, a label and an operation id.
+	// title, body, type, a label and an operation id. It is also an OPEN issue of Project that SearchText matches (through
+	// its title), so that a search summary is checked for the same stripping as GetIssue.
 	Dirty string
+	// MissingProject is a well-formed project that does not exist; empty means "kitnoproject".
+	MissingProject string
 	// Moved was a key of Project and is now an issue of OtherProject, under the same key there.
 	Moved string
 	// Hidden exists but the credential may not see it; Missing does not exist.
@@ -320,6 +324,24 @@ func t007(ctx context.Context, s Subject) error {
 			return fmt.Errorf("issue %s: the body holds %U, which a provider strips", key, bad)
 		}
 	}
+	// The summary of a search hit is stripped and bounded like the title of GetIssue.
+	res, err := search(ctx, s, s.SearchText, 50)
+	if err != nil {
+		return err
+	}
+	seen := false
+	for _, h := range res.GetIssues() {
+		if err := ValidateSummary(h); err != nil {
+			return fmt.Errorf("search hit %s: %w", h.GetIssueKey(), err)
+		}
+		if bad, ok := forbidden(h.GetTitle(), false); ok {
+			return fmt.Errorf("the search hit %s has a title that holds %U, which a provider strips", h.GetIssueKey(), bad)
+		}
+		seen = seen || h.GetIssueKey() == s.Dirty
+	}
+	if !seen {
+		return fmt.Errorf("a search for %q did not return %s, the dirty fixture issue: the subject must hold one that SearchText matches", s.SearchText, s.Dirty)
+	}
 	return nil
 }
 
@@ -337,21 +359,20 @@ func t008(ctx context.Context, s Subject) error {
 func t009(ctx context.Context, s Subject) error {
 	badProjects := []string{"", "../x", "a b", "-a", strings.Repeat("a", 101)}
 	badKeys := []string{"", "PAY 1", "PAY#1", "-1", strings.Repeat("a", 65)}
+	secrets := s.secrets(s.Project, s.Found)
 	for _, p := range badProjects {
-		_, err := get(ctx, s, p, s.Found, small)
-		if e := wantReason(err, pluginv1.Reason_REASON_INVALID_ARGUMENT); e != nil {
+		if e := wantInvalidTwin(func(v string) error { _, err := get(ctx, s, v, s.Found, small); return err }, p, secrets...); e != nil {
 			return fmt.Errorf("project %q: %w", p, e)
 		}
 	}
 	for _, k := range badKeys {
-		_, err := get(ctx, s, s.Project, k, small)
-		if e := wantReason(err, pluginv1.Reason_REASON_INVALID_ARGUMENT); e != nil {
+		if e := wantInvalidTwin(func(v string) error { _, err := get(ctx, s, s.Project, v, small); return err }, k, secrets...); e != nil {
 			return fmt.Errorf("key %q: %w", k, e)
 		}
 	}
 	for _, m := range []uint32{0, maxBody + 1} {
 		_, err := get(ctx, s, s.Project, s.Found, m)
-		if e := wantReason(err, pluginv1.Reason_REASON_INVALID_ARGUMENT); e != nil {
+		if e := wantInvalid(err, strconv.FormatUint(uint64(m), 10), secrets...); e != nil {
 			return fmt.Errorf("max_body_bytes %d: %w", m, e)
 		}
 	}
@@ -363,14 +384,14 @@ func search(ctx context.Context, s Subject, text string, limit uint32) (*ticketi
 }
 
 func t010(ctx context.Context, s Subject) error {
+	secrets := s.secrets(s.Project, s.Found)
 	for _, m := range []uint32{0, 51} {
 		_, err := search(ctx, s, s.SearchText, m)
-		if e := wantReason(err, pluginv1.Reason_REASON_INVALID_ARGUMENT); e != nil {
+		if e := wantInvalid(err, strconv.FormatUint(uint64(m), 10), secrets...); e != nil {
 			return fmt.Errorf("max_results %d: %w", m, e)
 		}
 	}
-	_, err := search(ctx, s, strings.Repeat("a", 257), 10)
-	if e := wantReason(err, pluginv1.Reason_REASON_INVALID_ARGUMENT); e != nil {
+	if e := wantInvalidTwin(func(v string) error { _, err := search(ctx, s, v, 10); return err }, strings.Repeat("a", 257), secrets...); e != nil {
 		return fmt.Errorf("text of 257 bytes: %w", e)
 	}
 	two, err := search(ctx, s, s.SearchText, 2)
@@ -440,8 +461,8 @@ func t012(ctx context.Context, s Subject) error {
 
 func t013(ctx context.Context, s Subject) error {
 	for _, body := range []string{"", strings.Repeat("a", 8193)} {
-		_, _, err := comment(ctx, s, "kit-comment-bound", body)
-		if e := wantInvalid(err, body); e != nil {
+		call := func(v string) error { _, _, err := comment(ctx, s, "kit-comment-bound", v); return err }
+		if e := wantInvalidTwin(call, body, s.secrets(s.Project, s.Found)...); e != nil {
 			return fmt.Errorf("body of %d bytes: %w", len(body), e)
 		}
 	}
@@ -512,11 +533,17 @@ func t015(ctx context.Context, s Subject) error {
 	if err != nil {
 		return err
 	}
+	var conflicts []string
 	for _, dry := range []bool{true, false} {
 		_, _, err := transition(ctx, s, Options{DryRun: dry, Key: "kit-tr-stuck"}, s.TransitionStuck, s.UnreachableTarget)
-		if e := wantReason(err, pluginv1.Reason_REASON_CONFLICT); e != nil {
+		msg, e := conflict(err, s.secrets(s.Project, s.TransitionStuck)...)
+		if e != nil {
 			return fmt.Errorf("an unreachable category, dry run %v: %w", dry, e)
 		}
+		conflicts = append(conflicts, msg)
+	}
+	if conflicts[0] != conflicts[1] {
+		return fmt.Errorf("the dry run answered the conflict %q and the call %q, want one fixed message", conflicts[0], conflicts[1])
 	}
 	after, err := get(ctx, s, s.Project, s.TransitionStuck, small)
 	if err != nil {
@@ -527,7 +554,7 @@ func t015(ctx context.Context, s Subject) error {
 	}
 	for _, target := range []ticketingv1.IssueStateCategory{ticketingv1.IssueStateCategory_ISSUE_STATE_CATEGORY_UNSPECIFIED, 99} {
 		_, _, err := transition(ctx, s, Options{Key: "kit-tr-bad"}, s.TransitionOpen, target)
-		if e := wantReason(err, pluginv1.Reason_REASON_INVALID_ARGUMENT); e != nil {
+		if e := wantInvalid(err, strconv.Itoa(int(target)), s.secrets(s.Project, s.TransitionOpen)...); e != nil {
 			return fmt.Errorf("target %d: %w", target, e)
 		}
 	}
