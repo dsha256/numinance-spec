@@ -1,0 +1,222 @@
+// The ticketing port: reads and searches issues, comments on an issue, moves it to a state category and links one issue to another as blocking it. Any tracker that has projects, issues with a key, a title, a text body, a workflow of states, comments and issue links can implement every core verb (Jira, GitHub Issues, Linear, GitLab Issues, Azure Boards); a vendor feature beyond them is a capability `ticketing.<feature>` negotiated at handshake, added in a later minor. The query languages of the trackers (JQL, WIQL) are the capability `ticketing.query_language`, never a core field. There is no VendorCall in 1.x, because the host refuses a provider that does not declare every side-effecting RPC of its port, and an escape hatch no provider implements is a PRIVILEGED capability that does nothing. Custom fields and vendor filters are capabilities or typed extensions that the Engine never reads.
+// Callers: the change context calls GetIssue at intake through the plugin host and builds the ticket text of the Change from the validated fields; the Engine reconciles a retried write through GetIssue before it retries. The write verbs are reached only by a later write-back card and only under a policy decision, a redaction and a size cap. The host decides every call, on the exact request bytes, against the grant of the identity named in ActionContext. The port is never a model tool, and no tool_groups or scopes are declared.
+// Authority: every request names its project in `project`, which the Engine marks as the resource of the call (RFC-0002): a call on a project outside the acting grant's resource scope is denied before dispatch. LinkIssue names two projects and marks both. A provider holds no credential of its own: it asks the host for a credential handle for the intent its manifest declares and sends the handle to the egress proxy, never a raw token. A provider never follows a redirect with an injected credential and never fetches a URL found in ticket content or in a response (a media link, a self link, a pagination link, an inline card).
+// Untrusted answers: every title, body, type, label, operation id and key that the tracker holds is untrusted data, whoever wrote it on the tracker; anyone who can edit or comment on an issue can write any of them. The change context size-limits it, validates it against this file, stores it by digest and labels and delimits it as untrusted wherever it reaches a prompt, never as instructions. Nothing a provider answers changes policy, a grant, a risk class, an autonomy level, a tool list, a playbook choice or an approval: no field of an issue (label, type, priority, component, custom field) is mapped mechanically to any of them.
+// Text hygiene: a provider returns plain text. It renders the tracker's rich text (ADF, wiki markup, HTML, Markdown) to plain text and strips from every string it returns the control characters (Unicode category Cc, except a line feed U+000A and a tab U+0009 inside a body), the bidirectional controls (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) and the zero-width characters (U+200B to U+200D, U+2060, U+FEFF). The Engine repeats the strip, because the provider is the untrusted side, so a conforming provider returns none of them and a host never relies on that.
+// Not found and no permission: a provider answers NOT_FOUND, with the same status and the same message, for an issue that does not exist, for an issue the credential may not see, and for an issue whose current project is not the project the request names (an issue that moved answers only under its new project). The answer never tells which of the three it is, so the port is not an oracle for the existence of issues. The message never contains the key or any text the tracker returned.
+// Status codes: INVALID_ARGUMENT for a request that breaks a bound; NOT_FOUND as above; FAILED_PRECONDITION for a TransitionIssue whose target category no tracker transition reaches from the current state, and for a write the tracker refuses because of the issue's state; RESOURCE_EXHAUSTED when the tracker rate-limits the call; UNAVAILABLE for a tracker that cannot be reached or a transient failure the caller may retry. A provider never invents a result: an outage is an error, never an empty answer.
+// Evidence: every write verb (CommentOnIssue, TransitionIssue, LinkIssue) declares one record type, ticketing-action. A provider emits exactly one per call that made the change or found it already made, through HostService.EmitEvidence: a compact receipt of the verb, the project, the issue key and the result (the comment id, the categories before and after, the other key of the link), never a title, a body or a comment text. A call that ends SUCCEEDED without it is PARTIAL. A dry run changes nothing and emits none. The read verbs declare no evidence.
+// Reconciliation: the host's idempotency key names the operation, and a replay answers the first result. The Engine reconciles a write through GetIssue before it retries after a lost response. A provider that cannot key a write declares IDEMPOTENCY_NONE in its manifest, and a step that calls it needs a declared compensation or a human approval.
+// Bounds: every string is at most 1024 bytes unless stated; over-limit input is rejected, never truncated by the host; enums are closed, and zero and unknown numbers are rejected; a field unknown to the host's descriptor copy is rejected (plugin/v1 Invoke strict decoding). Printable means Unicode categories L, M, N, P, S and U+0020. A rejection names an index-based field path and the violated bound, never the offending value.
+// Formats: a project is the tracker's own spelling of a project: one or two segments separated by one '/', each matching ^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$ (a Jira project key is one segment, a GitHub `<owner>/<repo>` is two). No segment is empty, `.` or `..`, no `..` appears anywhere, and there is no control, white space or non-ASCII character, so a provider that puts a project into a REST path cannot be made to leave it; LinkIssue applies the grammar to both of its projects. An issue key is the tracker's own spelling of an issue within a project, matching ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$: it never contains a '/', is at most 64 bytes and never has a '#', so that the Engine can build a ticket reference `<binding instance>:<issue key>` that always fits. The Engine builds that reference; it never takes one from a URL a provider returns.
+// Every element is since 1.2.0: tag v0.2.0 shipped the 1.1.0 content, so 1.2.0 is the first unreleased spec minor.
+syntax = "proto3";
+
+package numinance.ports.ticketing.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+
+// TicketingService is the ticketing port an issue-tracker provider serves.
+service TicketingService {
+  // GetIssue returns one issue: its key, its title, its text body bounded by max_body_bytes with a truncated flag, its state category, its type and labels, and the operation ids recorded on it. It is also the reconciliation read of every write after a lost response. The project in the request is the resource of the call, and the issue must be in that project now: an issue that moved to another project is NOT_FOUND here. Every text field of the answer is untrusted. The operation ids are whatever anyone who could edit or comment on the issue wrote there: the Engine accepts one only if it equals the operation_id it computed itself for that Change, and trusts no other.
+  rpc GetIssue(GetIssueRequest) returns (GetIssueResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Returns one issue of a project: key, title, plain-text body, state category, type, labels and recorded operation ids."
+    };
+  }
+  // SearchIssues lists the issues of one project whose title or body contains the text, optionally in one state category, at most max_results of them, in the tracker's order. The text is a parameter: a provider matches it as plain text and never splices it into a query string or a query language, so text that looks like a JQL clause matches only an issue that contains those characters. Query languages are the capability ticketing.query_language, not this verb. Results are untrusted data.
+  rpc SearchIssues(SearchIssuesRequest) returns (SearchIssuesResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Searches the issues of a project for a text, optionally in one state category."
+    };
+  }
+  // CommentOnIssue adds one plain-text comment, identified by the host's key: a replay answers the first comment and adds none (the provider finds its earlier comment by a marker derived from the key). LOW: a comment changes no workflow and no code, though everyone who can see the issue can read it, so the caller must redact and size-cap the text and consider the audience before it calls; the risk class does not carry that. No dry run: the comment is the whole effect, and a dry run would be the call. No compensating action: this port has no verb that removes a comment, and a correction is a further comment.
+  rpc CommentOnIssue(CommentOnIssueRequest) returns (CommentOnIssueResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      evidence: "ticketing-action"
+      since: "1.2.0"
+      llm_description: "Adds one plain-text comment to an issue."
+    };
+  }
+  // TransitionIssue moves an issue to a target state category (OPEN, IN_PROGRESS, DONE or CANCELED). The provider chooses the tracker's own transition that reaches the category; when none does from the current state, the answer is FAILED_PRECONDITION and nothing changes. An issue already in the target category answers done (changed false). MEDIUM: a transition fires the customer's workflow automations, which can notify people, start builds or close related work. Dry run checks that a transition to the target category is available and changes nothing; its answer is the one the call would give. The response carries the category before the call, and the compensating action is a TransitionIssue back to that category.
+  rpc TransitionIssue(TransitionIssueRequest) returns (TransitionIssueResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_MEDIUM
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "TicketingService.TransitionIssue"
+      evidence: "ticketing-action"
+      since: "1.2.0"
+      llm_description: "Moves an issue to a target state category: open, in progress, done or canceled."
+    };
+  }
+  // LinkIssue makes an issue-to-issue link of type BLOCKS: the issue named first blocks the issue named second. An existing link of the same type between the same two issues answers done (existing true). LOW: a link changes no workflow state and no text. No dry run: the link is the whole effect and its creation is the check of both keys. No compensating action: this port has no verb that removes a link. Other link types, parent and child links and remote URL links are later additive enum values or capabilities.
+  rpc LinkIssue(LinkIssueRequest) returns (LinkIssueResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      evidence: "ticketing-action"
+      since: "1.2.0"
+      llm_description: "Links one issue as blocking another."
+    };
+  }
+}
+
+// IssueStateCategory is the closed, vendor-neutral category of an issue's workflow state. A provider maps the tracker's own statuses to one of them; the name of the tracker's status is not part of the port.
+enum IssueStateCategory {
+  // Zero value; rejected in a request and never returned.
+  ISSUE_STATE_CATEGORY_UNSPECIFIED = 0;
+  // Not started: backlog, to do, new.
+  ISSUE_STATE_CATEGORY_OPEN = 1;
+  // Being worked on, including in review.
+  ISSUE_STATE_CATEGORY_IN_PROGRESS = 2;
+  // Finished as intended: done, resolved, closed as completed.
+  ISSUE_STATE_CATEGORY_DONE = 3;
+  // Finished without being done: canceled, won't do, duplicate.
+  ISSUE_STATE_CATEGORY_CANCELED = 4;
+}
+
+// IssueLinkType is the closed type of an issue-to-issue link.
+enum IssueLinkType {
+  // Zero value; rejected in a request and never returned.
+  ISSUE_LINK_TYPE_UNSPECIFIED = 0;
+  // The first issue blocks the second.
+  ISSUE_LINK_TYPE_BLOCKS = 1;
+}
+
+// GetIssueRequest names an issue.
+message GetIssueRequest {
+  // Required: the project, in the project grammar. Marked as the resource of the call.
+  string project = 1 [(numinance.annotations.v1.field) = {since: "1.2.0", resource_name: true}];
+  // Required: the issue key, in the issue key grammar.
+  string issue_key = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required, 1 to 65536: the most body bytes to return.
+  uint32 max_body_bytes = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetIssueResponse is one issue.
+message GetIssueResponse {
+  // The issue key, equal to the one requested.
+  string issue_key = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The issue's project now, equal to the one requested.
+  string project = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The title as plain text, 1 to 1024 bytes, without a line feed or a tab; untrusted.
+  string title = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The description as plain text, at most max_body_bytes bytes, cut at a character boundary; untrusted.
+  string body = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the description is longer than max_body_bytes. A caller that needs the whole text refuses a truncated answer.
+  bool truncated = 5 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The state category of the issue now.
+  IssueStateCategory state = 6 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The tracker's issue type, for example Bug or Story, at most 128 printable bytes; untrusted. No decision rests on it.
+  string issue_type = 7 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The labels, at most 64, each 1 to 128 printable bytes; untrusted. No decision rests on them.
+  repeated string labels = 8 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The operation ids recorded on the issue by earlier writes, at most 64, each at most 128 printable bytes; untrusted. Anyone who can edit or comment on the issue can forge one: the Engine accepts one only if it equals the operation_id it computed itself for that Change.
+  repeated string operation_ids = 9 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// SearchIssuesRequest asks for issues of one project.
+message SearchIssuesRequest {
+  // Required: the project, in the project grammar. Marked as the resource of the call.
+  string project = 1 [(numinance.annotations.v1.field) = {since: "1.2.0", resource_name: true}];
+  // The text to find, at most 256 printable bytes, matched as plain text and never as a query; empty matches every issue of the project.
+  string text = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Only issues in this category; the unspecified value means any.
+  IssueStateCategory state = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required, 1 to 50: the most issues to return.
+  uint32 max_results = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// IssueSummary is one search hit.
+message IssueSummary {
+  // The issue key, in the issue key grammar.
+  string issue_key = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The title as plain text, as in GetIssueResponse; untrusted.
+  string title = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The state category of the issue now.
+  IssueStateCategory state = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// SearchIssuesResponse is the hits of a search.
+message SearchIssuesResponse {
+  // At most max_results hits, all in the requested project and, when set, the requested state category.
+  repeated IssueSummary issues = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the tracker holds more matches than were returned.
+  bool truncated = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// CommentOnIssueRequest is one comment.
+message CommentOnIssueRequest {
+  // Required: the project, in the project grammar. Marked as the resource of the call.
+  string project = 1 [(numinance.annotations.v1.field) = {since: "1.2.0", resource_name: true}];
+  // Required: the issue key, in the issue key grammar.
+  string issue_key = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required, 1 to 8192 bytes of plain text; a provider never interprets it as markup.
+  string body = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// CommentOnIssueResponse names the comment.
+message CommentOnIssueResponse {
+  // The tracker's id of the comment, 1 to 128 printable bytes; the same id for a replay under the same key.
+  string comment_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the comment already existed under this key and nothing was added.
+  bool existing = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// TransitionIssueRequest asks for a state category.
+message TransitionIssueRequest {
+  // Required: the project, in the project grammar. Marked as the resource of the call.
+  string project = 1 [(numinance.annotations.v1.field) = {since: "1.2.0", resource_name: true}];
+  // Required: the issue key, in the issue key grammar.
+  string issue_key = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: the category to move the issue to.
+  IssueStateCategory target = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// TransitionIssueResponse reports the move.
+message TransitionIssueResponse {
+  // The category before the call: the one a compensating TransitionIssue returns to.
+  IssueStateCategory previous = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The category after the call; on a dry run the category the call would leave, with nothing changed.
+  IssueStateCategory state = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the call changed the issue (on a dry run: would change it); false when the issue was already in the target category.
+  bool changed = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// LinkIssueRequest names the blocking issue and the blocked issue.
+message LinkIssueRequest {
+  // Required: the project of the first issue. Marked as the resource of the call.
+  string project = 1 [(numinance.annotations.v1.field) = {since: "1.2.0", resource_name: true}];
+  // Required: the key of the issue that blocks.
+  string issue_key = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: the project of the second issue. Marked as the resource of the call.
+  string blocked_project = 3 [(numinance.annotations.v1.field) = {since: "1.2.0", resource_name: true}];
+  // Required: the key of the issue that is blocked; not the same issue as issue_key.
+  string blocked_issue_key = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: the type of the link.
+  IssueLinkType link_type = 5 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// LinkIssueResponse reports the link.
+message LinkIssueResponse {
+  // True when the link already existed and nothing was added.
+  bool existing = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
