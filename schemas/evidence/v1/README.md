@@ -37,6 +37,10 @@ The schemas use only the keyword subset of the validator in `sdk/go/schema` (see
 
 A document that passes a schema is well shaped, not verified. Run an evidence verifier for that.
 
+## Receipt lines
+
+The outputs of a receipt record are strings of the `artifact` shape, so a schema cannot check the grammar of a `receipt/request/...` line. The verifier does (`docs/evidence/receipts.md`). The line has ten fields, or eleven when the last is the literal `injected` (added in 1.1.0); the schemas are unchanged.
+
 ## Tests
 
 `go test ./schemas/...` from `numinance-spec/` compiles every schema, resolves every `$ref`, validates every file of the verifying golden exports and every conformance vector against its schema, and checks that hand-made bad documents are rejected. Exports that are tampered on purpose are not validated.

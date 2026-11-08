@@ -1,6 +1,8 @@
 package evidenceverify
 
 import (
+	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 )
@@ -124,5 +126,71 @@ func TestRecordFields_AnUnknownActorKindFailsAndTheKnownReceiptKindsPass(t *test
 	}
 	if _, err := decodeRecord(line("runner")); err != nil {
 		t.Errorf("decodeRecord(runner) = %v, want it accepted", err)
+	}
+}
+
+// requestBatch is a request receipt with one request line.
+func requestBatch(line string) *record {
+	r := goodRequests()
+	r.outputs = []artifact{marker("receipt/epoch/1793958000000000000"), marker("receipt/request/" + line)}
+	return r
+}
+
+// TestCheckReceiptRules_RequestLineInjectedMarker pins the injected marker (ADR 0059): ten fields, or eleven when the last is
+// the literal injected on a line whose handle is a ref. It fails if the verifier takes exactly ten fields.
+func TestCheckReceiptRules_RequestLineInjectedMarker(t *testing.T) {
+	const head = "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/"
+	tests := []struct {
+		name    string
+		line    string
+		wantErr bool
+	}{
+		{"ten fields with a handle ref", head + "nhref_0123456789ab", false},
+		{"ten fields with none", head + "none", false},
+		{"allow with injected", head + "nhref_0123456789ab/injected", false},
+		{"deny with injected", "1/deny/quota/write/443/inv_x/api.github.com/403/0/nhref_0123456789ab/injected", false},
+		{"allow with injected and none", head + "none/injected", true},
+		{"deny with injected and none", "1/deny/quota/write/443/inv_x/api.github.com/403/0/none/injected", true},
+		{"empty eleventh", head + "nhref_0123456789ab/", true},
+		{"capitalised eleventh", head + "nhref_0123456789ab/Injected", true},
+		{"other eleventh", head + "nhref_0123456789ab/plain", true},
+		{"twelfth field", head + "nhref_0123456789ab/injected/injected", true},
+		{"nine fields", "1/allow/allow_list/write/443/inv_x/api.github.com/201/12", true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := checkReceiptRules(requestBatch(tc.line)); (err != nil) != tc.wantErr {
+				t.Errorf("checkReceiptRules(%q) = %v, want an error: %v", tc.line, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestCheckReceiptRules_RequestLineVectors runs the hand-written line vectors of the conformance kit through the receipt rules,
+// so the kit and the verifier cannot drift.
+func TestCheckReceiptRules_RequestLineVectors(t *testing.T) {
+	b, err := os.ReadFile("../../../conformance/evidence/v1/receipt-request-lines.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f struct {
+		Cases []struct {
+			Name  string `json:"name"`
+			Line  string `json:"line"`
+			Valid bool   `json:"valid"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(b, &f); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Cases) < 12 {
+		t.Fatalf("the kit holds %d cases, want at least 12", len(f.Cases))
+	}
+	for _, c := range f.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			if err := checkReceiptRules(requestBatch(c.Line)); (err == nil) != c.Valid {
+				t.Errorf("checkReceiptRules(%q) = %v, want valid: %v", c.Line, err, c.Valid)
+			}
+		})
 	}
 }

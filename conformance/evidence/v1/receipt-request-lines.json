@@ -1,0 +1,21 @@
+{
+  "description": "Request lines of a NetworkRequests.v1 receipt (docs/evidence/receipts.md, section 1 and rule 12 of records-and-chain.md). Hand-written; the vector generator of the reference implementation does not own this file. A line is the text after receipt/request/. A ten-field line is valid in every spec version. The eleven-field form with the literal injected is added in 1.1.0 (ADR 0059): a verifier of 1.1.0 or newer accepts it, an older one fails the record (record_invalid). Each case is a one-line request batch; valid cases pass the receipt rules, the others are record_invalid.",
+  "since": "1.1.0",
+  "cases": [
+    {"name": "ten fields, allow, handle ref (unchanged)", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab", "valid": true},
+    {"name": "ten fields, deny, handle none (unchanged)", "line": "1/deny/not_allowed/read/80/inv_07070707070707070707070707070707/h-0123456789abcdef/403/0/none", "valid": true},
+    {"name": "ten fields, allow, handle none (unchanged)", "line": "1/allow/allow_list/read/443/inv_07070707070707070707070707070707/api.github.com/200/5/none", "valid": true},
+    {"name": "injected on an allow line with a handle ref", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/injected", "valid": true},
+    {"name": "injected on a deny line with a handle ref", "line": "1/deny/quota/write/443/inv_07070707070707070707070707070707/api.github.com/403/0/nhref_0123456789ab/injected", "valid": true},
+    {"name": "injected with handle none on an allow line", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/none/injected", "valid": false},
+    {"name": "injected with handle none on a deny line", "line": "1/deny/quota/write/443/inv_07070707070707070707070707070707/api.github.com/403/0/none/injected", "valid": false},
+    {"name": "an empty eleventh field", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/", "valid": false},
+    {"name": "an eleventh token in another case", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/Injected", "valid": false},
+    {"name": "another eleventh token", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/plain", "valid": false},
+    {"name": "a longer eleventh token", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/injected2", "valid": false},
+    {"name": "a twelfth field", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/injected/injected", "valid": false},
+    {"name": "a twelfth empty field", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/injected/", "valid": false},
+    {"name": "nine fields", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12", "valid": false},
+    {"name": "injected on a line with a bad handle ref", "line": "1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nh_0123456789ab/injected", "valid": false}
+  ]
+}

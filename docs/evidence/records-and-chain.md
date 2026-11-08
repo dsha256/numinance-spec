@@ -58,7 +58,7 @@ A stored record MUST satisfy all of these, in addition to the strict decoding of
 9. `inputs` and `outputs` hold at most 1024 entries each and every artifact is valid.
 10. `signature` is empty or 64 bytes, and when set so are `signing_key_id` and `record_hash`.
 11. `lifecycle`, when present, is valid and only on the actions and the outcome above.
-12. A receipt action (`HandleIssued.v1`, `HandleRevoked.v1`, `NetworkRequests.v1`, `ReceiptsOverflow.v1`) and a component `actor_kind` (`broker`, `egress-proxy`) go together, and the outputs have the grammar of [receipts](receipts.md).
+12. A receipt action (`HandleIssued.v1`, `HandleRevoked.v1`, `NetworkRequests.v1`, `ReceiptsOverflow.v1`) and a component `actor_kind` (`broker`, `egress-proxy`) go together, and the outputs have the grammar of [receipts](receipts.md) (a request line has ten fields, or eleven with the `injected` marker added in 1.1.0).
 13. A `TrajectoryCompared.v1` record is the runner's succeeded record in the grammar of [trajectory](trajectory.md), its result agrees with its counts, and its `ev_id` is the one its change derives.
 
 Messages of a refusal never echo a field value; a verifier SHOULD NOT either.

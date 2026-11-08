@@ -15,6 +15,7 @@ keys/                       generated test public keys, one file each: 64 hex ch
 exports/<name>/             golden export directories, as a verifier is given them
 vectors/index.json          every vector, its status and what it covers
 vectors/<name>/expected.json   one vector: the export, the flags and what to expect
+receipt-request-lines.json  hand-written: request-line cases of a NetworkRequests.v1 receipt (not generated)
 ```
 
 The keys are public keys of generated test keys. No private key is stored, and none protects anything. A few key files are deliberately odd (`runner-uppercase.pub`, `runner-nbsp.pub`, `runner-oversize.pub`, `runner-short.pub`): they test how a key file is read, and the harness MUST read a key file as the shipped command does (a file over 1024 bytes is an error, never a truncated read).
@@ -69,6 +70,10 @@ A harness on a system without symbolic links may skip the vectors that use them 
 Each export under `exports/` is generated, deterministically, by the Numinance evidence code over in-memory adapters with fixed keys, fixed identifiers and a fixed clock. The base exports are verifying exports of a Closed change (`closed-basic`, `closed-complete`, `closed-sealed`, `closed-attested-fields`, `closed-ticket-none`, `closed-canon-unicode`, `closed-canon-timestamps`), an Abandoned, a RolledBack and an open (no terminal record) change, and a Closed change with an attestation gap. Every other export is one of them tampered in one stated way, with the index and the signed manifest rewritten or kept as the vector's description says. The generator is private; a vector's meaning is its `description` and its `expect`, not its generator.
 
 The log origin of every vector is `numinance.test/log`. The runner key is `keys/runner.pub` and the log key `keys/log.pub`; `keys/other-runner.pub` signs only the export `closed-basic-other-runner-key` (an attacker's chain); `keys/third-runner.pub` and `keys/other-log.pub` sign nothing in any export and stand for keys a caller pins by mistake.
+
+## Receipt request lines
+
+`receipt-request-lines.json` is written by hand and is not owned by the generator. Each case is one request line and whether the receipt rules accept it: the ten-field line (valid in every version), the eleven-field line with the literal `injected` (added in 1.1.0; valid on an `allow` and a `deny` line with a handle ref) and the lines that are `record_invalid` (`injected` with the handle `none`, an eleventh token other than `injected`, an empty or capitalised one, a twelfth field). The open verifier runs it in `receipts_test.go`. Export-level vectors that carry a receipt record are owed to the generator.
 
 ## What has no vector
 

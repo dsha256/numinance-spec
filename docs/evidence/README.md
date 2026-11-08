@@ -32,6 +32,8 @@ Machine-readable parts:
 - the `--json` fields `level_enum`, `weakened_by_flags` and `anchored_head_record_hash` and the flags `--expect-change` and `--expect-head` ([verification.md](verification.md), sections 6 and 8): implemented by the open verifier and by the reference implementation's own verifier;
 - the vectors of status `target`, which cover them.
 
+Added in spec 1.1.0 (the unreleased minor that also carries `postgres_transport`): the optional eleventh field `injected` of a `NetworkRequests.v1` request line ([receipts.md](receipts.md), section 1a). An export whose lines carry `injected` needs a verifier of 1.1.0 or newer; an older verifier refuses it with `record_invalid` (fail closed). Exports without the marker verify unchanged. The kit file `../../conformance/evidence/v1/receipt-request-lines.json` holds the line cases.
+
 ## The open verifier
 
 The open verifier is the Go package `../../sdk/go/evidenceverify` (standard library only, offline, read-only, size-bounded), and `numi evidence verify` in the open `numi` is a thin wrapper over it (`../../cli/README.md`). It was written from these pages, the schemas and the vectors only, and it passes every vector of `../../conformance/evidence/v1/`, those of status `target` included. It has no built-in trust root: it reaches `verified` only with runner keys, a log key and a log origin that the caller pins.

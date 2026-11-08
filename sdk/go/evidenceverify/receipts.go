@@ -13,13 +13,15 @@ import (
 // rules here are the shape of one record; they re-derive nothing from other records.
 
 const (
-	maxRequestLines   = 256
-	maxScopeLines     = 256
-	receiptRefPrefix  = "receipt/"
-	actionHandleIssue = "HandleIssued.v1"
-	actionHandleRevok = "HandleRevoked.v1"
-	actionRequests    = "NetworkRequests.v1"
-	actionOverflow    = "ReceiptsOverflow.v1"
+	maxRequestLines = 256
+	maxScopeLines   = 256
+	// requestInjectedMarker is the optional eleventh field of a request line: the proxy selected a rule-bound injection.
+	requestInjectedMarker = "injected"
+	receiptRefPrefix      = "receipt/"
+	actionHandleIssue     = "HandleIssued.v1"
+	actionHandleRevok     = "HandleRevoked.v1"
+	actionRequests        = "NetworkRequests.v1"
+	actionOverflow        = "ReceiptsOverflow.v1"
 )
 
 var (
@@ -151,6 +153,14 @@ func checkRequestReceipt(r *record, kv map[string]string, scopes int, requests [
 	var prev uint64
 	for _, raw := range requests {
 		f := strings.Split(raw, "/")
+		// Ten fields, or eleven when the last is the literal "injected" (added in 1.1.0, ADR 0059). Any other eleventh token
+		// (an empty one included), a twelfth field, or the marker with the handle "none" is outside the grammar.
+		if len(f) == 11 {
+			if f[10] != requestInjectedMarker || f[9] == "none" {
+				return errors.New("a request line is outside the grammar")
+			}
+			f = f[:10]
+		}
 		if len(f) != 10 || !positive(f[0]) {
 			return errors.New("a request line is outside the grammar")
 		}
