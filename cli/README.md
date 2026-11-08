@@ -105,7 +105,7 @@ Exactly one key mode is required (none, or two, is exit 2). There is no built-in
 
 Exit codes of `verify`: 0 a pass (with or without an allowance), 1 internal or cancel, 2 usage, 3 a report with a finding or a refused directory path, 4 the directory does not exist, 5 a consistent export weaker than `verified`, 7 an I/O error, 8 timeout. 6 is never produced. The full table, the finding codes and the level algorithm are in `docs/evidence/verification.md`.
 
-`numi evidence export` is not in the open build (an unknown subcommand, exit 2); the engine exports with `-evidence-export-dir` and the engine build's `numi` runs its own `verify` until a later release makes it delegate to the public package. No export leaves the project's own machines before the release ordering rule holds: the specification, the open verifier and a release tag exist, and the ticket, credential scopes and network policy of the export are sourced by their owners (see [verification.md](../docs/evidence/verification.md) section 10).
+`numi evidence export` is not in the open build (an unknown subcommand, exit 2); the engine exports with `-evidence-export-dir` and the engine build's `numi evidence verify` takes its verdict from the same public package (`sdk/go/evidenceverify`), so both builds give one answer. The release ordering rule ([verification.md](../docs/evidence/verification.md) section 10) is met as of release v0.2.0: the specification, the open verifier, parity and delegation are merged, a release tag exists, and the ticket, credential scopes and network policy of the export are sourced by their owners. Sharing an export remains the maintainers' decision.
 
 ## Engine build
 

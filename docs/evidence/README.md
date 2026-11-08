@@ -42,4 +42,4 @@ Section 11 of [verification.md](verification.md) lists the readings the vectors 
 
 ## What is not here
 
-No export leaves the project's own machines before the ordering rule of [verification.md](verification.md) section 10 holds.
+The ordering rule of [verification.md](verification.md) section 10 is met as of release v0.2.0 (specification, open verifier, parity and delegation merged, a release tag, and the three attestation fields sourced). Whether to share a given export remains the maintainers' decision.
