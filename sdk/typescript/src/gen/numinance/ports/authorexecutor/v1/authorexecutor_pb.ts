@@ -183,7 +183,7 @@ export type ChangeExecutionRequest = Message<"numinance.ports.authorexecutor.v1.
   grantId: string;
 
   /**
-   * repository_digest is the digest of the repository content the worktree was created from.
+   * repository_digest is the digest of the repository content the worktree was created from: the git tree of the commit the worktree of this run is created from, which is the change's pinned base revision, or the head of the change's branch for a later work unit. It is the sha256 of the bytes "repository/tree", NUL, the object format of the repository ("sha1" or "sha256"), NUL and the lower-case hex id of that tree. The host computes it when the run starts and checks it again when the worktree is created.
    *
    * @generated from field: numinance.types.v1.Digest repository_digest = 5;
    */

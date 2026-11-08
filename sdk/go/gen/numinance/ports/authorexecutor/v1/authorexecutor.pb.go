@@ -418,7 +418,7 @@ type ChangeExecutionRequest struct {
 	RunId string `protobuf:"bytes,3,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	// grant_id is ^grant_[0-9a-f]{32}$: the grant the run acts under.
 	GrantId string `protobuf:"bytes,4,opt,name=grant_id,json=grantId,proto3" json:"grant_id,omitempty"`
-	// repository_digest is the digest of the repository content the worktree was created from.
+	// repository_digest is the digest of the repository content the worktree was created from: the git tree of the commit the worktree of this run is created from, which is the change's pinned base revision, or the head of the change's branch for a later work unit. It is the sha256 of the bytes "repository/tree", NUL, the object format of the repository ("sha1" or "sha256"), NUL and the lower-case hex id of that tree. The host computes it when the run starts and checks it again when the worktree is created.
 	RepositoryDigest *v1.Digest `protobuf:"bytes,5,opt,name=repository_digest,json=repositoryDigest,proto3" json:"repository_digest,omitempty"`
 	// worktree_ref is the worktree the sandbox mounts; host-only, never resolvable by the provider.
 	WorktreeRef *v1.Reference `protobuf:"bytes,6,opt,name=worktree_ref,json=worktreeRef,proto3" json:"worktree_ref,omitempty"`
