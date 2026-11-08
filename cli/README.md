@@ -28,7 +28,7 @@ numi version
 
 ## Init (`numi init`)
 
-`numi init --ci github-actions|jenkins|both [path]` writes a `.numinance/` template for a Python repository, so the first repository can be onboarded by hand and checked with `numi validate`. The command is in both builds (it needs no resolver) and is the public function `cli.RunInit`. It names no CI vendor in code: vendor names appear in the template data (`sdk/go/cli/initdata/*.tmpl`) and in the generated documents only.
+`numi init --ci github-actions|jenkins|both [path]` writes a `.numinance/` template for a Python repository, so the first repository can be onboarded and checked with `numi validate`. The command is in both builds (it needs no resolver) and is the public function `cli.RunInit`. It names no CI vendor in code: vendor names appear in the template data (`sdk/go/cli/initdata/*.tmpl`) and in the generated documents only.
 
 | Flag | Meaning |
 |---|---|
