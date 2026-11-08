@@ -11,6 +11,8 @@ import (
 	cikit "github.com/numinance/numinance-spec/conformance/ciexecutor/v1"
 	"github.com/numinance/numinance-spec/plugins/official/ci-github-actions/provider"
 	"github.com/numinance/numinance-spec/plugins/official/ci-github-actions/replay"
+	jkprovider "github.com/numinance/numinance-spec/plugins/official/ciexecutor-jenkins/provider"
+	jkreplay "github.com/numinance/numinance-spec/plugins/official/ciexecutor-jenkins/replay"
 	pluginv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/plugin/v1"
 	civ1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/ports/ciexecutor/v1"
 )
@@ -72,5 +74,26 @@ func TestKit_ReplayingGitHubActionsProvider(t *testing.T) {
 		Target: d, Repository: replay.Repository, Missing: "acme/missing", Pipeline: "release.yml", DryRunPipeline: "dry.yml",
 		Revision: replay.Revision, StartKey: "chg_0001/release/1", Params: map[string]string{"environment": "staging"},
 		Progressing: "9005", Cancellable: "9003", WithArtifacts: "9006",
+	})
+}
+
+// TestKit_ReplayingJenkinsProvider runs the kit against the replaying build of ciexecutor-jenkins. An operation id of that provider is
+// the digest of the key, a dot and the pipeline, so the three runs the kit reads are named that way in the cassette.
+func TestKit_ReplayingJenkinsProvider(t *testing.T) {
+	t.Parallel()
+	tr, err := jkreplay.Transport()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := jkprovider.ParseURL(jkprovider.ExampleURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := direct{jkprovider.New(jkprovider.ReplayPluginID, "sha256:0", cfg, tr, 0, testHost{}, nil)}
+	cikit.Run(t, cikit.Subject{
+		Target: d, Repository: jkreplay.Repository, Missing: "acme/missing", Pipeline: "release", DryRunPipeline: "dry",
+		Revision: jkreplay.Revision, StartKey: "chg_0001/release/1", Params: map[string]string{"environment": "staging"},
+		Progressing: "00000000000000000000000000000005.release", Cancellable: "00000000000000000000000000000003.release",
+		WithArtifacts: "00000000000000000000000000000006.release",
 	})
 }

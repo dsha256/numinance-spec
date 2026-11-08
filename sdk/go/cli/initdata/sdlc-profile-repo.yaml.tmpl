@@ -8,8 +8,8 @@
 #   (the README of that provider says what the workflow must declare). A live run is not yet verified.
 {{- end}}
 {{- if .Jenkins}}
-#   jenkins: the ciexecutor port exists but NO Jenkins provider exists yet. The id dev.numinance.official/jenkins is
-#   a placeholder taken from the design examples; nothing resolves it, and validation does not check that a provider is installed.
+#   jenkins: the ciexecutor provider dev.numinance.ciexecutor-jenkins exists in the open plugins in replay mode only: a live run
+#   is owed and it is not yet in the release bundle. Validation does not check that a provider is installed.
 {{- end}}
 {{- if .Both}}
 #

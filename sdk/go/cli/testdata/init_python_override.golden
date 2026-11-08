@@ -17,9 +17,9 @@ The kernel floors (separation of duties, plan before side effects, evidence by t
 ceilings and others) are part of the Numinance engine, always on, and no document in this tree or in an organization
 repository can weaken them. Nothing here references them, because there is nothing to reference.
 
-Jenkins: no Jenkins ciexecutor provider exists yet; see the comments in `policy/sdlc-profile.yaml`.
+Jenkins: the ciexecutor-jenkins provider exists in replay mode only (a live run is owed; not yet in the release bundle); see the comments in `policy/sdlc-profile.yaml`.
 The repository profile binds GitHub Actions. The Jenkins binding is only a grant (an org AdapterSelector) or an inert
-document, and a one-line edit of the profile could rebind to the placeholder provider. That rebinding is the operator's
+document, and a one-line edit of the profile could rebind to the Jenkins provider. That rebinding is the operator's
 explicit edit, and `numi validate` does not check that a provider is installed, so it would pass and still run nothing.
 === .numinance/policy/sdlc-profile.yaml ===
 # SDLCProfile of this repository, written by "numi init". It binds the names defined in this tree
@@ -29,8 +29,8 @@ explicit edit, and `numi validate` does not check that a provider is installed, 
 #   github-actions: the ciexecutor provider dev.numinance.ci-github-actions exists in the open plugins (replay and live builds).
 #   It starts a workflow_dispatch workflow that the repository already defines on its default branch
 #   (the README of that provider says what the workflow must declare). A live run is not yet verified.
-#   jenkins: the ciexecutor port exists but NO Jenkins provider exists yet. The id dev.numinance.official/jenkins is
-#   a placeholder taken from the design examples; nothing resolves it, and validation does not check that a provider is installed.
+#   jenkins: the ciexecutor provider dev.numinance.ciexecutor-jenkins exists in the open plugins in replay mode only: a live run
+#   is owed and it is not yet in the release bundle. Validation does not check that a provider is installed.
 #
 # The adapter schema binds ONE ciexecutor per scope, so with both CI systems selected the binding below is the one that
 # takes effect: github-actions, the only CI provider that exists.
@@ -74,17 +74,17 @@ spec:
 # Written by "numi init --org-dir" when both CI systems are selected. An AdapterSelector of the org scope grants the
 # Jenkins binding: a repository may select it as its ciexecutor. It is a grant only and is not bound today: the profiles
 # (sdlc-profile.yaml of the org and of the repository) bind GitHub Actions and are applied after this one, because one
-# ciexecutor binding is possible per scope. A repository could rebind to this placeholder by a one-line edit of its profile;
+# ciexecutor binding is possible per scope. A repository could rebind to this binding by a one-line edit of its profile;
 # that is the operator's explicit edit, and validate does not check that a provider is installed.
 #
-# The provider id is a placeholder from the design examples. There is NO Jenkins ciexecutor provider yet; when one exists,
-# an on-prem Jenkins server needs an egress allow-list entry for its host and a credential handle from the broker.
+# The provider dev.numinance.ciexecutor-jenkins exists in replay mode only: a live run is owed and it is not yet in the
+# release bundle. An on-prem Jenkins server needs an egress allow-list entry for its host and a credential handle from the broker.
 apiVersion: numinance.dev/v1
 kind: AdapterSelector
 metadata: {name: ci-jenkins, scope: SCOPE_ORG}
 spec:
   ports:
-    ciexecutor: {provider: dev.numinance.official/jenkins, instance: jenkins-onprem}
+    ciexecutor: {provider: dev.numinance.ciexecutor-jenkins, instance: jenkins-onprem}
 === .numinance/policy/playbook-bugfix-bounded.yaml ===
 # Playbook "bugfix-bounded", written by "numi init": a bounded bug fix that ends in a pull request. The verifier names are
 # the ones of the LanguageToolchain python-3.11.
@@ -109,7 +109,7 @@ spec:
 # binding: a repository may select only a binding (port, provider, instance) that an org document binds.
 #
 # CI: github-actions and jenkins. The ciexecutor binding below is the one of ci-github-actions.
-# No Jenkins provider exists yet; dev.numinance.official/jenkins is a placeholder id from the design examples.
+# Jenkins: dev.numinance.ciexecutor-jenkins exists in replay mode only (a live run is owed; not yet in the release bundle).
 apiVersion: numinance.dev/v1
 kind: SDLCProfile
 metadata: {name: org-baseline, scope: SCOPE_ORG}
@@ -137,7 +137,7 @@ spec:
     - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
     # GitHub Actions: runs the repository's own workflow through the ciexecutor port.
     - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
-    # Jenkins: the ciexecutor port exists, no Jenkins provider exists yet (placeholder id).
+    # Jenkins: the ciexecutor-jenkins provider exists in replay mode (a live run is owed; not yet in the release bundle).
     - {name: ci-jenkins, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
     - name: pr-gate
       maps_to: CHANGE_STATE_RELEASE_GATE

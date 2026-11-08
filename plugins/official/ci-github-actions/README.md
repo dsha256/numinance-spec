@@ -35,5 +35,5 @@ As in `scm-github`: `ci-github-actions` (live, through the egress proxy) and `ci
 ## Not done
 
 - A live run and a recording tool (a GitHub token is needed); the host gives the provider no egress-proxy address yet.
-- Jenkins and other CI providers (the second provider of the port).
+- Other CI providers beyond `ciexecutor-jenkins` (replay only, live run owed), the second provider of the port.
 - The wait for the dispatched run is five looks (`poll` apart); a run that has not appeared fails the call as unavailable and the host's retry finds it by its key.

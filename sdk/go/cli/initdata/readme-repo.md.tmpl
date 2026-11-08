@@ -28,10 +28,10 @@ ceilings and others) are part of the Numinance engine, always on, and no documen
 repository can weaken them. Nothing here references them, because there is nothing to reference.
 {{- if .Jenkins}}
 
-Jenkins: no Jenkins ciexecutor provider exists yet; see the comments in `policy/sdlc-profile.yaml`.
+Jenkins: the ciexecutor-jenkins provider exists in replay mode only (a live run is owed; not yet in the release bundle); see the comments in `policy/sdlc-profile.yaml`.
 {{- if .Both}}
 The repository profile binds GitHub Actions. The Jenkins binding is only a grant (an org AdapterSelector) or an inert
-document, and a one-line edit of the profile could rebind to the placeholder provider. That rebinding is the operator's
+document, and a one-line edit of the profile could rebind to the Jenkins provider. That rebinding is the operator's
 explicit edit, and `numi validate` does not check that a provider is installed, so it would pass and still run nothing.
 {{- end}}
 {{- end}}

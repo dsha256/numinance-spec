@@ -5,7 +5,7 @@
 #
 # CI: {{.CIText}}. The ciexecutor binding below is the one of {{.PrimaryCI.Stage}}.
 {{- if .Jenkins}}
-# No Jenkins provider exists yet; dev.numinance.official/jenkins is a placeholder id from the design examples.
+# Jenkins: dev.numinance.ciexecutor-jenkins exists in replay mode only (a live run is owed; not yet in the release bundle).
 {{- end}}
 apiVersion: numinance.dev/v1
 kind: SDLCProfile

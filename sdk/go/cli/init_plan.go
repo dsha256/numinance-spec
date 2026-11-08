@@ -44,9 +44,9 @@ func githubActions() ciSystem {
 func jenkins() ciSystem {
 	return ciSystem{
 		Stage:    "ci-jenkins",
-		Provider: "dev.numinance.official/jenkins",
+		Provider: "dev.numinance.ciexecutor-jenkins",
 		Instance: "jenkins-onprem",
-		Comment:  "Jenkins: the ciexecutor port exists, no Jenkins provider exists yet (placeholder id).",
+		Comment:  "Jenkins: the ciexecutor-jenkins provider exists in replay mode (a live run is owed; not yet in the release bundle).",
 	}
 }
 

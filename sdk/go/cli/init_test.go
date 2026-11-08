@@ -362,7 +362,7 @@ func TestInit_Run_ConflictAndForce(t *testing.T) {
 		if got[".numinance/policy/autonomy.yaml"] == "edited\n" {
 			t.Errorf("force did not overwrite a file it writes")
 		}
-		if !strings.Contains(got[".numinance/policy/sdlc-profile.yaml"], "dev.numinance.official/jenkins") {
+		if !strings.Contains(got[".numinance/policy/sdlc-profile.yaml"], "dev.numinance.ciexecutor-jenkins") {
 			t.Errorf("forced run did not write the jenkins profile:\n%s", got[".numinance/policy/sdlc-profile.yaml"])
 		}
 	})
@@ -655,7 +655,7 @@ func TestInit_Run_BothNoteSaysTheJenkinsGrantIsNotBound(t *testing.T) {
 	if code != cli.ExitOK {
 		t.Fatalf("Run = %d, stderr %q, want 0", code, errOut)
 	}
-	if !strings.Contains(out, "rebinding it to the placeholder is your explicit edit that validate does not check") {
+	if !strings.Contains(out, "rebinding it to ciexecutor-jenkins is your explicit edit that validate does not check") {
 		t.Errorf("stdout lacks the rebinding caveat:\n%s", out)
 	}
 }

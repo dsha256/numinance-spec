@@ -1,0 +1,581 @@
+{
+ "redaction": "Hand-written from the Jenkins remote access API (the /api/json tree parameter, buildWithParameters, queue, crumbIssuer), not recorded: the server is the made-up jenkins.example.test, repository, job and artifact names are invented (acme/shop, release), commit ids and the crumb are fixed test values, and no header other than Location and Content-Length, token, e-mail address or real person appears. Replace with recordings from a live Jenkins once one is available (README, Not done).",
+ "interactions": [
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/api/json?tree=buildable,property[parameterDefinitions[name]]",
+   "status": 200,
+   "body": {
+    "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+    "buildable": true,
+    "property": [
+     {
+      "_class": "jenkins.model.BuildDiscarderProperty"
+     },
+     {
+      "_class": "hudson.model.ParametersDefinitionProperty",
+      "parameterDefinitions": [
+       {
+        "_class": "hudson.model.StringParameterDefinition",
+        "name": "numinance_revision"
+       },
+       {
+        "_class": "hudson.model.StringParameterDefinition",
+        "name": "numinance_operation_id"
+       },
+       {
+        "_class": "hudson.model.StringParameterDefinition",
+        "name": "environment"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/dry/api/json?tree=buildable,property[parameterDefinitions[name]]",
+   "status": 200,
+   "body": {
+    "_class": "org.jenkinsci.plugins.workflow.job.WorkflowJob",
+    "buildable": true,
+    "property": [
+     {
+      "_class": "jenkins.model.BuildDiscarderProperty"
+     },
+     {
+      "_class": "hudson.model.ParametersDefinitionProperty",
+      "parameterDefinitions": [
+       {
+        "_class": "hudson.model.StringParameterDefinition",
+        "name": "numinance_revision"
+       },
+       {
+        "_class": "hudson.model.StringParameterDefinition",
+        "name": "numinance_operation_id"
+       },
+       {
+        "_class": "hudson.model.StringParameterDefinition",
+        "name": "environment"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/missing/job/release/api/json?tree=buildable,property[parameterDefinitions[name]]",
+   "status": 404
+  },
+  {
+   "method": "GET",
+   "path": "/queue/api/json?tree=items[id,task[name,url],actions[parameters[name,value]]]",
+   "status": 200,
+   "body": {
+    "items": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/queue/api/json?tree=items[id,task[name,url],actions[parameters[name,value]]]",
+   "status": 200,
+   "body": {
+    "items": [
+     {
+      "id": 42,
+      "task": {
+       "name": "release",
+       "url": "https://jenkins.example.test/job/acme/job/shop/job/release/"
+      },
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "23521ecb0621d5b7ea51d38bdb155f7f"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/queue/api/json?tree=items[id,task[name,url],actions[parameters[name,value]]]",
+   "status": 200,
+   "body": {
+    "items": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/api/json?tree=builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}",
+   "status": 200,
+   "body": {
+    "builds": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/api/json?tree=builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}",
+   "status": 200,
+   "body": {
+    "builds": [
+     {
+      "number": 7,
+      "building": true,
+      "result": null,
+      "timestamp": 1793527200000,
+      "duration": 0,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000005"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 6,
+      "building": true,
+      "result": null,
+      "timestamp": 1793527200000,
+      "duration": 0,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000003"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 5,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 60000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000006"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/api/json?tree=builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}",
+   "status": 200,
+   "body": {
+    "builds": [
+     {
+      "number": 7,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 120000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000005"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 6,
+      "building": true,
+      "result": null,
+      "timestamp": 1793527200000,
+      "duration": 0,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000003"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 5,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 60000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000006"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/api/json?tree=builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}",
+   "status": 200,
+   "body": {
+    "builds": [
+     {
+      "number": 7,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 120000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000005"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 6,
+      "building": true,
+      "result": null,
+      "timestamp": 1793527200000,
+      "duration": 0,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000003"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 5,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 60000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000006"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/api/json?tree=builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}",
+   "status": 200,
+   "body": {
+    "builds": [
+     {
+      "number": 7,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 120000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000005"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 6,
+      "building": false,
+      "result": "ABORTED",
+      "timestamp": 1793527200000,
+      "duration": 30000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000003"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     },
+     {
+      "number": 5,
+      "building": false,
+      "result": "SUCCESS",
+      "timestamp": 1793527200000,
+      "duration": 60000,
+      "actions": [
+       {
+        "_class": "hudson.model.ParametersAction",
+        "parameters": [
+         {
+          "name": "numinance_revision",
+          "value": "c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01"
+         },
+         {
+          "name": "numinance_operation_id",
+          "value": "00000000000000000000000000000006"
+         },
+         {
+          "name": "environment",
+          "value": "staging"
+         }
+        ]
+       },
+       {
+        "_class": "hudson.model.CauseAction"
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/dry/api/json?tree=builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}",
+   "status": 200,
+   "body": {
+    "builds": []
+   }
+  },
+  {
+   "method": "GET",
+   "path": "/crumbIssuer/api/json",
+   "status": 200,
+   "body": {
+    "_class": "hudson.security.csrf.DefaultCrumbIssuer",
+    "crumb": "0123456789abcdef0123456789abcdef",
+    "crumbRequestField": "Jenkins-Crumb"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/job/acme/job/shop/job/release/buildWithParameters",
+   "form": "environment=staging&numinance_operation_id=23521ecb0621d5b7ea51d38bdb155f7f&numinance_revision=c0ffee00c0ffee00c0ffee00c0ffee00c0ffee01",
+   "status": 201,
+   "headers": {
+    "Location": "https://jenkins.example.test/queue/item/42/"
+   }
+  },
+  {
+   "method": "POST",
+   "path": "/job/acme/job/shop/job/release/6/stop",
+   "status": 302
+  },
+  {
+   "method": "GET",
+   "path": "/job/acme/job/shop/job/release/5/api/json?tree=artifacts[relativePath]",
+   "status": 200,
+   "body": {
+    "artifacts": [
+     {
+      "relativePath": "dist/shop-1.0.0.tar.gz"
+     },
+     {
+      "relativePath": "reports/summary.txt"
+     }
+    ]
+   }
+  },
+  {
+   "method": "HEAD",
+   "path": "/job/acme/job/shop/job/release/5/artifact/dist/shop-1.0.0.tar.gz",
+   "status": 200,
+   "headers": {
+    "Content-Length": "2048"
+   }
+  },
+  {
+   "method": "HEAD",
+   "path": "/job/acme/job/shop/job/release/5/artifact/reports/summary.txt",
+   "status": 200,
+   "headers": {
+    "Content-Length": "512"
+   }
+  }
+ ]
+}

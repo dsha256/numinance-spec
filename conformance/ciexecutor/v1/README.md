@@ -4,7 +4,7 @@ Skeleton that runs. The acceptance tests for a provider of `numinance.ports.ciex
 (`proto/numinance/ports/ciexecutor/v1/ciexecutor.proto`). The kit version tracks the port minor; this skeleton tracks 1.0.0. The
 runnable skeleton is the Go package `cikit` in this directory (`kit.go`): it runs CORE-001 to CORE-008 against any `Target` with the
 fixtures a publisher supplies (`Subject`), and `ValidateOperation` is the port's response rule as a function. `kit_test.go` runs it
-against the replaying build of `plugins/official/ci-github-actions`; the release context's acceptance
+against the replaying builds of `plugins/official/ci-github-actions` and `plugins/official/ciexecutor-jenkins`; the release context's acceptance
 (the reference implementation's host-level acceptance test) runs the same provider through a real launch and `Invoke`.
 
 ## Core

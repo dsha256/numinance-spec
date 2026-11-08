@@ -73,7 +73,9 @@ type Spec struct {
 	// Intent is the credential intent every capability declares; Host and Suite name the one network destination and the
 	// conformance suite.
 	Intent, NetworkHost, Suite string
-	Methods                    []Method
+	// NetworkPort is the port of the one network destination; zero means 443.
+	NetworkPort uint32
+	Methods     []Method
 	// Transport is how the provider reaches the code host.
 	Transport Transport
 	// Timeout is the manifest timeout of every capability.
@@ -153,7 +155,11 @@ func New(spec Spec, digest string, host Host, stop func()) *Server {
 	caps := make([]*pluginv1.CapabilityDescriptor, 0, len(spec.Methods))
 	// A replay build never opens a connection and never asks for a credential, so its manifest declares no network destination, no
 	// credential intent and the dev environment only: it cannot be installed where the live provider runs.
-	intents, network, scope := []string{spec.Intent}, []*pluginv1.NetworkIntent{{Host: spec.NetworkHost, Port: 443}}, []string{"dev", "staging", "prod"}
+	port := spec.NetworkPort
+	if port == 0 {
+		port = 443
+	}
+	intents, network, scope := []string{spec.Intent}, []*pluginv1.NetworkIntent{{Host: spec.NetworkHost, Port: port}}, []string{"dev", "staging", "prod"}
 	if spec.Transport.Replay {
 		intents, network, scope = nil, nil, []string{"dev"}
 	}

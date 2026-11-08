@@ -283,13 +283,13 @@ func runInit(ctx context.Context, opts initOptions) (string, error) {
 	}
 	b.WriteString("autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)\n")
 	if data.Jenkins {
-		b.WriteString("note: no Jenkins provider exists yet; the Jenkins binding names a placeholder provider id\n")
+		b.WriteString("note: the Jenkins provider dev.numinance.ciexecutor-jenkins exists in replay mode only (a live run is owed and it is not yet in the release bundle); the Jenkins binding names it\n")
 	}
 	if data.Both {
 		// Say only what was written: the repository tree holds the inert document, the org tree holds a grant.
 		where := "the Jenkins binding is in .numinance/ci-jenkins.yaml and is ignored"
 		if org != nil {
-			where = "the Jenkins binding is an org grant in .numinance/policy/ci-jenkins.yaml of the organization policy repository and is not bound: the repository profile binds github-actions, and rebinding it to the placeholder is your explicit edit that validate does not check"
+			where = "the Jenkins binding is an org grant in .numinance/policy/ci-jenkins.yaml of the organization policy repository and is not bound: the repository profile binds github-actions, and rebinding it to ciexecutor-jenkins is your explicit edit that validate does not check"
 		}
 		b.WriteString("note: one ciexecutor binding takes effect per scope: github-actions; " + where + "\n")
 	}
