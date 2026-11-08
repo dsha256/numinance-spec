@@ -80,6 +80,8 @@ type initData struct {
 	CI                    []ciSystem
 	GitHub, Jenkins, Both bool
 	PrimaryCI             ciSystem
+	// TicketFile is true for --tickets file: only the README says where tickets come from; no binding is written.
+	TicketFile bool
 }
 
 func newInitData(o initOptions) initData {
@@ -88,6 +90,7 @@ func newInitData(o initOptions) initData {
 		Scope:          "SCOPE_REPO",
 		PythonVersion:  o.PythonVersion,
 		PackageManager: o.PackageManager,
+		TicketFile:     o.TicketFile,
 	}
 	if d.OrgMode {
 		d.Scope = "SCOPE_ORG"

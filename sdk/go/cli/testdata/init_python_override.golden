@@ -94,8 +94,12 @@ metadata: {name: bugfix-bounded, scope: SCOPE_ORG}
 spec:
   change_type: bugfix
   steps:
-    - {name: fix, capability_set: scm-write, risk: RISK_CLASS_LOW, evidence: [diff], verifiers: [lint, typecheck]}
-    - {name: open-pr, capability_set: scm-pr, risk: RISK_CLASS_MEDIUM, evidence: [pr-ref], rehearse: false}
+    # One step per identity kind. The capability_set names are the ones the deployment defines: implement (author-agent:
+    # the branch push and the pull request), review (reviewer-agent: verifier.run), release (release-pipeline: the read-only
+    # status of the pull request). No step merges: Numinance opens pull requests only.
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_MEDIUM, evidence: [diff, pr-ref], verifiers: [lint, typecheck]}
+    - {name: review, capability_set: review, risk: RISK_CLASS_LOW}
+    - {name: pr-status, capability_set: release, risk: RISK_CLASS_LOW}
   max_repair_attempts: 2
   qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
 === .numinance/policy/sdlc-profile.yaml ===

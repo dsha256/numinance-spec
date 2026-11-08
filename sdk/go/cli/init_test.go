@@ -82,6 +82,7 @@ func TestInit_Run_GoldenTemplates(t *testing.T) {
 		{name: "python_github-actions", args: []string{"--ci", "github-actions"}},
 		{name: "python_jenkins", args: []string{"--ci", "jenkins"}},
 		{name: "python_both", args: []string{"--ci", "both"}},
+		{name: "python_tickets-file", args: []string{"--ci", "github-actions", "--language", "python", "--scm", "github", "--tickets", "file"}},
 		{name: "python_github-actions_org", args: []string{"--ci", "github-actions"}, org: true},
 		{name: "python_override", args: []string{"--ci", "both", "--package-manager", "poetry", "--python-version", "3.11", "--verifiers", "lint,typecheck"}, org: true},
 	}
@@ -208,6 +209,11 @@ func TestInit_Run_FlagErrorsExitUsage(t *testing.T) {
 		{name: "unknown verifier", args: []string{"--ci", "both", "--verifiers", "lint,security", repo}, want: "--verifiers"},
 		{name: "repeated verifier", args: []string{"--ci", "both", "--verifiers", "lint,lint", repo}, want: "--verifiers repeats"},
 		{name: "empty verifier name", args: []string{"--ci", "both", "--verifiers", "lint,", repo}, want: "--verifiers"},
+		{name: "language go", args: []string{"--ci", "both", "--language", "go", repo}, want: "--language go: only python has a toolchain template"},
+		{name: "language empty", args: []string{"--ci", "both", "--language", "", repo}, want: "--language : only python has a toolchain template"},
+		{name: "scm gitlab", args: []string{"--ci", "both", "--scm", "gitlab", repo}, want: "--scm gitlab: only github has a provider"},
+		{name: "tickets jira", args: []string{"--ci", "both", "--tickets", "jira", repo}, want: "--tickets jira: no ticketing provider exists yet; use file"},
+		{name: "tickets none", args: []string{"--ci", "both", "--tickets", "none", repo}, want: "--tickets none: no ticketing provider exists yet; use file"},
 		{name: "two paths", args: []string{"--ci", "both", repo, repo}, want: "at most one path"},
 		{name: "unknown flag", args: []string{"--ci", "both", "--bogus", repo}, want: "bogus"},
 		{name: "ci value missing", args: []string{repo, "--ci"}, want: "--ci"},
@@ -651,5 +657,67 @@ func TestInit_Run_BothNoteSaysTheJenkinsGrantIsNotBound(t *testing.T) {
 	}
 	if !strings.Contains(out, "rebinding it to the placeholder is your explicit edit that validate does not check") {
 		t.Errorf("stdout lacks the rebinding caveat:\n%s", out)
+	}
+}
+
+func TestInit_Run_ClosedChoicesAreReportedWithTheirSource(t *testing.T) {
+	tests := []struct {
+		name   string
+		args   []string
+		want   []string
+		readme bool
+	}{
+		{
+			name: "absent flags print the default choices",
+			args: []string{"--ci", "github-actions"},
+			want: []string{"chose: language python (default)", "chose: scm github (default)", "chose: tickets none (default)"},
+		},
+		{
+			name:   "given flags print the flag source and bind no tickets",
+			args:   []string{"--ci", "github-actions", "--language", "python", "--scm", "github", "--tickets", "file"},
+			want:   []string{"chose: language python (flag)", "chose: scm github (flag)", "chose: tickets file (flag)"},
+			readme: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			code, out, errOut := runInit(append(tc.args, repo)...)
+			if code != cli.ExitOK {
+				t.Fatalf("Run(%v) = %d, stderr %q, want 0", tc.args, code, errOut)
+			}
+			for _, w := range tc.want {
+				if !strings.Contains(out, w) {
+					t.Errorf("Run(%v) stdout = %q, want it to contain %q", tc.args, out, w)
+				}
+			}
+			files := readFiles(t, repo)
+			if got := strings.Contains(files[".numinance/README.md"], "numi v1a run --ticket FILE"); got != tc.readme {
+				t.Errorf("README names the ticket file = %v, want %v", got, tc.readme)
+			}
+			for name, content := range files {
+				if strings.Contains(strings.ToLower(content), "ticketing") && name != ".numinance/README.md" {
+					t.Errorf("%s mentions a ticketing binding, want none", name)
+				}
+			}
+		})
+	}
+}
+
+func TestInit_Run_PlaybookHasOneStepPerIdentityKind(t *testing.T) {
+	repo := t.TempDir()
+	if code, _, errOut := runInit("--ci", "github-actions", repo); code != cli.ExitOK {
+		t.Fatalf("Run = %d, stderr %q, want 0", code, errOut)
+	}
+	pb := readFiles(t, repo)[".numinance/policy/playbook-bugfix-bounded.yaml"]
+	for _, want := range []string{"capability_set: implement", "capability_set: review", "capability_set: release"} {
+		if !strings.Contains(pb, want) {
+			t.Errorf("playbook lacks %q:\n%s", want, pb)
+		}
+	}
+	for _, bad := range []string{"scm-write", "scm-pr", "open-pr", "scm.merge"} {
+		if strings.Contains(pb, bad) {
+			t.Errorf("playbook contains %q, want PR only with the deployment's set names", bad)
+		}
 	}
 }

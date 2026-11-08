@@ -22,6 +22,10 @@ const initUsage = `usage: numi init --ci github-actions|jenkins|both [flags] [pa
   --package-manager NAME  uv, pip or poetry (default: detected from uv.lock, poetry.lock, pyproject.toml, requirements.txt; else uv)
   --python-version X.Y    Python version of the toolchain (default: .python-version, else 3.12)
   --verifiers LIST        comma-separated subset of unit-tests,lint,typecheck (default: all three)
+  --language python       toolchain language; python is the only value (default python)
+  --scm github            source-control provider; github is the only value (default github)
+  --tickets file          tickets come from the ticket file the run is given (numi v1a run --ticket FILE); writes no ticketing binding
+                          (default: no ticket binding; no ticketing provider exists yet)
   --force                 overwrite the files init writes in an existing .numinance (other files are never touched)
 path is the repository (default .). --org-dir naming the repository by any spelling (dot, relative, symlink) is refused with exit 3.
 Exit codes: 0 ok, 2 usage, 3 invalid, 4 not found, 5 conflict, 1 internal.
@@ -37,6 +41,26 @@ type initOptions struct {
 	PythonVersion  string
 	Verifiers      []string
 	Force          bool
+	// Language, SCM and Tickets are the values of the closed-set flags; empty when the flag was absent.
+	Language, SCM, Tickets string
+	// TicketFile is true when --tickets file was given.
+	TicketFile bool
+}
+
+// closedChoice is a flag whose accepted set has one member today. Absent, the flag behaves as that member (or, for
+// tickets, as no binding) and the report says so with source default; given, any other value is a usage error. The
+// vendor names are table data, not logic.
+type closedChoice struct {
+	Flag, Accepted, Reason string
+}
+
+// closedChoices is the one table of the closed sets.
+func closedChoices() []closedChoice {
+	return []closedChoice{
+		{Flag: "language", Accepted: "python", Reason: "only python has a toolchain template"},
+		{Flag: "scm", Accepted: "github", Reason: "only github has a provider"},
+		{Flag: "tickets", Accepted: "file", Reason: "no ticketing provider exists yet; use file"},
+	}
 }
 
 // RunInit runs "numi init" with the arguments after "init" and returns the exit code. It writes a .numinance template
@@ -80,8 +104,12 @@ func parseInit(args []string, stdout, stderr io.Writer) (initOptions, int) {
 	fs.StringVar(&opts.PythonVersion, "python-version", "", "")
 	fs.StringVar(&verifier, "verifiers", "", "")
 	fs.BoolVar(&opts.Force, "force", false, "")
+	closed := map[string]*string{"language": &opts.Language, "scm": &opts.SCM, "tickets": &opts.Tickets}
+	for _, c := range closedChoices() {
+		fs.StringVar(closed[c.Flag], c.Flag, "", "")
+	}
 	flagArgs, paths := splitArgs(args, func(name string) bool {
-		return slices.Contains([]string{"ci", "org-dir", "package-manager", "python-version", "verifiers"}, name)
+		return slices.Contains([]string{"ci", "org-dir", "package-manager", "python-version", "verifiers", "language", "scm", "tickets"}, name)
 	})
 	usage := func(format string, a ...any) (initOptions, int) {
 		_, _ = fmt.Fprintf(stderr, "numi init: %s\n%s", fmt.Sprintf(format, a...), initUsage)
@@ -93,6 +121,13 @@ func parseInit(args []string, stdout, stderr io.Writer) (initOptions, int) {
 			return opts, ExitOK
 		}
 		return usage("%s", clean(err.Error(), maxMessageRunes))
+	}
+	given := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
+	for _, c := range closedChoices() {
+		if v := *closed[c.Flag]; given[c.Flag] && v != c.Accepted {
+			return usage("--%s %s: %s", c.Flag, clean(v, maxFieldRunes), c.Reason)
+		}
 	}
 	if len(paths) > 1 {
 		return usage("at most one path")
@@ -132,6 +167,14 @@ func parseInit(args []string, stdout, stderr io.Writer) (initOptions, int) {
 	}
 	// Whether --org-dir is the repository is decided on the opened directories (runInit), not on the spelling.
 	return opts, proceed
+}
+
+// closedChoiceOf is the choice of a closed-set flag: the flag value, or def with source default when it was absent.
+func closedChoiceOf(v, def string) choice {
+	if v == "" {
+		return choice{Value: def, Source: "default"}
+	}
+	return choice{Value: v, Source: "flag"}
 }
 
 // runInit detects, plans, checks and writes, and returns the report for stdout.
@@ -180,6 +223,11 @@ func runInit(ctx context.Context, opts initOptions) (string, error) {
 		verifiers = choice{Value: strings.Join(names, " "), Source: "default"}
 	}
 	opts.PackageManager, opts.PythonVersion = manager.Value, version.Value
+	language, scm, tickets := closedChoiceOf(opts.Language, "python"), closedChoiceOf(opts.SCM, "github"), closedChoiceOf(opts.Tickets, "")
+	if tickets.Value == "" {
+		tickets.Value = "none"
+	}
+	opts.TicketFile = opts.Tickets == "file"
 
 	data := newInitData(opts)
 	repoFiles, err := planRepoTree(data)
@@ -221,6 +269,9 @@ func runInit(ctx context.Context, opts initOptions) (string, error) {
 	fmt.Fprintf(&b, "chose: python %s\n", version)
 	fmt.Fprintf(&b, "chose: verifiers %s\n", verifiers)
 	fmt.Fprintf(&b, "chose: ci %s (flag)\n", data.CIText())
+	fmt.Fprintf(&b, "chose: language %s\n", language)
+	fmt.Fprintf(&b, "chose: scm %s\n", scm)
+	fmt.Fprintf(&b, "chose: tickets %s\n", tickets)
 	for _, f := range repoFiles {
 		fmt.Fprintf(&b, "wrote \"%s\"\n", f.Path)
 	}

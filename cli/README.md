@@ -37,6 +37,9 @@ numi version
 | `--package-manager NAME` | `uv`, `pip` or `poetry`. Default: detected from the target directory in this order: `uv.lock`, `poetry.lock`, `pyproject.toml` (`[tool.poetry]`, `[tool.uv]`), `requirements.txt`; with none of them `uv`. Two different managers named by the directory (for example `uv.lock` and `poetry.lock`) are a usage error until the flag decides |
 | `--python-version 3.N` | default: the first line of `.python-version` when it is a plain `3.N` or `3.N.P`, else `3.12` |
 | `--verifiers LIST` | comma-separated subset of `unit-tests`, `lint`, `typecheck` (pytest, ruff, mypy of the verifier provider); default all three |
+| `--language python` | optional; python is the only accepted value and the default. Absent, the report says `chose: language python (default)`. Any other value is a usage error (exit 2): `--language go: only python has a toolchain template` |
+| `--scm github` | optional; github is the only accepted value and the default (`chose: scm github (default)`). Any other value is exit 2: `--scm gitlab: only github has a provider` |
+| `--tickets file` | optional; `file` is the only accepted value. Absent, no ticket binding (`chose: tickets none (default)`). Given, it writes no ticketing binding and no new kind field (the ticketing port has no file provider yet); it adds one line to `.numinance/README.md`: tickets come from the ticket file the run is given (`numi v1a run --ticket FILE`). Any other value is exit 2: `--tickets jira: no ticketing provider exists yet; use file` |
 | `--force` | overwrite the files init writes in an existing `.numinance`; other files are never touched |
 
 It prints each choice with its source (`flag`, `detected from uv.lock`, `default`), the files it wrote and notes. Exit codes: 0 OK, 2 usage, 3 invalid (the path is not a directory, or the config directory, `policy/` or a document is a symbolic link or not a regular file), 4 the directory is missing, 5 conflict (`.numinance` already has any file and no `--force`; also a leftover `*.numi-init.tmp`), 1 internal.
@@ -48,7 +51,7 @@ What it writes (`.numinance/policy/` is the protected location of section 12: a 
 | `policy/sdlc-profile.yaml` | SDLCProfile (repo) | `playbooks`, `toolchains`, `adapters.scm` (`dev.numinance.scm-github`) and the one `adapters.ciexecutor` |
 | `policy/autonomy.yaml` | AutonomyPolicy | `defaults.level: AUTONOMY_LEVEL_PR` |
 | `policy/stage-registry.yaml` | StageRegistry `pr-only` | triage, plan gate, implement, a static verify stage, one CI verify stage per CI system (both map to Verifying), a human `pr-gate` at the release gate state. No stage maps to Merging |
-| `policy/playbook-bugfix-bounded.yaml` | Playbook | `fix` (verifiers of the toolchain) and `open-pr` |
+| `policy/playbook-bugfix-bounded.yaml` | Playbook | three steps, one per identity kind, with the capability set names the deployment defines: `fix` (`implement`, MEDIUM, evidence `diff` and `pr-ref`, the verifiers of the toolchain; the branch push and the pull request), `review` (`review`) and `pr-status` (`release`, read-only status of the pull request). No step merges |
 | `policy/toolchain-python.yaml` | LanguageToolchain | language, version, `package_manager` and the verifiers with provider `dev.numinance.verifier-python` and `config.check` |
 | `ci-jenkins.yaml` | AdapterSelector | only for `--ci both` without `--org-dir`; outside `policy/`, so no authority |
 | `README.md` | | what the tree is |
