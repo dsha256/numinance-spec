@@ -6,10 +6,10 @@ kit is the Go package `ticketingkit` in this directory (`kit.go`): it runs TICKE
 fixtures a publisher supplies (`Subject`). `ValidateIssue` and `ValidateSummary` are the port's response rules as functions a host or
 a test can apply to any provider. Modes are those of ADR 0015: replay, live publisher-run, live registry-run.
 
-There is no ticketing provider in this tree yet. `kit_test.go` proves the kit against a small in-memory fake (`fake_test.go`, with the
+`kit_test.go` proves the kit against a small in-memory fake (`fake_test.go`, with the
 fixture `testdata/tracker.json`): the conforming fake passes every case, and each of fifty-six fakes broken in one way fails exactly the cases
 that guard that fault (and no other); a fake with four faults at once fails several. A provider's own test builds a `Target` over its replaying build and calls `ticketingkit.Run`, exactly as the
-`scmkit` and `cikit` tests do. The official Jira provider is a later card.
+`scmkit` and `cikit` tests do. The official provider `plugins/official/ticketing-jira` runs all 24 cases against its replaying build.
 
 ## Core
 
