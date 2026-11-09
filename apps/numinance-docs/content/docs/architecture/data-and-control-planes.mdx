@@ -1,0 +1,76 @@
+---
+title: Data and control planes
+description: The customer data plane that holds code, credentials and inference, the thin vendor control plane, and the metadata allowed between them.
+---
+
+<FeatureStatus kind="designed">
+  This split is the designed deployment model. It is not a claim of a generally available installer or of every topology shipping today.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/ports/sandboxprovider/v1/sandboxprovider.proto", "proto/numinance/ports/evidencestore/v1/evidencestore.proto"]} note="Public ports the data plane serves through." />
+
+<ShortProductTruth>
+  Your infrastructure. Not our playground. Code, credentials, inference and infrastructure actions stay in the customer account.
+</ShortProductTruth>
+
+## The two planes
+
+The customer data plane does the work. The vendor control plane coordinates and holds metadata only. The product is designed so that a sovereign deployment has no dependency on the control plane.
+
+<SystemBoundaryExplorer />
+
+## Inside the data plane
+
+| Component | What it does | Boundary it enforces |
+| --- | --- | --- |
+| Runner | Registers outbound, creates one sandbox per work unit, supervises the broker and egress proxy, collects the event stream | Only identity that writes evidence; holds no customer credentials |
+| Engine | Runs the change lifecycle and issues per-step grants | Calls the policy decision point before any privileged action |
+| Capability broker | Converts a grant and a plugin's credential intent into the minimum material for one step | Reusable credentials are never given to the model |
+| Egress proxy | Default-deny path for every outbound request | Applies credentials outside the sandbox; link-local and metadata addresses always denied |
+| Plugins | Out-of-process providers for source control, CI, verification, knowledge | Only the network, filesystem and credential intents their manifest declares |
+| Sandbox | One per work unit, digest-pinned image, writable worktree only | No ambient credentials, protected paths absent |
+| Artifact store | Holds source, diffs, logs and findings | Content lives here; workflows carry references |
+| Evidence store | Append-only chain | Written by the runner identity, exported as a directory |
+
+## What stays in the customer account
+
+- Source code and generated diffs.
+- Credentials and secrets, including the material behind every handle.
+- Model inference, subject to the residency class the customer sets.
+- Infrastructure actions, executed by the release identity in the customer's own systems.
+- The evidence chain and the circuit breaker state.
+
+## What may cross to the control plane
+
+The control plane is designed to hold metadata only: tenant and licence state, runner registration and heartbeats, version and update information, and summaries such as change state and counts used to render a fleet view. Orchestration payloads that reach any hosted service carry identifiers, references, digests, statuses and timestamps, never source, prompts, logs or secrets.
+
+<Callout type="info" title="What this does not say">
+  It does not claim the plane is isolated from every network, or that no data leaves the account in every configuration. Residency is a per-component floor the customer sets, and the exact metadata set is confirmed against the deployment contract rather than assumed.
+</Callout>
+
+## Boundary table
+
+| Question | Data plane | Control plane |
+| --- | --- | --- |
+| Where does source code live | Here | Never |
+| Where are credentials resolved | Broker, per step | Never |
+| Who writes evidence | Runner | No one |
+| Who can stop a run | Customer breaker, local | Can display state, cannot be required to stop a run |
+| Who approves a gate | Authenticated human principal | Relays the approval; cannot create one |
+| What if it is unreachable | Not applicable | Authorised work and evidence export continue in sovereign mode |
+
+## Failure cases
+
+- Control plane outage: the dashboard and fleet view degrade; runners continue authorised work and keep evidence local.
+- Control plane compromise: the design assumes it. Connections are outbound-only from the runner, payloads are reference-only, and a control plane cannot issue a grant or approve a change on its own.
+- Licence expiry: stops upgrades and hosted services; it must not stop an installed runtime from applying policy, finishing authorised work or exporting evidence.
+
+## Why this matters for verification
+
+Evidence is produced in the data plane and exported as a directory. An offline verifier needs no control plane access. See [Offline verification](/docs/evidence/offline-verification).
+
+<Cards>
+  <Card title="Deployment modes" href="/docs/architecture/deployment-modes" description="Managed, sovereign and air-gapped." />
+  <Card title="Trust kernel" href="/docs/architecture/trust-kernel" description="What the data plane enforces without exception." />
+  <Card title="Record chain" href="/docs/evidence/record-chain" description="How evidence is written and linked." />
+</Cards>

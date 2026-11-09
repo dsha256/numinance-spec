@@ -1,0 +1,27 @@
+---
+title: Versioning
+description: How numinance-spec versions its contracts and what pre-alpha means for compatibility.
+---
+
+<FeatureStatus kind="public-spec"/>
+
+<SourceReference paths={["VERSIONING.md"]} />
+
+
+Identifiers carry only the major version (`numinance.ports.ciexecutor.v1`, `apiVersion: numinance.dev/v1`); releases carry `x.y.z`.
+
+| Artifact | MAJOR when | MINOR |
+| --- | --- | --- |
+| Wire protocol `numinance.plugin.vN` | An RPC or field is removed or renamed, or semantics change | A new RPC or field behind a protocol capability |
+| Port `numinance.ports.<p>.vN` | Any `buf breaking` file break, a Core verb change, or risk lowered | A new capability, optional field or enum value |
+| Config kind `numinance.dev/vN` | A field is removed, renamed or retyped, or a default changes | An optional field with `since` |
+| Plugin | It drops a port or protocol major, a capability or a config field, or widens permissions | A new capability or action |
+| Pack, policy, playbook | A new deny, or a component removed | Additions, or equal or looser decisions |
+
+Minors are additive and every addition carries `since`. Pre-GA maturity uses `v1alpha1` (`1.0.0-alpha.1`, off by default) and `v1beta1` (`1.0.0-beta.1`, on by default). Unknown YAML fields are errors except under a reverse-DNS `extensions:` map; unknown wire fields are preserved.
+
+## Pre-alpha
+
+Before the first tag nothing is released: untagged SDK packages (for example `sdk/go/cli`) may change in breaking ways, and the pull request declares it. After the first tag, the table above applies.
+
+The policy also states compatibility windows (the engine serves protocol majors N and N-1 for 24 months after N+1 GA, port majors M and M-1 for 12 months through shims), deprecation signals (`deprecated_in`, `replaced_by`, a `DEPRECATED` diagnostic) and that lockfiles pin version, digest and signer identity, with permission widening always requiring re-approval. The table above omits the PATCH column (docs, messages or fixes). Read `VERSIONING.md` for the full text, including support windows for GA, beta and alpha.

@@ -1,0 +1,209 @@
+---
+title: HostService
+description: The five RPCs a plugin calls back into the host, the invocation-scoped authority they run under, and why a plugin never holds a reusable credential.
+---
+
+<FeatureStatus kind="public-spec">HostService is part of the Apache-2.0 numinance-spec protocol. The host that serves it is the Numinance plugin host in the proprietary runtime, which is not generally available.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/plugin/v1/host.proto", "proto/numinance/types/v1/types.proto"]} />
+
+<ShortProductTruth>
+HostService is how a plugin asks for things it is not allowed to take: evidence appends, credentials and artifact bytes all go through the host, inside the authority of one in-flight call.
+</ShortProductTruth>
+
+## When to use this page
+
+You need it when your plugin logs, reports progress, emits evidence, reads referenced artifacts or reaches a customer system with a credential. The mechanism is the same for all of them: the plugin quotes the `invocation_id` of the `Invoke` it is serving, and the host decides.
+
+## The service
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+service HostService {
+  rpc Log(LogRequest) returns (LogResponse) { ... }
+  rpc EmitEvidence(EmitEvidenceRequest) returns (EmitEvidenceResponse) { ... }
+  rpc RequestCredential(RequestCredentialRequest) returns (RequestCredentialResponse) { ... }
+  rpc ResolveReference(ResolveReferenceRequest) returns (stream ResolveReferenceResponse) { ... }
+  rpc ReportProgress(ReportProgressRequest) returns (ReportProgressResponse) { ... }
+}
+```
+
+HostService is served by the host and called by a plugin during an `Invoke`. It is never exposed as a model tool and never an action target. Every element is `since: "1.0.0"` except `RequestCredentialResponse.egress_proxy`, which is `since: "1.1.0"`.
+
+| RPC | Risk | Exec | Idempotent | Dry run | Purpose |
+|---|---|---|---|---|---|
+| [`Log`](#log) | `RISK_CLASS_LOW` | `EXEC_MODE_SYNC` | false | false | One structured log entry. |
+| [`EmitEvidence`](#emitevidence) | `RISK_CLASS_LOW` | `EXEC_MODE_SYNC` | true | false | Submit one evidence item. |
+| [`RequestCredential`](#requestcredential) | `RISK_CLASS_PRIVILEGED` | `EXEC_MODE_SYNC` | true | false | Get a credential handle for a declared intent. |
+| [`ResolveReference`](#resolvereference) | `RISK_CLASS_READ` | `EXEC_MODE_SYNC` | true | false | Stream the bytes of a referenced artifact. |
+| [`ReportProgress`](#reportprogress) | `RISK_CLASS_READ` | `EXEC_MODE_SYNC` | true | false | Report units of work done. |
+
+## Invocation-scoped authority
+
+Every request carries an `invocation_id`: the `ActionContext.invocation_id` of the call being served.
+
+- The host assigned that id to this plugin process and still has the call in flight. Any other id is rejected, so a plugin can act only inside the authority of the call it serves.
+- The host identifies the calling plugin by the connection it established at launch, never by request content. Quoting someone else's id from another connection does not work.
+- Per invocation, at most 256 `EmitEvidence`, 1024 `Log`, 1024 `ReportProgress`, 64 `ResolveReference` and 16 `RequestCredential` calls, and 2048 HostService calls in total. A call over any count is rejected and the invocation is recorded FAILED.
+- No HostService RPC declares `evidence`. The host records each call and its outcome in the invocation's evidence.
+- Strings are at most 1024 bytes and repeated fields at most 256 entries unless a field says otherwise. Over-limit input is rejected, never truncated. A rejection names an index-based field path and the violated bound, never the offending value.
+
+"Printable" in the rules below means Unicode categories L, M, N, P, S and U+0020; Cc, Cf, Cs, Co, Cn, Zl and Zp (including bidi and zero-width controls) are rejected.
+
+## Log
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+message LogRequest {
+  string invocation_id = 1;
+  Severity severity = 2;
+  Reason reason = 3;
+  repeated LogField fields = 4;
+}
+
+message LogField {
+  string key = 1;
+  string value = 2;
+}
+
+message LogResponse {}
+```
+
+| Field | Rule |
+|---|---|
+| `severity` | A `Severity` value ([enum table](/docs/protocol/envelope-action-context#severity)). |
+| `reason` | A `Reason` code ([enum table](/docs/protocol/envelope-action-context#reason)). There is no message text. |
+| `fields` | At most 32 attributes, unique by `key`. |
+| `LogField.key` | Matches `^[a-z][a-z0-9_]{0,63}$`. A key equal to a host-owned key is rejected. |
+| `LogField.value` | Untrusted, printable only, at most 256 bytes. The host escapes it, passes it through its redaction and writes it under a plugin-owned group. |
+
+The log vocabulary is closed on purpose: a plugin cannot smuggle prose or instructions into the host's retained logs. `Log` has no dry run; the entry is the whole effect.
+
+## EmitEvidence
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+message EmitEvidenceRequest {
+  string invocation_id = 1;
+  string emit_key = 2;
+  string record_type = 3;
+  google.protobuf.Any payload = 4;
+  repeated numinance.types.v1.Reference artifacts = 5;
+}
+
+message EmitEvidenceResponse {
+  string evidence_id = 1;
+}
+```
+
+The plugin submits; the host validates and appends under the runner identity. The plugin never appends. The risk is `LOW` because the host can refuse, while the append itself is the host's.
+
+| Field | Rule |
+|---|---|
+| `emit_key` | Unique per item within the invocation; matches `^[a-z0-9][a-z0-9._-]{0,127}$`. A replay with the same key, payload and artifacts returns the same `evidence_id`; any difference is rejected. |
+| `record_type` | An evidence record type that is in the capability's `evidence_declared` and in the host's allow-list of plugin-emittable types (provider-produced kinds such as verifier reports and operation logs). Lifecycle, policy decision, gate, approval and credential-issuance kinds are host-authored: rejected at install in `evidence_declared` and rejected here. |
+| `payload` | The typed evidence payload, at most 16 KiB serialized, with a type URL the host allows for `record_type`. It is never a source of record fields: ids, actor, policy decision, grant, risk class, digests, sandbox fields and timestamp come from the host's invocation state. |
+| `artifacts` | At most 64 `Reference` values. Each must exist in the artifact store with a matching sha256 and be readable under the invocation's grant, else the call is rejected and nothing is appended. v1 has no upload; other content travels only in `payload`. |
+
+`EmitEvidenceResponse.evidence_id` is the `ev_` prefixed id of the record the host appended. The plugin lists it in `ActionResult.evidence_ids`; any id the host did not return for this invocation is rejected there.
+
+Evidence is why a plugin cannot forge a history. It supplies a typed fact about its own work; the host stamps who, under which grant, at what time. See the [record chain](/docs/evidence/record-chain).
+
+## RequestCredential
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+message RequestCredentialRequest {
+  string invocation_id = 1;
+  string intent = 2;
+}
+
+message RequestCredentialResponse {
+  string handle = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string egress_proxy = 3;
+}
+```
+
+(Per-field options omitted. `handle` is annotated `sensitive: true`; `egress_proxy` is `since: "1.1.0"`.)
+
+### The credential handle
+
+`RequestCredential` returns a handle for a declared credential intent, never credential material.
+
+| Field | Rule |
+|---|---|
+| `intent` | A credential intent in the capability's `credential_intents` that the grant allows. Any other is rejected. |
+| `handle` | Opaque, at most 256 bytes, bound to the invocation and the intent, usable only through the host's egress proxy, never logged or recorded. The same intent requested again in the same invocation yields the same handle. |
+| `expires_at` | When the handle stops working; never later than the invocation deadline. |
+| `egress_proxy` | The `host:port` of the egress proxy listener for the invocation's step: the only address the provider sends a request carrying the handle to, as an absolute-form HTTP request for the destination its manifest declares. The proxy terminates it, applies the credential and re-originates it over TLS. It is an address, never credential material. Empty when the host runs no egress proxy; then a handle cannot be used. |
+
+### Why the plugin never gets a reusable token
+
+A plugin that holds a raw token can use it outside the call, copy it, log it or hand it to a model. A handle cannot do any of that: it is bound to one invocation and one intent, it only means something at the egress proxy, and it expires with the call. The proxy applies the real credential on the way out, so the secret never enters the plugin process.
+
+When `ActionContext.dry_run` is set, the broker issues a handle only for a read-class intent and the egress proxy denies any non-read method on it. The host records `dry_run` on the invocation's evidence, so a write that happened anyway is flagged on reconciliation.
+
+Credential-issuance records are host-authored evidence kinds: a plugin cannot emit them through `EmitEvidence`, so the record of what was issued is not the plugin's to write.
+
+## ResolveReference
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+message ResolveReferenceRequest {
+  string invocation_id = 1;
+  numinance.types.v1.Reference reference = 2;
+}
+
+message ResolveReferenceResponse {
+  bytes chunk = 1;
+}
+```
+
+Orchestration payloads carry references and digests, not content. When a plugin needs the bytes, it asks the host to stream them.
+
+- `reference` must equal (`proto.Equal` on all three fields) a `Reference` in a field of the method's input type, found by walking the request with the host's descriptor copy. A `Reference` inside an `Any` is never resolvable. Anything else is rejected as not found.
+- A reference whose `sha256.value` equals that of a field the port marks `host_only`, or of a `Reference` nested under one, is refused whatever its `artifact_type` or `artifact_ref`. The mark is inherited by every `Reference` nested under a marked message-typed field. For example, authorexecutor `worktree_ref` and `network_policy_ref` are host-only.
+- Each `chunk` is at most 64 KiB. The host verifies the object's sha256 against the reference before the first chunk and streams nothing on a mismatch. The total per invocation is at most `ActionContext.budget.disk_bytes`.
+- There are no presigned URLs. The host streams the exact bytes whose sha256 it verified before the first chunk (a pinned object version or a buffered copy).
+
+## ReportProgress
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+message ReportProgressRequest {
+  string invocation_id = 1;
+  uint64 completed = 2;
+  uint64 total = 3;
+  Reason reason = 4;
+}
+
+message ReportProgressResponse {}
+```
+
+| Field | Rule |
+|---|---|
+| `completed` | Units of work done; never decreases within an invocation. |
+| `total` | Units expected, or zero when unknown. `completed` above a non-zero `total` is rejected. |
+| `reason` | A phase reason: `REASON_STARTED`, `REASON_RUNNING`, `REASON_WAITING` or `REASON_COMPLETED`. Any other is rejected. There is no message text. |
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| `invocation_id` not in flight for the calling connection | Rejected. |
+| Call count over the per-invocation limit | Rejected; the invocation is recorded FAILED. |
+| `EmitEvidence` for a host-authored record type | Rejected; nothing appended. |
+| `EmitEvidence` artifact missing or digest mismatch | Rejected; nothing appended. |
+| `RequestCredential` for an intent the capability or grant does not allow | Rejected. |
+| `ResolveReference` for a host-only reference | Refused. |
+| `ResolveReference` digest mismatch | Nothing streamed. |
+| Handle used outside the invocation or off the egress proxy | Unusable by construction. |
+
+## Troubleshooting
+
+- `RequestCredential` is rejected although the manifest declares the intent: the grant for this call must also allow it. The manifest declares; the grant authorizes.
+- `EmitEvidence` is rejected for a type you declared: the type must be in both your capability's `evidence_declared` and the host's allow-list of plugin-emittable types.
+- A handle works in a unit test but not at run time: the handle is only usable through the egress proxy address in `egress_proxy`; an empty value means the host runs no proxy and the handle cannot be used.
+
+## Next steps
+
+<Cards>
+  <Card title="PluginService" href="/docs/protocol/plugin-service" description="The RPCs the host calls on a plugin, including the Invoke stream." />
+  <Card title="Envelope, ActionContext and ActionResult" href="/docs/protocol/envelope-action-context" description="Where invocation_id, grants and budgets come from." />
+  <Card title="Authority and policy" href="/docs/architecture/authority-and-policy" description="How grants and credential handles fit the trust model." />
+</Cards>

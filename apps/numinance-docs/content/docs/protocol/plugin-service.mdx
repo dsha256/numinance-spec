@@ -1,0 +1,230 @@
+---
+title: PluginService
+description: Every RPC a plugin serves to the host, with exact messages, bounds, stream rules and rejection semantics.
+---
+
+<FeatureStatus kind="public-spec">PluginService is part of the Apache-2.0 numinance-spec protocol. The host that calls it is the Numinance plugin host in the proprietary runtime; the conformance kits and Go SDK packages in the spec repository exercise the plugin side.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/plugin/v1/plugin.proto", "proto/numinance/plugin/v1/envelope.proto", "proto/numinance/plugin/v1/manifest.proto"]} />
+
+<ShortProductTruth>
+PluginService is the lifecycle surface a plugin serves and the host calls. It is never a model tool, and no PluginService RPC is ever an action target.
+</ShortProductTruth>
+
+## When to use this page
+
+Read it when you implement a plugin from scratch against the wire contract, when you write a test host, or when you need the exact rejection rules the host applies to what a plugin returns. If you only want to build a plugin with the Go packages, start with [Build a custom plugin in Go](/docs/integrations/custom-plugin-go) and return here for the details.
+
+The other half of the plugin boundary is [HostService](/docs/protocol/host-service): the plugin calls it, from inside an `Invoke`, to log, emit evidence and obtain credential handles.
+
+## The service
+
+`PluginService` has six RPCs. These lines are copied from `plugin.proto`; the annotation bodies are shown in the [annotation table](#annotations-of-each-rpc).
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+service PluginService {
+  rpc Handshake(HandshakeRequest) returns (HandshakeResponse) { ... }
+  rpc GetManifest(GetManifestRequest) returns (GetManifestResponse) { ... }
+  rpc GetDescriptors(GetDescriptorsRequest) returns (GetDescriptorsResponse) { ... }
+  rpc Invoke(InvokeRequest) returns (stream InvokeResponse) { ... }
+  rpc Health(HealthRequest) returns (HealthResponse) { ... }
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse) { ... }
+}
+```
+
+Only `Invoke` is server-streaming. Every element of the service is `since: "1.0.0"`.
+
+<PluginInvocationSequence />
+
+### Rules that hold for every RPC
+
+- Every RPC except `Invoke` is host-only lifecycle. `Invoke` carries an action whose target is a method in a `numinance.ports.*` package; the target's annotations in the host's descriptor copy govern it, never `Invoke`'s own.
+- No PluginService RPC declares `evidence`. The host records each lifecycle call in its own lifecycle evidence and each `Invoke` under the target's declared evidence.
+- Every string is at most 1024 bytes and every repeated field at most 256 entries unless a field states otherwise. Over-limit input is rejected, never truncated. Duplicate entries in any repeated field are rejected.
+- The host reads every response through a size-limited reader with a per-call timeout.
+- A rejection names an index-based field path and the violated bound, never the offending value.
+
+### Annotations of each RPC
+
+| RPC | Risk | Exec | Idempotent | Dry run |
+|---|---|---|---|---|
+| `Handshake` | `RISK_CLASS_READ` | `EXEC_MODE_SYNC` | true | false |
+| `GetManifest` | `RISK_CLASS_READ` | `EXEC_MODE_SYNC` | true | false |
+| `GetDescriptors` | `RISK_CLASS_READ` | `EXEC_MODE_SYNC` | true | false |
+| `Invoke` | `RISK_CLASS_PRIVILEGED` | `EXEC_MODE_OPERATION` | false | false |
+| `Health` | `RISK_CLASS_READ` | `EXEC_MODE_SYNC` | true | false |
+| `Shutdown` | `RISK_CLASS_LOW` | `EXEC_MODE_SYNC` | true | false |
+
+`Invoke` is `RISK_CLASS_PRIVILEGED` because it carries one policy-approved action to code that may touch customer systems. Its `exec` is `OPERATION` because the stream carries OPERATION targets, not because `Invoke` has the start, get and cancel shape. The meaning of each annotation is in [Governance annotations](/docs/protocol/governance-annotations).
+
+## Handshake
+
+`Handshake` negotiates the protocol version, the spec version and the capabilities between host and plugin.
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message HandshakeRequest {
+  string spec_version = 1;
+  repeated uint32 protocol_versions = 2;
+  repeated string ports = 3;
+  repeated string capabilities = 4;
+}
+
+message HandshakeResponse {
+  uint32 protocol_version = 1;
+  string spec_version = 2;
+  repeated string capabilities = 3;
+}
+```
+
+(Per-field `[(numinance.annotations.v1.field).since = "1.0.0"]` options omitted.)
+
+### HandshakeRequest fields
+
+| Field | Number | Type | Meaning |
+|---|---:|---|---|
+| `spec_version` | 1 | `string` | Strict x.y.z spec version of the host. |
+| `protocol_versions` | 2 | `repeated uint32` | Protocol versions the host offers. Must equal the `NUMINANCE_PLUGIN_PROTOCOLS` offer. At install both carry the host's full set; at run time both carry only the version locked at install. |
+| `ports` | 3 | `repeated string` | Ports of the installed manifest, each at the major that manifest declares, in the `Manifest.ports` grammar. A port the host cannot serve at that major fails install and aborts the handshake. |
+| `capabilities` | 4 | `repeated string` | Non-Core capability names the host knows for the ports of the installed manifest only. Core verbs are never negotiated. |
+
+### HandshakeResponse fields
+
+| Field | Number | Type | Meaning |
+|---|---:|---|---|
+| `protocol_version` | 1 | `uint32` | One of the offered versions; equals the version on the plugin's stdout protocol line. Zero or a value outside the offer aborts the handshake. |
+| `spec_version` | 2 | `string` | Strict x.y.z spec version the plugin was built against. It never selects the host's validation path. |
+| `capabilities` | 3 | `repeated string` | The negotiated capabilities: a subset of both the host offer and the manifest. Any entry not in both aborts the handshake. |
+
+The response is at most 64 KiB serialized.
+
+### Semantics worth knowing
+
+- The host records the negotiated versions in its own lifecycle evidence; the plugin declares none.
+- The host writes the negotiated protocol version into the lockfile at install and offers only that version at run time. A plugin cannot select a lower protocol later.
+- Negotiation is an intersection, never a union: a plugin cannot claim a capability the manifest does not declare, and the host will not enable one it did not offer.
+
+## GetManifest
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message GetManifestRequest {}
+
+message GetManifestResponse {
+  Manifest manifest = 1;
+}
+```
+
+`GetManifestRequest` has no fields; the plugin has one manifest. The returned `manifest` is at most 1 MiB serialized and must equal (`proto.Equal`) the manifest decoded from the installed package's `manifest.yaml`, whose digest the lockfile pins. If it does not, the host refuses to start the plugin. The manifest returned here is never a source of intents or capabilities: those come from the installed, digest-pinned package. See [Manifest and capabilities](/docs/integrations/manifest-and-capabilities).
+
+## GetDescriptors
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message GetDescriptorsRequest {}
+
+message GetDescriptorsResponse {
+  google.protobuf.FileDescriptorSet descriptor_set = 1;
+}
+```
+
+The plugin returns every port it implements as a serialized `FileDescriptorSet`, at most 2 MiB and at most 64 files. The host validates it against the spec version it supports, and its own compiled copy of each port file is authoritative:
+
+- A shared port file that differs from the host copy in any option fails install.
+- An RPC that is not in a port file the host serves is not dispatchable.
+- A file whose name or package collides with a host-compiled file (annotations, types, the `google.protobuf` well-known types, any `numinance.ports.*`) must equal the host copy (`proto.Equal` on `FileDescriptorProto` with `source_code_info` cleared) or install fails; the host copy is used either way.
+- Plugin-private files must not use the `numinance.` or `google.` package prefixes and must not extend any `google.protobuf` options message.
+- Options are always read through the host's own registry. `source_code_info` of every plugin-supplied file is discarded after validation and never rendered.
+
+The consequence is the invariant that matters: a plugin cannot change the risk, execution mode or evidence declarations of a port verb by shipping its own copy of the descriptor. Governance annotations come from the host's descriptors.
+
+## Invoke
+
+`Invoke` dispatches one action after the policy decision and the grant check.
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message InvokeRequest {
+  Envelope envelope = 1;
+}
+
+message InvokeResponse {
+  ActionResult result = 1;
+}
+```
+
+`InvokeRequest.envelope` is the action, built by the host. Its structure is on [Envelope, ActionContext and ActionResult](/docs/protocol/envelope-action-context). Each `InvokeResponse.result` is one reported result of the stream; `status` is `INVOKE_STATUS_RUNNING` on every message but the last.
+
+### Stream bounds
+
+| Target kind | Messages the plugin sends |
+|---|---|
+| A non-OPERATION target | Exactly one. |
+| An OPERATION target | At most 1024. A RUNNING message is at most 64 KiB and the terminal message at most 4 MiB, so a stream is at most 64 MiB of RUNNING messages plus the terminal one. Only the last message is terminal. |
+
+### Server-streaming targets
+
+A target whose method is itself server-streaming (a port verb such as authorexecutor `Execute`) is always an OPERATION target and rides the same stream.
+
+- Each message of the target's stream is one RUNNING message whose `ActionResult.result` holds it. The type URL is the method's output type, and the 64 KiB RUNNING bound covers it.
+- The terminal message carries no `result`. Its status follows the last stream message as the port defines it. For authorexecutor `Execute`, `SUCCEEDED` follows `EXECUTION_COMPLETED` and `FAILED` follows `EXECUTION_FAILED`.
+- A terminal status that disagrees with the last stream message is rejected.
+- A stream whose last stream message is not one the port names terminal is rejected.
+- A stream that ends without any stream message may only end `FAILED` (a provider rejection).
+- A RUNNING message with a result on a target that is not server-streaming is rejected.
+
+### Error semantics
+
+The host reads each message through a size-limited reader, never buffers the stream, and decodes strictly, rejecting unknown fields. A stream that breaks any rule above is rejected and recorded as failed. The host decides the recorded outcome itself: the plugin's `status` is a claim, not the record (see [InvokeStatus](/docs/protocol/envelope-action-context#invokestatus)).
+
+There is no dry run of `Invoke` itself. The host sets `ActionContext.dry_run` only for a target whose `supports_dry_run` is true.
+
+## Health
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message HealthRequest {}
+
+message HealthResponse {
+  HealthStatus status = 1;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_SERVING = 1;
+  HEALTH_STATUS_NOT_SERVING = 2;
+}
+```
+
+Health is reported for the whole plugin. The host rejects `HEALTH_STATUS_UNSPECIFIED`. `HEALTH_STATUS_SERVING` accepts calls; `HEALTH_STATUS_NOT_SERVING` accepts none.
+
+## Shutdown
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message ShutdownRequest {}
+
+message ShutdownResponse {}
+```
+
+`Shutdown` asks the plugin to stop. Before calling it the host cancels in-flight operations and revokes the plugin's credential handles and egress grants. The plugin starts no new work after it, and the host kills the process after a bounded grace period. It has no dry run: stopping its own process is the whole effect, and the host may always kill the process.
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| Handshake `protocol_version` is zero or not in the offer | Handshake aborts. |
+| Handshake capability not in both the host offer and the manifest | Handshake aborts. |
+| `GetManifest` result differs from the digest-pinned `manifest.yaml` | Host refuses to start the plugin. |
+| Plugin descriptor for a shared port file differs from the host copy | Install fails; the host copy is used. |
+| Over-limit string, repeated field or message | Rejected, never truncated; the error names a field path and the bound. |
+| Invoke stream breaks a bound or terminal-status rule | Stream rejected and recorded as failed. |
+| Plugin reaches for a lower protocol after install | Not possible: only the locked version is offered at run time. |
+
+## Troubleshooting
+
+- Install fails after a descriptor change: you shipped a port file that differs from the host's copy. Regenerate from the pinned spec revision instead of editing options.
+- A streaming verb is recorded as failed although the work finished: check that the last stream message is the one the port names terminal and that the terminal status agrees with it.
+- The host rejects a `Diagnostic`: its `field_path` or `subject` did not resolve in the host's registry. Details are on the [envelope page](/docs/protocol/envelope-action-context#diagnostic).
+
+## Next steps
+
+<Cards>
+  <Card title="HostService" href="/docs/protocol/host-service" description="The calls a plugin makes back into the host during an Invoke." />
+  <Card title="Envelope, ActionContext and ActionResult" href="/docs/protocol/envelope-action-context" description="The authority and result messages Invoke carries." />
+  <Card title="Plugin lifecycle" href="/docs/integrations/plugin-lifecycle" description="How install, handshake, run and shutdown fit together." />
+</Cards>

@@ -1,0 +1,187 @@
+---
+title: Adapters, environments and executors
+description: Bind ports to providers with an AdapterSelector, describe disposable environments with an EnvironmentProvider, and declare an author executor with an ExecutorManifest.
+---
+
+<FeatureStatus kind="public-spec">
+  The schemas and examples are public and validate with the open `numi validate --files`. Provider resolution, environment creation and executor routing belong to the proprietary runtime, which is not generally available.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/kinds/v1/adapter_selector.proto",
+    "proto/numinance/kinds/v1/environment_provider.proto",
+    "proto/numinance/kinds/v1/executor_manifest.proto",
+    "schemas/examples/AdapterSelector/payments.yaml",
+    "schemas/examples/EnvironmentProvider/postgres-clone.yaml",
+    "schemas/examples/ExecutorManifest/claude-cli-bedrock.yaml",
+  ]}
+/>
+
+<ShortProductTruth>
+  Ports are how Numinance reaches your systems. These three kinds say which provider serves a port, how a disposable environment is made and destroyed, and what an author executor claims it can do. None of them grants authority: grants come from policy, and every provider is a signed, digest-pinned extension in the designed runtime.
+</ShortProductTruth>
+
+## When to use these kinds
+
+- You want a repository to use a specific source-control or CI provider instance. Use an AdapterSelector.
+- A change needs a database clone or a namespace that is created for it and destroyed on a timer. Use an EnvironmentProvider.
+- You run an author harness and want the router to know its capabilities and models. The adapter ships an ExecutorManifest, and your org pins it. See [agent harnesses](/docs/architecture/agent-harnesses).
+
+## AdapterSelector
+
+An AdapterSelector says which provider implements which port for its scope. The public example binds source control and CI at repository scope and lists the knowledge connections the repository may read.
+
+<TypeTable type={{
+  "spec.ports": { type: "AdapterPorts", description: "Required; the loader enforces it. An empty ports binds nothing, which is a valid no-op.", required: true },
+  "spec.ports.scm": { type: "AdapterBinding", description: "Binds the scm port. Merge: replace as a unit." },
+  "spec.ports.ticketing": { type: "AdapterBinding", description: "Binds the ticketing port. Merge: replace." },
+  "spec.ports.ciexecutor": { type: "AdapterBinding", description: "Binds the ciexecutor port. Merge: replace." },
+  "spec.ports.cdprovider": { type: "AdapterBinding", description: "Binds the cdprovider port. Merge: replace." },
+  "spec.ports.cloud": { type: "AdapterBinding", description: "Binds the cloud port. Merge: replace." },
+  "spec.ports.database": { type: "AdapterBinding", description: "Binds the database port. Merge: replace." },
+  "spec.ports.observability": { type: "AdapterBinding", description: "Binds the observability port. Merge: replace." },
+  "spec.ports.knowledge": { type: "string[]", description: "Names of the KnowledgeConnection objects the scope may read. A narrower scope's list replaces the wider one." },
+  "AdapterBinding.provider": { type: "string", description: "Required. The extension id of a provider of the port. It must resolve to a lockfile entry.", required: true },
+  "AdapterBinding.instance": { type: "string", description: "Required. The configured instance of the provider; one provider may serve several, such as two CI servers.", required: true },
+}} />
+
+```yaml title="schemas/examples/AdapterSelector/payments.yaml"
+apiVersion: numinance.dev/v1
+kind: AdapterSelector
+metadata: {name: payments, scope: SCOPE_REPO}
+spec:
+  ports:
+    scm: {provider: dev.numinance.official/github, instance: main}
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: ci-prod}
+    knowledge: [confluence-eng, jira-pay]
+```
+
+Each binding is replaced as a unit. A repository cannot pair its own provider with the org's instance, because that would mix one scope's trust with another's configuration.
+
+<DesignNote title="Which names a repository may bind">
+  The spec CLI notes that only the org scope grants adapter-binding names to repositories, and that a repository asking for an ungranted name has it recorded as ignored. That behaviour is profile resolution in the engine build. Open `numi validate` does not perform it and does not check that a provider is installed. `numi validate` exits 7 after the schema pass for exactly this reason.
+</DesignNote>
+
+The ports themselves (scm, ticketing, ciexecutor and the others) are defined in the protocol; see [capability ports](/docs/protocol/capability-ports). Official provider code is described under [official providers](/docs/integrations/official-providers).
+
+## EnvironmentProvider
+
+An EnvironmentProvider describes how a disposable environment is created for a change. Provisioning is idempotent by change id and tags the environment with it.
+
+<TypeTable type={{
+  "spec.provider": { type: "string", description: "Required. The extension id of an environment-port provider. It must resolve to a lockfile entry.", required: true },
+  "spec.kind": { type: "ENVIRONMENT_KIND_DATABASE_CLONE | ENVIRONMENT_KIND_NAMESPACE | ENVIRONMENT_KIND_COMPOSE | ENVIRONMENT_KIND_VM", description: "Required. ENVIRONMENT_KIND_UNSPECIFIED is rejected.", required: true },
+  "spec.source": { type: "string", description: "What is cloned (a database, a namespace template). The provider resolves the name; it never carries a credential." },
+  "spec.ttl": { type: "duration", description: "Required, in proto JSON form such as 14400s, and above zero. The environment is destroyed when it expires.", required: true },
+  "spec.seed": { type: "string[]", description: "Seed data sets applied after creation. A name is never executed as a command." },
+  "spec.budget.max_concurrent": { type: "uint32", description: "Most environments alive at once. Absent means 1. A create above it waits or escalates.", default: "1 (when absent)" },
+  "spec.tags": { type: "map<string, string>", description: "Tags set on every environment besides the change_id tag. A change_id key is refused by the profile context." },
+}} />
+
+```yaml title="schemas/examples/EnvironmentProvider/postgres-clone.yaml"
+apiVersion: numinance.dev/v1
+kind: EnvironmentProvider
+metadata: {name: postgres-clone, scope: SCOPE_REPO}
+spec:
+  provider: dev.numinance.official/aurora-clone
+  kind: ENVIRONMENT_KIND_DATABASE_CLONE
+  source: payments-primary
+  ttl: 14400s
+  seed: [synthetic-customers]
+  budget: {max_concurrent: 2}
+  tags: {team: payments}
+```
+
+Every environment is ephemeral: `ttl` is required, and the loader refuses a value that is not above zero. `seed: [synthetic-customers]` names a data set; point it at synthetic or masked data, not production records. The profile context, not the open loader, checks the `change_id` tag rule.
+
+## ExecutorManifest
+
+An ExecutorManifest declares an author executor: its adapter, its capabilities, the models it may run and a cost class. Profiles select it by `metadata.name`, the executor id. One adapter ships one manifest per data path, so the same harness reaching a different model endpoint is a different manifest.
+
+<TypeTable type={{
+  "metadata.scope": { type: "SCOPE_ORG", description: "The loader refuses any other scope. Authority comes only from the manifest pinned with its adapter in the lockfile.", required: true },
+  "spec.provider": { type: "string", description: "Required. The extension id of the authorexecutor adapter. It must resolve to a lockfile entry.", required: true },
+  "spec.capabilities": { type: "ExecutorCapability[]", description: "Required, non-empty and unique. Playbook steps require capabilities by name. Values: EXECUTOR_CAPABILITY_FILESYSTEM_READ, _FILESYSTEM_WRITE, _SHELL, _NETWORK, _SUBAGENTS, _BROWSER, _MCP, _CHECKPOINT, _STRUCTURED_PLAN, _APPROVAL_CALLBACKS, _NATIVE_SANDBOX, _CONTEXT_PERSISTENCE.", required: true },
+  "spec.models": { type: "ExecutorModel[]", description: "Required, non-empty, unique by id. The models the executor may run.", required: true },
+  "spec.models[].id": { type: "string", description: "Required. 1 to 253 bytes of ASCII letters, digits, and . _ - : / @, starting with a letter or digit.", required: true },
+  "spec.models[].max_context": { type: "uint32", description: "Required, at least 1. The most tokens of context the model accepts in one request.", required: true },
+  "spec.cost_class": { type: "EXECUTOR_COST_CLASS_LOW | _MEDIUM | _HIGH", description: "Required. The relative cost of one run; the router weighs it against the budget.", required: true },
+}} />
+
+```yaml title="schemas/examples/ExecutorManifest/claude-cli-bedrock.yaml"
+apiVersion: numinance.dev/v1
+kind: ExecutorManifest
+metadata: {name: claude-cli-bedrock, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/claude-cli
+  capabilities: [EXECUTOR_CAPABILITY_FILESYSTEM_READ, EXECUTOR_CAPABILITY_FILESYSTEM_WRITE, EXECUTOR_CAPABILITY_SHELL, EXECUTOR_CAPABILITY_SUBAGENTS,
+    EXECUTOR_CAPABILITY_MCP, EXECUTOR_CAPABILITY_STRUCTURED_PLAN, EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS]
+  models:
+    - {id: eu.anthropic.claude-sonnet-v1:0, max_context: 200000}
+  cost_class: EXECUTOR_COST_CLASS_MEDIUM
+```
+
+### A manifest is a claim, not a control
+
+The schema comments are explicit: every field is a claim of the adapter author. The sandbox, the egress proxy and the credential broker enforce the request whatever the manifest says. Listing `EXECUTOR_CAPABILITY_SHELL` does not give an executor a shell, and omitting `EXECUTOR_CAPABILITY_NETWORK` is a statement about the adapter, not a firewall. Capabilities help the router match a playbook step to an executor that can plausibly do it.
+
+### Residency is not declared here
+
+The public ExecutorManifest has no residency field. The schema reserves that slot for a later minor version and states that a residency class is never declared: until then, the class derived from the live configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it. Adding `residency:` to a manifest is a schema error (shown below).
+
+<DesignNote title="Where data goes: compute, inference, egress and retention">
+  In the designed runtime, residency is dimensional, and the class is computed, not copied from a file. The dimensions include where the executor's compute runs, where inference runs, whether prompts and responses leave, which regions are possible destinations, whether the vendor may train on the data, and how long it may retain it. The class that results is checked against the floor of the [ResidencyPolicy](/docs/configuration/governance-kinds) at the start of a change, and a mismatch refuses the change.
+
+  Two consequences matter for how you read a manifest. Running on a cloud provider does not imply the data stays in your account, and a model endpoint with a cross-region inference profile can send prompts to another region. The model id `eu.anthropic.claude-sonnet-v1:0` in the example is a string the manifest author wrote; it is not evidence about where inference runs. Resolver and reviewer inference are bound by the same floor as author inference.
+</DesignNote>
+
+## Security implications
+
+- A provider id must resolve to a lockfile entry. A selector naming a provider that is not installed and approved is useless, not dangerous; the failure surfaces when the profile is resolved.
+- Binding replacement is atomic per port, so a repository cannot splice its own instance onto an org-approved provider.
+- An EnvironmentProvider is a cost and data-exposure surface. `ttl` and `max_concurrent` bound it, and `tags` plus the change id make orphaned environments findable. `source` and `seed` are names; credentials never appear in them.
+- ExecutorManifest is org-scoped only. A repository cannot introduce its own executor by committing a manifest.
+- Agents cannot widen their own grants by editing these files. Configuration under protected paths changes through your normal review, not through the author agent.
+
+## Real failures
+
+<VerifiedSnippet what="Edited copies of the examples, run with the open numi build">
+
+```text
+$ numi validate --files bad/doc.yaml      # AdapterSelector instance: "main prod"
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.AdapterBinding.instance fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # EnvironmentProvider ttl: 0s
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.EnvironmentProviderSpec.ttl fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # EnvironmentProvider ttl: 4h
+invalid  file "doc.yaml": kind: does not match the kind schema: a value is not in protobuf JSON form
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # ExecutorManifest scope: SCOPE_REPO
+invalid  file "doc.yaml": kind: invalid: ExecutorManifest is org-scoped only
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # model id "eu anthropic"
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.ExecutorModel.id fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # ExecutorManifest with an added "residency:" field
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/residency\": additionalProperties
+(exit 3)
+```
+
+</VerifiedSnippet>
+
+Durations use the proto JSON form: seconds with an `s` suffix, so `4h` is `14400s`.
+
+## Next steps
+
+<Cards>
+  <Card title="Governance kinds" href="/docs/configuration/governance-kinds" description="ResidencyPolicy floors that an executor's derived class must meet." />
+  <Card title="Agent harnesses" href="/docs/architecture/agent-harnesses" description="How the harness and the adapter sit under Numinance's authority." />
+  <Card title="Knowledge connection" href="/docs/configuration/knowledge-connection" description="The connections an AdapterSelector lists under knowledge." />
+</Cards>

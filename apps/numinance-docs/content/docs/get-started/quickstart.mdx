@@ -1,0 +1,149 @@
+---
+title: Quickstart
+description: Validate the shipped examples, scaffold a Python repository with numi init, and read what the open build can and cannot tell you.
+---
+
+<FeatureStatus kind="public-spec">Every command here runs in the open `numi` build. The outputs shown are from a real run against revision 3c74d59.</FeatureStatus>
+<SourceReference paths={["cli/README.md", "schemas/examples/SDLCProfile/", "sdk/go/cli/initdata/"]} />
+
+<ShortProductTruth>In ten minutes you validate real configuration kinds, scaffold a `.numinance/` tree, and learn why the open build deliberately stops at a schema pass.</ShortProductTruth>
+
+## Prerequisites
+
+- A built `numi` from the [install page](/docs/get-started/install). Commands below assume `numi` is on your path; substitute `./bin/numi` or `go run ./cli/numi` otherwise.
+- A clone of `numinance-spec`, for the example documents. Run step 1 from its root.
+- A Python repository for step 2. A directory with a `pyproject.toml` is enough.
+
+## Step 1: validate the shipped examples
+
+```bash title="From the root of numinance-spec"
+numi validate --files schemas/examples/SDLCProfile
+```
+
+<VerifiedSnippet what="strict schema and loader check of two example documents" exit="0">
+
+```text
+revision: "files"
+ok       file "org-baseline.yaml" SDLCProfile "org-baseline"
+ok       file "payments-api.yaml" SDLCProfile "payments-api"
+```
+
+</VerifiedSnippet>
+
+`--files` checks each YAML file against its generated kind schema and runs the loader checks. Unknown fields are errors unless they sit under `extensions:`. It runs no resolver and no floors. Point it at the whole `schemas/examples` directory and every example kind passes; add `--json` for one machine-readable object.
+
+## Step 2: scaffold a repository
+
+```bash title="From the root of your Python repository"
+numi init --ci github-actions .
+```
+
+`--ci` is required, because a default CI system would wire one your repository may not use. The command detected `uv` from a `pyproject.toml` with no package-manager table.
+
+<VerifiedSnippet what="numi init in a directory with a.py and a pyproject.toml declaring [project]" exit="0">
+
+```text
+numi init: repository "."
+chose: package manager uv (detected from pyproject.toml with no package manager table, the default)
+chose: python 3.12 (default)
+chose: verifiers unit-tests lint typecheck (default)
+chose: ci github-actions (flag)
+chose: language python (default)
+chose: scm github (default)
+chose: tickets none (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/policy/autonomy.yaml"
+wrote ".numinance/policy/stage-registry.yaml"
+wrote ".numinance/policy/playbook-bugfix-bounded.yaml"
+wrote ".numinance/policy/toolchain-python.yaml"
+wrote ".numinance/README.md"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: unit-tests (pytest) runs candidate code and is UNAVAILABLE in the live verifier provider until its nested sandbox exists
+note: without --org-dir the stage registry is not selected and floors are the engine's shipped floors (PR; HIGH at SUGGEST)
+next: numi validate "."
+```
+
+</VerifiedSnippet>
+
+Each `chose:` line names a decision and where it came from: `flag`, `default`, or `detected from <file>`. The generated tree:
+
+<Files>
+  <Folder name=".numinance" defaultOpen>
+    <File name="README.md" />
+    <Folder name="policy" defaultOpen>
+      <File name="sdlc-profile.yaml" />
+      <File name="autonomy.yaml" />
+      <File name="stage-registry.yaml" />
+      <File name="playbook-bugfix-bounded.yaml" />
+      <File name="toolchain-python.yaml" />
+    </Folder>
+  </Folder>
+</Files>
+
+The agent level it chose is the cautious one: `AUTONOMY_LEVEL_PR`. It may open pull requests and may never merge. [First configuration](/docs/get-started/first-configuration) walks through each file.
+
+## Step 3: validate the result
+
+```bash title="Repository validation"
+numi validate .
+```
+
+<VerifiedSnippet what="open-build repository validation after init" exit="7">
+
+```text
+revision: "working tree (uncommitted changes included)"
+ok       repo ".numinance/policy/autonomy.yaml" AutonomyPolicy "pr-only"
+ok       repo ".numinance/policy/playbook-bugfix-bounded.yaml" Playbook "bugfix-bounded"
+ok       repo ".numinance/policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+ok       repo ".numinance/policy/stage-registry.yaml" StageRegistry "pr-only"
+ok       repo ".numinance/policy/toolchain-python.yaml" LanguageToolchain "python-3.12"
+numi validate: profile resolution needs the Numinance engine build
+```
+
+</VerifiedSnippet>
+
+### Why exit 7 is the expected result
+
+All five documents are schema-valid. Exit 7 has exactly one meaning in the open build: the schema pass succeeded, and profile resolution is not available because it belongs to the Numinance engine build. The design is deliberate. A CI job that ran the open `numi validate` could otherwise report green on a configuration whose floors and bindings were never resolved.
+
+If you want an exit code of 0 for the schema check alone, say so explicitly:
+
+```bash title="Schema and loader check only"
+numi validate --files .numinance
+```
+
+This exits 0 with the same five documents shown as `ok  file ...`. Treat it as a lint, not as validation of the repository.
+
+## Step 4: re-run and meet exit 5
+
+```bash title="Second run in the same repository"
+numi init --ci github-actions .
+```
+
+<VerifiedSnippet what="init refuses to overwrite an existing .numinance" exit="5">
+
+```text
+numi init: .numinance already has files; pass --force to overwrite the files init writes (other files are never touched)
+```
+
+</VerifiedSnippet>
+
+Exit 5 is a conflict. `init` will not overwrite your edits. `--force` overwrites only the files `init` itself writes; any other file in `.numinance/` is left alone. Use it deliberately, since it discards local changes to the generated documents.
+
+## Failure modes
+
+| Exit | Meaning here | Fix |
+| --- | --- | --- |
+| 2 | Usage error, such as a missing `--ci` | Add `--ci github-actions`, `jenkins` or `both`. |
+| 3 | Invalid: a schema error, or the config directory is a symbolic link | Read the message. It names a path and a keyword, never a value. |
+| 4 | The directory does not exist, or no kind documents were found | Check the path. |
+| 5 | `.numinance` already has files | Review the existing files, or pass `--force`. |
+| 7 | Schema pass succeeded; profile resolution needs the engine build | Expected in the open build. |
+
+## Next steps
+
+<Cards>
+  <Card title="First configuration" href="/docs/get-started/first-configuration" description="Every generated file, the protected policy location and safe edits." />
+  <Card title="numi init reference" href="/docs/cli/init" description="All flags and exit codes." />
+  <Card title="Validation and errors" href="/docs/configuration/validation-and-errors" description="What validation checks and what it leaves to the engine." />
+</Cards>

@@ -1,0 +1,186 @@
+---
+title: Evidence quickstart
+description: Verify a real evidence/v1 export offline under pinned keys, then watch a wrong key, a self-stated trust bundle and skipped signatures each change the result.
+---
+
+<FeatureStatus kind="public-spec">The verifier and the conformance exports are in the public tree. Exporting evidence from a run is an engine function and is not in the open build.</FeatureStatus>
+<SourceReference paths={["sdk/go/evidenceverify/", "docs/evidence/verification.md", "conformance/evidence/v1/", "cli/README.md"]} />
+
+<ShortProductTruth>Don't trust the agent. Check the evidence, under keys you chose, without a network and without the system that wrote it.</ShortProductTruth>
+
+## What you need
+
+- A built `numi` and a clone of `numinance-spec` ([install](/docs/get-started/install)).
+- The conformance fixtures. Run every command below from `conformance/evidence/v1` inside the clone. It holds `keys/` (public keys) and `exports/` (golden export directories). The example export is `exports/closed-author`: a change that ran to a Closed terminal state at pull-request level.
+
+You do not need to generate an export. `numi evidence export` is designed and not in the open build; calling it is an unknown subcommand and exits 2.
+
+## The pinned-key run
+
+```bash title="From conformance/evidence/v1"
+numi evidence verify \
+  --runner-key keys/runner.pub \
+  --log-key keys/log.pub \
+  --log-origin numinance.test/log \
+  --complete \
+  exports/closed-author
+```
+
+<VerifiedSnippet what="full verification of the closed-author export" exit="0">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 12, head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48
+state: ended Closed
+level: verified
+chain: records link, hash and end as stated
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+attestation: signed, re-derived from the chain
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+not applicable: deployment.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+not applicable: observation.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+result: verified
+```
+
+</VerifiedSnippet>
+
+### The flags
+
+| Flag | What it does |
+| --- | --- |
+| `--runner-key FILE` | A runner public key you pin (64 hex characters). Repeatable. Any pinned key may sign any record, the attestation or the manifest. |
+| `--log-key FILE`, `--log-origin ORIGIN` | The transparency log you pin. Give both or neither. This is what lets the head be proved as published. |
+| `--complete` | Fail if any part of the design list is absent. A part that is not applicable at PR level, such as deployment and observation, is not absent. |
+| `--trust-bundle-keys` | Trust the keys the export states about itself. Caps the result at `self-consistent`. |
+| `--skip-signatures` | Check no signature. Caps the result at `unauthenticated`. |
+| `--allow-unanchored`, `--allow-incomplete`, `--allow-unsigned` | Accept a named weakness; the level is suffixed with it. |
+| `--expect-change CHG_ID`, `--expect-head DIGEST` | Fail unless the chain is that change, or its head matches that digest. |
+| `--json` | One JSON object, including `level_enum`, `weakened_by_flags` and `anchored_head_record_hash`. |
+
+Exactly one key mode is required. There is no built-in trust root: a key that comes from the export never reaches `verified`.
+
+## Wrong key: exit 3
+
+Pin a different runner key and the same export fails.
+
+<VerifiedSnippet what="the same export with keys/other-runner.pub as the runner key" exit="3">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 0, head 
+state: open (no terminal record)
+level: failed
+chain: failed
+signatures: not verified
+anchor: not proved
+attestation: none
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+absent: deployment.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed; owner: release context (Gate B): a change that is released is deployed and observed by it)
+absent: observation.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed; owner: release context (Gate B): a change that is released is deployed and observed by it)
+FAIL signer_untrusted: a record names a key that is not trusted
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+FAIL parts_absent: a part is absent and --complete was given
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+FAIL parts_absent: a part is absent and --complete was given
+result: failed
+```
+
+</VerifiedSnippet>
+
+Exit 3 means the report has at least one finding. `signer_untrusted` is the root cause. The `part_contradiction` and `parts_absent` findings follow because a "not applicable" claim needs a verified chain behind it; when the chain did not verify, nothing shows the change closed at PR level, so each claim counts as a contradiction and the parts as absent.
+
+## Trust bundle only: exit 5
+
+Ask the verifier to trust the keys the export states about itself:
+
+```bash title="Self-stated keys"
+numi evidence verify --trust-bundle-keys exports/closed-author
+```
+
+<VerifiedSnippet what="trust the keys the export states" exit="5">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 12, head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48
+state: ended Closed
+level: self-consistent
+chain: records link, hash and end as stated
+signatures: verified under keys the export states only
+anchor: not checked (no log pinned)
+attestation: signed, re-derived from the chain
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+not applicable: deployment.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+not applicable: observation.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+WEAK signatures verified only under keys the export states
+WEAK the head was not proved under a pinned log
+result: self-consistent
+```
+
+</VerifiedSnippet>
+
+Exit 5 means a consistent export that is weaker than `verified`. The chain is intact, but an attacker who builds a whole chain and signs it with their own key would pass this check too. Self-consistency proves the directory agrees with itself, not that it came from the runner you trust.
+
+## Skipping signatures
+
+```bash title="No signature check, JSON output"
+numi evidence verify --skip-signatures --json exports/closed-author
+```
+
+<VerifiedSnippet what="skip signature checks; JSON fields shown are those of the real report" exit="5">
+
+```json
+{"ok":false,"level":"unauthenticated","level_enum":"unauthenticated","weakened_by_flags":[],"weaknesses":["no signature was checked","the head was not proved under a pinned log"],"signatures":"not checked (--skip-signatures)","anchor":"not checked (no log pinned)"}
+```
+
+</VerifiedSnippet>
+
+The snippet shows the decision fields of the real report. The full object also carries `change_id`, `records`, `head_record_hash`, `anchored_head_record_hash`, `ended`, `terminal_state`, `sealed`, `chain`, `attestation`, `not_applicable`, `credential_scopes` and `network_policy`. Links, digests and re-derivations are still checked; only signatures are not.
+
+## What each level means
+
+| Level | Meaning | Exit |
+| --- | --- | --- |
+| `verified` | Records link and hash, signatures check under your pinned runner keys, and the head is proved under your pinned log. | 0 |
+| `unanchored`, `incomplete`, `unsigned` | A single named weakness, reachable by passing the matching `--allow-` flag. | 5 without the flag, 0 with it, suffixed in the level |
+| `self-consistent` | Consistent, signed under keys the export itself states. | 5 |
+| `unauthenticated` | Consistent, but no signature was checked. | 5 |
+| `failed` | At least one finding. | 3 |
+
+## Reading results in automation
+
+- A pass with an allowance, such as `verified, unanchored`, exits 0. Never test whether `level` starts with `verified`.
+- A full pass is exit 0, `level_enum` equal to `verified` and an empty `weakened_by_flags`. Test all three.
+- A `verified` result can still list absent parts. Read the `absent` list in the JSON, or pass `--complete`.
+- Use `--expect-change` and `--expect-head` to bind the result to the change and head you expected, not just any valid chain.
+
+## What verified does and does not prove
+
+`verified` proves provenance and chain integrity under the keys you pinned. It does not prove that the code is correct, that tests were thorough, that the model reasoned well, or that a compromised host logged every event. The two `unsourced` lines above are a reminder: the attestation carries no credential-broker or egress-proxy statement, so those claims are not backed here.
+
+## Inspect a chain interactively
+
+The component below shows how records link into a chain and where each level of the verifier gains or loses its guarantee.
+
+<EvidenceChainInspector />
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| Exit 2, "exactly one key mode" | None or more than one of the pinned keys, `--trust-bundle-keys`, `--skip-signatures`. | Pass exactly one mode. |
+| Exit 4 | The export directory does not exist. | Check the path relative to where you ran the command. |
+| Exit 3 with `signer_untrusted` | The pinned key is not the one that signed. | Pin the correct runner key, from a source you trust. |
+| Exit 3 with `expectation_mismatch` | `--expect-change` or `--expect-head` did not match. | You may be verifying a different chain than you expected. |
+| Exit 5 | A consistent export weaker than `verified`. | Pin keys and a log, or decide explicitly which allowance you accept. |
+
+## Next steps
+
+<Cards>
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="What the verifier checks, in order, and every finding code." />
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="The level algorithm and what flags can and cannot change." />
+  <Card title="Verify a run" href="/docs/guides/verify-a-run" description="Fit verification into a review or release process." />
+</Cards>

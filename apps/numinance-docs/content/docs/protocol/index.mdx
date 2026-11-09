@@ -1,0 +1,133 @@
+---
+title: "Protocol overview"
+description: "The open, typed contract between Numinance and everything it touches: package map, design principles, and how the protocol is versioned and kept compatible."
+---
+
+<FeatureStatus kind="public-spec">The protocol, schemas, SDK stubs and conformance kits are published under Apache-2.0 in numinance-spec. The engine that hosts plugins and enforces policy is proprietary and not generally available.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/", "buf.yaml", "buf.gen.yaml", "VERSIONING.md", "rfcs/"]} />
+
+<ShortProductTruth>
+The brain is private. The contract is open. Everything a plugin, a policy file or a verifier needs to interoperate is protobuf you can read, lint and generate from.
+</ShortProductTruth>
+
+## When to use this section
+
+Read the protocol pages when you build a plugin, write a provider for a port, generate a client, or check exactly what a configuration field or enum value means. If you are new to Numinance, the [concepts](/docs/concepts) section explains why the contract has this shape; this section is the reference.
+
+## Design principles
+
+| Principle | What it means in the contract |
+|---|---|
+| Authority outside the model | Every RPC carries an `action` annotation (risk, execution mode, idempotency, dry run, evidence, scopes). The host reads it from descriptors and evaluates policy before the call. See [Governance annotations](/docs/protocol/governance-annotations). |
+| The host owns the envelope | A plugin never sets who it acts as, which grant allows it, or its budget. The host builds the [`ActionContext`](/docs/protocol/envelope-action-context) after the policy decision. |
+| References, not content | Payloads carry `Reference` and `Digest` values. Bytes are fetched through the host, which verifies the digest first. |
+| Claims are checked, not trusted | A plugin result is a claim. The host derives outcomes, checks evidence ids and side effects, and measures cost and duration itself. |
+| No credential in the plugin | A plugin receives a handle, usable only through the host's egress proxy, and only inside one invocation. See [HostService](/docs/protocol/host-service#the-credential-handle). |
+| Closed vocabularies | Enums are closed and zero is invalid; diagnostics, log entries and progress reports use a closed `Reason` enum with no free text. |
+| Fail closed | Unknown enum numbers and unknown fields are rejected, so an older consumer refuses a newer value instead of misreading it. |
+
+## Package map
+
+| Package | Contents | Reference page |
+|---|---|---|
+| `numinance.annotations.v1` | `RiskClass`, `ExecMode`, `ActionOptions`, `FieldAnnotations` and the `action` and `field` extensions | [Governance annotations](/docs/protocol/governance-annotations) |
+| `numinance.types.v1` | Shared enums, `Digest`, `Reference` | [Shared types](/docs/protocol/shared-types) |
+| `numinance.plugin.v1` | `PluginService`, `HostService`, `Envelope`, `ActionContext`, `ActionResult`, `Diagnostic`, `Manifest` | [PluginService](/docs/protocol/plugin-service), [HostService](/docs/protocol/host-service), [Envelope](/docs/protocol/envelope-action-context) |
+| `numinance.ports.PORT.v1` | Nine typed ports: scm, ticketing, ciexecutor, authorexecutor, sandboxprovider, verifier, knowledge, evidencestore, transparencylog | [Capability ports](/docs/protocol/capability-ports) |
+| `numinance.kinds.v1` | Sixteen configuration kinds and `Metadata`, `Scope`, `MergeDirective` | [Kinds and JSON Schema](/docs/protocol/kinds-and-jsonschema) |
+| `numinance.evidence.v1` | `record`, `attestation`, `checkpoint`, `anchor`, `bundle_manifest`, `inclusion_proof`, `reconciliation_report` | [Evidence](/docs/evidence) |
+| `numinance.events.v1` | Reference-only event payloads: `change`, `envelope`, `evals`, `evidence`, `policy` | Source files under `proto/numinance/events/v1/` |
+
+```text
+proto/numinance/
+  annotations/v1/   types/v1/   plugin/v1/   events/v1/   evidence/v1/   kinds/v1/
+  ports/{scm,ticketing,ciexecutor,authorexecutor,sandboxprovider,verifier,knowledge,evidencestore,transparencylog}/v1/
+```
+
+### How the packages fit
+
+A plugin implements one or more ports. The host talks to it through `PluginService` (`Handshake`, `GetManifest`, `GetDescriptors`, `Invoke`, `Health`, `Shutdown`). During an `Invoke`, the plugin calls back through `HostService` to log, emit evidence, resolve references and request a credential handle. Everything the host decides about a call comes from the annotations in the port descriptors, the grant, and the policy decision, and ends as a record in the evidence chain. Configuration kinds are the customer-owned YAML that tells the runtime which ports, packs and floors apply.
+
+## Versioning and compatibility
+
+Identifiers carry only the major version (`numinance.ports.ciexecutor.v1`, `apiVersion: numinance.dev/v1`); releases carry x.y.z. The policy is in `VERSIONING.md` in the spec repository.
+
+| Artifact | MAJOR when | MINOR | PATCH |
+|---|---|---|---|
+| Wire protocol `numinance.plugin.vN` | An RPC or field is removed or renamed; semantic change | A new RPC or field behind a protocol capability | Docs |
+| Port `numinance.ports.PORT.vN` | Any `buf breaking` FILE break; Core verb change; risk lowered | New capability, optional field, enum value | Docs |
+| Config kind `numinance.dev/vN` | A field is removed, renamed or retyped; a default changed | An optional field with `since` | Messages |
+| Plugin | Drops a port or protocol major, a capability or a config field; widens permissions | New capability or action | Fix |
+| Pack, policy or playbook | A new deny; a component removed | Additions; equal or looser decisions | Fix |
+
+### The `since` rule
+
+Minors are additive and every addition carries `since`. For an RPC it is `ActionOptions.since`; for a field it is `FieldAnnotations.since`, required on every field added after 1.0.0. `deprecated_in` and `replaced_by` mark a field on its way out. Most elements are `since: "1.0.0"`. Two examples of later additions are `RequestCredentialResponse.egress_proxy` (`since: "1.1.0"`) and the entire ticketing port (`since: "1.2.0"`). A sender uses a field added in a later minor only when the negotiated spec version is at least that minor, or behind a negotiated capability, because the host rejects fields its descriptor copy does not know.
+
+### Major versions, deprecation and support windows
+
+- **Pre-GA stages.** `v1alpha1` is `1.0.0-alpha.1` (off by default) and `v1beta1` is `1.0.0-beta.1` (on by default). `EvalSet` is an alpha kind today.
+- **Unknown fields.** In YAML an unknown field is an error except under a reverse-DNS `extensions:` map. On the wire, unknown fields are preserved by the protobuf layer but the plugin host decodes `Invoke` messages strictly and rejects them.
+- **Engine support windows.** The engine serves protocol majors N and N-1 for 24 months after N+1 reaches GA, and port majors M and M-1 for 12 months via shims. Official plugins are tested against engine N, N-1 and N-2.
+- **Deprecations** ship with `deprecated_in` and `replaced_by`, a `DEPRECATED` diagnostic, a codemod and a conformance marker.
+- **Lockfiles** pin version, digest, installed-tree hashes and signer identity. Widening permissions always requires re-approval.
+
+Before the first tag nothing is released: untagged SDK packages may change in breaking ways, and the pull request declares it. After the first tag the table above applies. The checkout these docs were verified against carries no tags, so treat the whole surface as pre-GA. Project-level rules are on [Versioning](/docs/project/versioning).
+
+### buf configuration
+
+The repository lints and breaks-checks the protocol with buf:
+
+```yaml title="buf.yaml"
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+    - COMMENTS
+  except:
+    - FIELD_NOT_REQUIRED
+    - PACKAGE_NO_IMPORT_CYCLE
+  rpc_allow_same_request_response: false
+  rpc_allow_google_protobuf_empty_requests: false
+  rpc_allow_google_protobuf_empty_responses: false
+  service_suffix: ""
+breaking:
+  use:
+    - FILE
+  ignore_unstable_packages: true
+```
+
+`COMMENTS` means every element is documented in the proto itself; `FILE`-level breaking detection is what the "any `buf breaking` FILE break" rule in the table refers to. `buf.gen.yaml` generates Go (`protoc-gen-go`, gRPC and Connect stubs), Python and TypeScript code, plus JSON Schema 2020-12 for the configuration kinds only. See [Generating clients](/docs/sdk/generating-clients) for what is verified and what is pre-alpha.
+
+## Changing the protocol
+
+Protected files (the annotations, for example) change only through an RFC and a security review. Four RFCs exist at the verified revision:
+
+| RFC | Subject | Status at the verified revision |
+|---|---|---|
+| 0001 | `host_only` field annotation | Accepted |
+| 0002 | `resource_name` field annotation | Accepted |
+| 0003 | The evidence chain and export format, `evidence/v1` | Open |
+| 0004 | The `EvalSet` kind | Accepted |
+
+See [RFCs](/docs/project/rfcs) and [Governance](/docs/project/governance).
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| A consumer sees an enum number it does not know | Rejects it, rather than guessing. |
+| A plugin ships a modified copy of a port file | Install fails; the host copy is authoritative. |
+| A change lowers the risk of an existing RPC | Counts as a major, contract-breaking change. |
+| A newer field reaches an older host | Rejected by strict decoding; gate it on the negotiated spec version or a capability. |
+
+## Next steps
+
+<Cards>
+  <Card title="PluginService" href="/docs/protocol/plugin-service" description="Start with the lifecycle RPCs and the Invoke stream." />
+  <Card title="Capability ports" href="/docs/protocol/capability-ports" description="Pick the port your provider implements." />
+  <Card title="Kinds and JSON Schema" href="/docs/protocol/kinds-and-jsonschema" description="Typed configuration and how it is validated." />
+</Cards>

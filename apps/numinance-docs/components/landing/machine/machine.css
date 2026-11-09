@@ -1,0 +1,206 @@
+/* Shared mechanics for the landing machines: positioning along a rail, station states, moving parts.
+   --i = current index, --n = station count, --ax/--ay = rail axis (vertical rail x / horizontal rail y). */
+
+.mx-at,
+.mx-rider {
+  position: absolute;
+  z-index: 20;
+  left: var(--ax, 40px);
+  top: calc((var(--i) + 0.5) / var(--n) * 100%);
+  transform: translate(-50%, -50%);
+  transition:
+    top var(--dur, 0.5s) linear,
+    left var(--dur, 0.5s) linear;
+}
+.mx-rider {
+  z-index: 30;
+  left: calc(100% - 30px);
+}
+.mx-line {
+  position: absolute;
+  left: var(--ax, 40px);
+  top: calc(0.5 / var(--n) * 100%);
+  bottom: calc(0.5 / var(--n) * 100%);
+  border-left: 1px dashed var(--lp-line-strong);
+}
+.mx-fill {
+  position: absolute;
+  left: calc(var(--ax, 40px) - 1px);
+  top: calc(0.5 / var(--n) * 100%);
+  height: calc(var(--i) / var(--n) * 100%);
+  border-left: 3px solid var(--lp-orange);
+  transition: height var(--dur, 0.5s) linear;
+}
+
+@media (min-width: 1024px) {
+  .mx-lg.mx-at {
+    left: calc((var(--i) + 0.5) / var(--n) * 100%);
+    top: var(--ay);
+  }
+  .mx-lg.mx-rider {
+    left: calc((var(--i) + 0.5) / var(--n) * 100%);
+    top: var(--ry, 0px);
+    transform: translate(-50%, -100%);
+  }
+  .mx-lg.mx-line {
+    left: calc(0.5 / var(--n) * 100%);
+    right: calc(0.5 / var(--n) * 100%);
+    top: var(--ay);
+    bottom: auto;
+    border-left: 0;
+    border-top: 1px dashed var(--lp-line-strong);
+  }
+  .mx-lg.mx-fill {
+    left: calc(0.5 / var(--n) * 100%);
+    top: calc(var(--ay) - 1px);
+    height: 0;
+    width: calc(var(--i) / var(--n) * 100%);
+    border-left: 0;
+    border-top: 3px solid var(--lp-orange);
+    transition: width var(--dur, 0.5s) linear;
+  }
+}
+@media (min-width: 768px) {
+  .mx-md.mx-at {
+    left: calc((var(--i) + 0.5) / var(--n) * 100%);
+    top: var(--ay);
+  }
+  .mx-md.mx-rider {
+    left: calc((var(--i) + 0.5) / var(--n) * 100%);
+    top: var(--ry, 0px);
+    transform: translate(-50%, -100%);
+  }
+  .mx-md.mx-line {
+    left: calc(0.5 / var(--n) * 100%);
+    right: calc(0.5 / var(--n) * 100%);
+    top: var(--ay);
+    bottom: auto;
+    border-left: 0;
+    border-top: 1px dashed var(--lp-line-strong);
+  }
+  .mx-md.mx-fill {
+    left: calc(0.5 / var(--n) * 100%);
+    top: calc(var(--ay) - 1px);
+    height: 0;
+    width: calc(var(--i) / var(--n) * 100%);
+    border-left: 0;
+    border-top: 3px solid var(--lp-orange);
+    transition: width var(--dur, 0.5s) linear;
+  }
+}
+/* always-horizontal rails (short tracks) */
+.mx-hz.mx-at {
+  left: calc((var(--i) + 0.5) / var(--n) * 100%);
+  top: var(--ay);
+}
+.mx-hz.mx-line {
+  left: calc(0.5 / var(--n) * 100%);
+  right: calc(0.5 / var(--n) * 100%);
+  top: var(--ay);
+  bottom: auto;
+  border-left: 0;
+  border-top: 1px dashed var(--lp-line-strong);
+}
+.mx-hz.mx-fill {
+  left: calc(0.5 / var(--n) * 100%);
+  top: calc(var(--ay) - 1px);
+  height: 0;
+  width: calc(var(--i) / var(--n) * 100%);
+  border-left: 0;
+  border-top: 3px solid var(--lp-orange);
+  transition: width var(--dur, 0.5s) linear;
+}
+
+/* ---- station illustrations: states come from the parent [data-state=idle|active|done] ---- */
+.mx-bay .s-act,
+.mx-bay .s-done,
+.mx-bay .s-seen {
+  opacity: 0;
+  transition: opacity 0.2s steps(3, end);
+}
+.mx-bay[data-state="active"] .s-act,
+.mx-bay[data-state="done"] .s-done,
+.mx-bay:not([data-state="idle"]) .s-seen {
+  opacity: 1;
+}
+.mx-bay .grow {
+  transform-box: fill-box;
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 0.45s steps(6, end);
+}
+.mx-bay:not([data-state="idle"]) .grow {
+  transform: scaleX(1);
+}
+.mx-bay .gate-arm {
+  transform-box: view-box;
+  transform-origin: 14px 16px;
+  transition: transform 0.5s steps(5, end);
+}
+.mx-bay[data-state="done"] .gate-arm {
+  transform: rotate(-72deg);
+}
+.mx-bay .slip {
+  transform: translateY(-16px);
+  transition: transform 0.7s steps(7, end);
+}
+.mx-bay[data-state="done"] .slip {
+  transform: translateY(0);
+}
+.mx-bay[data-state="active"] .piston {
+  animation: mx-pump 0.7s steps(4, end) infinite alternate;
+}
+.mx-bay[data-state="active"] .scan {
+  animation: mx-sweep 0.9s steps(9, end) infinite alternate;
+}
+.mx-bay[data-state="active"] .caret,
+.mx-bay[data-state="active"] .blink {
+  animation: mx-blink 0.7s steps(1, end) infinite;
+}
+@keyframes mx-pump {
+  to {
+    transform: translateY(7px);
+  }
+}
+@keyframes mx-sweep {
+  to {
+    transform: translateX(36px);
+  }
+}
+@keyframes mx-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes mx-feed {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mx-at,
+  .mx-rider,
+  .mx-fill,
+  .mx-bay *,
+  .mx-anim,
+  .mx-anim * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+@keyframes mx-swap {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+.mx-swap {
+  animation: mx-swap 0.35s steps(7, end) both;
+}

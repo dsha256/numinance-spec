@@ -1,0 +1,23 @@
+{
+  "/docs/concepts/evidence-and-trust-roots": "/docs/concepts/evidence-and-trust",
+  "/docs/concepts/policies-grants-capabilities": "/docs/concepts/governed-execution",
+  "/docs/architecture/data-plane-control-plane": "/docs/architecture/data-and-control-planes",
+  "/docs/architecture/plugins-and-host": "/docs/architecture/plugin-host",
+  "/docs/architecture/separation-of-duties": "/docs/architecture/authority-and-policy",
+  "/docs/protocol/annotations-and-governance": "/docs/protocol/governance-annotations",
+  "/docs/protocol/configuration-kinds": "/docs/protocol/kinds-and-jsonschema",
+  "/docs/protocol/manifests-and-intents": "/docs/integrations/manifest-and-capabilities",
+  "/docs/protocol/plugin-and-host-services": "/docs/protocol/plugin-service",
+  "/docs/protocol/ports": "/docs/protocol/capability-ports",
+  "/docs/evidence/caller-pinned-trust-roots": "/docs/evidence/trust-levels",
+  "/docs/evidence/canonical-form": "/docs/evidence/record-chain",
+  "/docs/evidence/chain-and-records": "/docs/evidence/record-chain",
+  "/docs/evidence/export-bundles": "/docs/evidence/export-format",
+  "/docs/evidence/offline-verifier": "/docs/evidence/offline-verification",
+  "/docs/evidence/receipts": "/docs/evidence/anchoring-and-receipts",
+  "/docs/evidence/transparency-log": "/docs/evidence/anchoring-and-receipts",
+  "/docs/evidence/verification-levels": "/docs/evidence/trust-levels",
+  "/docs/integrations/adapter-development": "/docs/integrations/custom-plugin-go",
+  "/docs/integrations/official-adapters": "/docs/integrations/official-providers",
+  "/docs/cli/limitations": "/docs/cli/validate"
+}

@@ -1,0 +1,268 @@
+---
+title: Verify a run
+description: Check an evidence export offline with numi evidence verify, read the four ways it fails, gate CI on the right JSON fields, and pin your keys independently of the export.
+---
+
+<FeatureStatus kind="public-spec">
+`numi evidence verify` and the `sdk/go/evidenceverify` package are in the open build and pass every conformance vector. Producing an export (`evidence export`) is not in the open build: the exports in this guide are the conformance fixtures shipped in the spec.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "cli/README.md",
+    "docs/evidence/verification.md",
+    "conformance/evidence/v1/README.md",
+    "conformance/evidence/v1/vectors/",
+    "sdk/go/evidenceverify/",
+  ]}
+/>
+
+<ShortProductTruth>Don't trust the agent. Check the evidence. A verified export proves who wrote the records and that the chain was not changed since. It does not prove the code is correct.</ShortProductTruth>
+
+## When to use this
+
+Run verification whenever a reviewer, an auditor or a release gate must decide whether a change's record can be believed, without access to the system that produced it. The verifier is offline, read-only, bounded in what it reads, and open source, so the party doing the checking does not have to trust the party that made the export.
+
+## Prerequisites
+
+- The open CLI built from a spec checkout: `go build -o ./bin/numi ./cli/numi`, or `go run ./cli/numi ...`. See [Install](/docs/get-started/install).
+- An export directory. In this guide, the fixtures under `conformance/evidence/v1/exports/`.
+- The **pinned** public keys: the runner key (64 hex characters), the transparency log key and the log origin. You obtain these from your own records, not from the export.
+
+All commands below were run from `conformance/evidence/v1` inside the spec checkout, using the prebuilt `numi` at revision 3c74d59.
+
+## What verified means
+
+The verifier reads the records of one change, recomputes each hash, checks each signature against the keys you pinned, checks that the chain head is proved under the log you pinned, and re-derives the attestation from the chain. The result is one of several levels. `verified` is the top one, and it is the only one that rests entirely on keys you chose.
+
+| Level | Signatures | Anchor | Exit |
+| --- | --- | --- | --- |
+| `verified` | Under pinned runner keys | Head proved under the pinned log | 0 |
+| `self-consistent` | Under keys the export states only | Not checked | 5 |
+| `unauthenticated` | Not checked (`--skip-signatures`) | Not checked | 5 |
+| `failed` | Any finding | n/a | 3 |
+
+What `verified` does **not** say: that the code is correct, that the tests were thorough, that the model reasoned well, or that a compromised host logged every event. It says the provenance and chain integrity hold under the keys you pinned. Read [Threat model and limits](/docs/evidence/threat-model-and-limits) before relying on it.
+
+<EvidenceChainInspector />
+
+## Verify a good export
+
+```bash title="from conformance/evidence/v1"
+numi evidence verify \
+  --runner-key keys/runner.pub \
+  --log-key keys/log.pub --log-origin numinance.test/log \
+  --complete exports/closed-author
+```
+
+<VerifiedSnippet what="numi evidence verify with pinned runner key, log key and origin, --complete" exit="exit 0">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 12, head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48
+state: ended Closed
+level: verified
+chain: records link, hash and end as stated
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+attestation: signed, re-derived from the chain
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+not applicable: deployment.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+not applicable: observation.json (not applicable at PR level: ... same reason)
+result: verified
+```
+
+</VerifiedSnippet>
+
+Two lines are not green and should not be skimmed. `credential_scopes` and `network_policy` are `unsourced`: the attestation carries no statement from a credential broker or an egress proxy, so the export proves nothing about those. And `deployment.json` and `observation.json` are marked not applicable because this change closed at PR level, and the chain bears that out. A part declared not applicable that the chain contradicts is a failure (`part_contradiction`).
+
+## Four ways it fails
+
+The conformance suite ships a failing vector for each tampering case. Each of these runs below used the same pinned keys as the success above, against an export that the vector names. The `absent:` lines that every failed report also prints are omitted for brevity.
+
+### 1. A record edited in place: `chain_broken`
+
+The vector `forged-record` edits a record and leaves its `record_hash`, so the hash no longer matches the content.
+
+<VerifiedSnippet what="numi evidence verify ... exports/forged-record (absent: lines omitted)" exit="exit 3">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 0, head 
+state: open (no terminal record)
+level: failed
+chain: failed
+signatures: not verified
+anchor: not proved
+attestation: none
+FAIL chain_broken: a record does not match its record_hash
+result: failed
+```
+
+</VerifiedSnippet>
+
+Notice `records: 0` and no head: a report for a broken chain does not claim a head, signatures or an anchor.
+
+### 2. A signature changed: `signature_invalid`
+
+The vector `signature-edited-in-place` changes one base64 character of a record's signature. The key is trusted and the signature fails.
+
+<VerifiedSnippet what="numi evidence verify ... exports/signature-edited-in-place (absent: lines omitted)" exit="exit 3">
+
+```text
+level: failed
+chain: failed
+signatures: not verified
+FAIL signature_invalid: a record signature does not verify
+result: failed
+```
+
+</VerifiedSnippet>
+
+### 3. A signer you did not pin: `signer_untrusted`
+
+An attacker who builds a complete, self-consistent chain with their own key gets a chain that is internally valid. It is rejected because their key is not one you pinned. This run points `--runner-key` at the wrong key for the `closed-author` export:
+
+<VerifiedSnippet what="numi evidence verify --runner-key keys/other-runner.pub ... exports/closed-author (absent: lines omitted)" exit="exit 3">
+
+```text
+level: failed
+FAIL signer_untrusted: a record names a key that is not trusted
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+result: failed
+```
+
+</VerifiedSnippet>
+
+(The two extra findings follow from the signer failure: the not-applicable declarations cannot be borne out by a chain whose signatures are not trusted.)
+
+### 4. Another genuine chain: `expectation_mismatch`
+
+A different but internally consistent export of the same change, signed by the pinned keys and anchored, verifies. A verifier cannot tell it from the original on its own. That is what `--expect-head` and `--expect-change` are for: you record the head hash when you approve a change, and the check later fails if the export presented is not that chain.
+
+```bash title="a wrong expected head against exports/closed-basic"
+numi evidence verify \
+  --runner-key keys/runner.pub \
+  --log-key keys/log.pub --log-origin numinance.test/log \
+  --expect-head sha256:cfe3d79b4663e5a178e3720a0f44c5503a79c7fe5c2230192fc3bdadb8e89393 \
+  exports/closed-basic
+```
+
+<VerifiedSnippet what="the command above (absent: lines omitted)" exit="exit 3">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 4, head sha256:f660cbc6ee23d051bd40f405bc60f2947b10577324e15172e5f1464b624b0d8c
+state: ended Closed
+level: failed
+chain: records link, hash and end as stated
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+attestation: signed, re-derived from the chain
+FAIL expectation_mismatch: the head is not the one expected
+result: failed
+```
+
+</VerifiedSnippet>
+
+Here the chain and signatures are fine, which is the point: only the caller's own expectation catches a swap for another valid chain. `--expect-change` takes a `chg_` id and exits 2 with a usage error for anything else.
+
+The full set of vectors is under `conformance/evidence/v1/vectors/*/expected.json`, each naming its export, flags, exit code and finding codes. See [Conformance vectors](/docs/evidence/conformance-vectors).
+
+## Exit codes
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | A pass, with or without an allowance flag |
+| 2 | Usage error: none or two key modes, bad flag value, a malformed `--expect-change` |
+| 3 | A report with a finding, or a refused directory path |
+| 4 | The directory does not exist |
+| 5 | A consistent export weaker than `verified` |
+| 7, 8 | I/O error, timeout |
+
+Exit 0 is not the same as `verified`. An allowance flag such as `--allow-unanchored` makes a weaker pass exit 0 and suffixes the level (`verified, unanchored`). That is why a CI gate must read the JSON, not the exit code alone.
+
+## Wire it into CI
+
+The rule from the CLI documentation: require `level_enum == "verified"` and an empty `weakened_by_flags`, never a prefix of the `level` string. A `verified` result can still carry declared-absent parts, so also read the `absent` list, or pass `--complete`.
+
+```sh title="gate.sh"
+#!/bin/sh
+set -u
+report=$(numi evidence verify --json \
+  --runner-key keys/runner.pub --log-key keys/log.pub --log-origin numinance.test/log \
+  --complete "$1")
+code=$?
+echo "$report" | jq -r '"level_enum=\(.level_enum) weakened_by_flags=\(.weakened_by_flags|length) absent=\((.absent // [])|length)"'
+[ "$code" -eq 0 ] || { echo "verify exit $code"; exit 1; }
+echo "$report" | jq -e '.level_enum == "verified" and (.weakened_by_flags | length == 0)' >/dev/null || { echo "weaker than verified"; exit 1; }
+echo "gate passed"
+```
+
+<VerifiedSnippet what="the script above, run against exports/closed-author then exports/forged-record" exit="exit 0 then exit 1">
+
+```text
+level_enum=verified weakened_by_flags=0 absent=0
+gate passed
+level_enum=failed weakened_by_flags=0 absent=5
+verify exit 3
+```
+
+</VerifiedSnippet>
+
+### Read the absent list
+
+`--complete` turns a declared-absent part into a failure. Without it, the same `closed-basic` export is `verified`, with five parts listed in `absent`:
+
+```text
+{"level_enum":"verified","absent":["change.json","verification/","review/","deployment.json","observation.json"]}
+```
+
+With `--complete` the same export exits 3 and prints `FAIL parts_absent: a part is absent and --complete was given`. Decide per pipeline: a gate that must know a verifier report and a reviewer decision exist should demand `--complete`, or inspect `absent` for the parts it needs. Treat each absent part as a statement that this export does not say anything about that area.
+
+## Pin keys independently
+
+The flags give you three modes, and exactly one is required:
+
+- `--runner-key FILE` (repeatable), with `--log-key` and `--log-origin`: the only mode that can reach `verified`. Any pinned runner key may sign any record, the attestation or the manifest.
+- `--trust-bundle-keys`: trusts the keys the export states. The best level is `self-consistent`.
+- `--skip-signatures`: checks no signature. The best level is `unauthenticated`.
+
+<VerifiedSnippet what="numi evidence verify --trust-bundle-keys exports/closed-author (selected lines)" exit="exit 5 (the CLI reports a consistent export weaker than verified)">
+
+```text
+level: self-consistent
+signatures: verified under keys the export states only
+anchor: not checked (no log pinned)
+result: self-consistent
+```
+
+</VerifiedSnippet>
+
+A key that arrives inside the export can only ever tell you the export agrees with itself. The attacker who forges a whole export brings their own key and their own bundle. The pin must therefore come through a channel the exporter does not control: a file in your own repository, a secrets store, a record your security team signed. There is no built-in trust root in the verifier and none in the spec. Rotating a key means updating your pin and, for old exports, keeping the old pin alongside the new one, since `--runner-key` is repeatable.
+
+<Callout type="info" title="Log pinning has two parts">
+`--log-key` and `--log-origin` go together. The origin names which log's checkpoints you accept. A correct key with the wrong origin, or the reverse, fails the anchor check (see the vectors `wrong-log-key` and `wrong-log-origin`).
+</Callout>
+
+## Failure modes and troubleshooting
+
+| What you see | Meaning | Fix |
+| --- | --- | --- |
+| `exactly one key mode is required`, exit 2 | No key mode or two modes given | Pick `--runner-key` with the log flags |
+| Usage error about the log flags, exit 2 | `--log-key` and `--log-origin` must be given together | Provide both |
+| `level: self-consistent`, exit 5 | Keys come from the export | Pin your own runner key |
+| `anchor_invalid` | Head not proved under the pinned log, or wrong log key | Check the log key, origin and that the export has a head proof |
+| `signer_untrusted` | A record is signed by a key you did not pin | Do not accept: investigate the signer |
+| Exit 0 and a `verified, unanchored` level | An allowance flag was given | Gate on `level_enum` and `weakened_by_flags` |
+| `parts_absent` | `--complete` and a part is missing | Decide whether the missing part matters for your gate |
+
+## Next steps
+
+<Cards>
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="Verifier algorithm, levels and every finding code." />
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="How the levels are derived and what each one allows." />
+  <Card title="Evidence quickstart" href="/docs/get-started/evidence-quickstart" description="The shortest path to a first verified export." />
+</Cards>

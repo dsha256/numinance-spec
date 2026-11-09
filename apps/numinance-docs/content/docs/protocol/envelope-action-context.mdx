@@ -1,0 +1,268 @@
+---
+title: Envelope, ActionContext and ActionResult
+description: The messages that carry one action to a plugin and one result back, with grant, policy decision, budget and typed Any rules.
+---
+
+<FeatureStatus kind="public-spec">These messages are part of the Apache-2.0 numinance-spec protocol (`numinance.plugin.v1`). The host that builds the envelope and judges the result is in the proprietary runtime.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/plugin/v1/envelope.proto", "proto/numinance/plugin/v1/manifest.proto", "proto/numinance/types/v1/types.proto"]} />
+
+<ShortProductTruth>
+The Envelope is the authority for one action. The host sets everything that matters; the plugin answers with claims that the host checks or records, and trusts none of them.
+</ShortProductTruth>
+
+## When to use this page
+
+Use it to see exactly what a plugin receives for one `Invoke` (who it acts as, under which grant and policy decision, with what budget and deadline) and what it may report back. The transport for these messages is [`PluginService.Invoke`](/docs/protocol/plugin-service#invoke).
+
+## Rules for the whole file
+
+- Every element is `since: "1.0.0"`.
+- Enums are closed. A consumer rejects the zero value and any unknown number.
+- No field carries credential material or content. Large data travels as a `types.v1.Reference`: references and digests, never content.
+- Every string is at most 1024 bytes and every repeated field at most 256 entries unless stated; over-limit input is rejected, never truncated. Duplicates are rejected, keyed as: `evidence_ids` by value, `side_effects` by `kind` and `target`, `diagnostics` by all four fields. Every repeated bound applies per invocation across the stream.
+- A rejection names an index-based field path and the violated bound, never the offending value.
+
+## Envelope
+
+```proto title="proto/numinance/plugin/v1/envelope.proto"
+message Envelope {
+  string method = 1;
+  ActionContext context = 2;
+  google.protobuf.Any request = 3;
+}
+```
+
+| Field | Number | Rule |
+|---|---:|---|
+| `method` | 1 | The full method name: a slash, the package, a dot, the service, a slash and the method, for example `/numinance.ports.scm.v1.ScmService/GetFile`. The method must be in a `numinance.ports.*` file the host serves and have a capability entry in the installed manifest. A non-Core capability must also be in the negotiated `HandshakeResponse.capabilities`. Otherwise the host does not dispatch. |
+| `context` | 2 | Set by the host after the policy decision. The plugin never supplies or changes it. |
+| `request` | 3 | The typed request, at most 4 MiB serialized (rejected, never truncated). Its type URL is `type.googleapis.com/` plus the method's input type in the host's descriptor copy. Any other type URL is rejected. |
+
+### Typed Any
+
+`request` and `ActionResult.result` are `google.protobuf.Any`, but not free-form: the type URL is derived from the method, not chosen by the sender. A request whose type URL is not exactly `type.googleapis.com/` plus the method's input type is rejected, and a result must name the method's output type. Decoding is strict and rejects unknown fields. A `Reference` inside an `Any` is never resolvable through [`ResolveReference`](/docs/protocol/host-service#resolvereference), which is why references that must be resolvable sit in ordinary fields of the request.
+
+## ActionContext
+
+`ActionContext` is the authority under which one action runs. Every field is set by the host.
+
+```proto title="proto/numinance/plugin/v1/envelope.proto"
+message ActionContext {
+  string invocation_id = 1;
+  string change_id = 2;
+  string run_id = 3;
+  numinance.types.v1.PrincipalKind actor_kind = 4;
+  string actor_principal = 5;
+  string grant_id = 6;
+  string policy_decision_id = 7;
+  numinance.types.v1.Digest plan_digest = 8;
+  numinance.types.v1.Digest profile_digest = 9;
+  string idempotency_key = 10;
+  google.protobuf.Timestamp deadline = 11;
+  ResourceBudget budget = 12;
+  numinance.types.v1.ResidencyClass residency = 13;
+  bool dry_run = 14;
+}
+```
+
+| Field | Number | Meaning |
+|---|---:|---|
+| `invocation_id` | 1 | Host-assigned: `inv_` plus 32 lowercase hex characters (128 bits of host randomness), unique per Invoke. The plugin quotes it in every [HostService](/docs/protocol/host-service) call; the host rejects an id not in flight for the calling plugin. |
+| `change_id` | 2 | The Change the action belongs to, `chg_` prefixed. |
+| `run_id` | 3 | The run the action belongs to, `run_` prefixed. |
+| `actor_kind` | 4 | The identity the action runs as, a [`PrincipalKind`](/docs/protocol/shared-types#principalkind). Unspecified is rejected. `PRINCIPAL_KIND_ENGINE` is producer-only and is refused here: it names who publishes an Engine fact, never an actor. |
+| `actor_principal` | 5 | The principal that acts, as in the evidence record's `actor_principal`. |
+| `grant_id` | 6 | The grant that allows the action, `grant_` prefixed. |
+| `policy_decision_id` | 7 | The policy decision that allowed the action, `dec_` prefixed. The host never dispatches without one. |
+| `plan_digest` | 8 | Digest of the plan the action belongs to; its value equals the evidence record's `plan_digest`. Required for DECLARATIVE `Apply`. |
+| `profile_digest` | 9 | Digest of the SDLC profile in force. |
+| `idempotency_key` | 10 | The key a KEYED capability uses so a replay has no extra effect. |
+| `deadline` | 11 | When the call must end; the host cancels it then. |
+| `budget` | 12 | The effective [`ResourceBudget`](#resourcebudget), every field non-zero (the host resolves defaults before dispatch): the minimum of declared and grant budget, under the policy ceiling. |
+| `residency` | 13 | The Change's [`ResidencyClass`](/docs/protocol/shared-types#residencyclass), derived by the host at Change start. Informational, never a grant; the plugin never declares it. |
+| `dry_run` | 14 | Asks for no side effects. The host sets it only when the method's `supports_dry_run` is true; then any reported side effect above READ fails the call and is recorded. |
+
+### Grants and policy decisions
+
+`grant_id` and `policy_decision_id` are how capability-based authority reaches the plugin. The policy decision ([`DecisionOutcome`](/docs/protocol/shared-types#decisionoutcome) is `ALLOW`, `DENY` or `REQUIRE_APPROVAL`) is made by the host outside the model before dispatch. The plugin receives only the ids of an allow, never the ability to produce or alter one. A plugin has no way to widen its grant: the context is host-set, and HostService calls are accepted only for an `invocation_id` the host has in flight. See [Authority and policy](/docs/architecture/authority-and-policy).
+
+### Limits
+
+Limits arrive as `deadline` and `budget` and are enforced by the host, not requested by the plugin.
+
+## ResourceBudget
+
+```proto title="proto/numinance/plugin/v1/manifest.proto"
+message ResourceBudget {
+  uint64 cpu_millicores = 1;
+  uint64 memory_bytes = 2;
+  uint64 disk_bytes = 3;
+}
+```
+
+A zero value means the host default in a manifest declaration; in `ActionContext.budget` every field is non-zero. `disk_bytes` also caps the total bytes `ResolveReference` may stream in one invocation.
+
+## ActionResult
+
+`ActionResult` is what the plugin reports. Every field is a claim the host checks or records, never trusts.
+
+```proto title="proto/numinance/plugin/v1/envelope.proto"
+message ActionResult {
+  InvokeStatus status = 1;
+  google.protobuf.Any result = 2;
+  repeated string evidence_ids = 3;
+  repeated ObservedSideEffect side_effects = 4;
+  bytes compensation_token = 5;
+  ResourceBudget cost = 6;
+  google.protobuf.Duration duration = 7;
+  repeated Diagnostic diagnostics = 8;
+}
+```
+
+| Field | Number | Meaning |
+|---|---:|---|
+| `status` | 1 | The reported [`InvokeStatus`](#invokestatus). |
+| `result` | 2 | The typed response, at most 4 MiB serialized. Required when status is SUCCEEDED and absent otherwise, except on a server-streaming target (`PluginService.Invoke`): there every RUNNING message carries exactly one stream message here and the terminal message carries none. A RUNNING message with a result is rejected for any other target. |
+| `evidence_ids` | 3 | `ev_` prefixed ids that `HostService.EmitEvidence` returned for this invocation. Any other id is rejected. Terminal message only. |
+| `side_effects` | 4 | Side effects the plugin observed ([`ObservedSideEffect`](#observedsideeffect)). One above the capability's declared `side_effect` fails the call. Terminal message only. |
+| `compensation_token` | 5 | Opaque, at most 1024 bytes, annotated `sensitive`. The host stores it outside evidence (evidence carries only its sha256) and passes it back only in a compensation action with its own policy decision and grant, to the same plugin digest inside the same Change. The host deletes it when the Change closes or the breaker trips. |
+| `cost` | 6 | Consumption the plugin reports in ResourceBudget units. Informational; never an input to budget accounting, which uses the host's own measurement. Terminal message only. |
+| `duration` | 7 | Time the plugin reports it took. The host's own measurement is authoritative; negative is rejected. |
+| `diagnostics` | 8 | Structured notes, at most 64. A `Diagnostic` with a phase reason is rejected. |
+
+A RUNNING message carries `status` and `diagnostics` only (plus the stream message in `result` on a server-streaming target).
+
+### What the host does with a claim
+
+| Claim | Host behavior |
+|---|---|
+| `status = SUCCEEDED` | Taken as a claim. The host derives the evidence `ActionOutcome` itself; PARTIAL is never claimed but derived when declared evidence is missing. |
+| `evidence_ids` | Each id must be one the host returned for this invocation. |
+| `side_effects` | A side effect above the capability's declared `side_effect` fails the call. With `dry_run`, anything above READ fails and is recorded. |
+| `cost`, `duration` | Recorded as reported; the host's own measurement decides. |
+
+### ObservedSideEffect
+
+```proto title="proto/numinance/plugin/v1/envelope.proto"
+message ObservedSideEffect {
+  SideEffect kind = 1;
+  string target = 2;
+}
+```
+
+`kind` is a `SideEffect` (`NONE` is rejected here). `target` identifies the external resource, printable characters only; it is untrusted and rendered delimited and labelled.
+
+### SideEffect
+
+```proto title="proto/numinance/plugin/v1/manifest.proto"
+enum SideEffect {
+  SIDE_EFFECT_UNSPECIFIED = 0;
+  SIDE_EFFECT_NONE = 1;
+  SIDE_EFFECT_READ = 2;
+  SIDE_EFFECT_WRITE = 3;
+  SIDE_EFFECT_DELETE = 4;
+  SIDE_EFFECT_DEPLOY = 5;
+}
+```
+
+`READ` reads external state, `WRITE` creates or changes it, `DELETE` removes it, `DEPLOY` changes what runs in an environment.
+
+### Diagnostic
+
+```proto title="proto/numinance/plugin/v1/envelope.proto"
+message Diagnostic {
+  Reason reason = 1;
+  Severity severity = 2;
+  string field_path = 3;
+  string subject = 4;
+}
+```
+
+A diagnostic has no free text. `field_path` is empty or starts with the literal `request` or `response`, resolves segment by segment against the method's input or output type in the host's descriptor copy (for example `request.items[3].name`), matches `^[a-z][a-z0-9_]*(\[[0-9]+\])?(\.[a-z][a-z0-9_]*(\[[0-9]+\])?)*$` and is at most 256 bytes. `subject` is empty or a full name, at most 256 bytes, that resolves in the host's registry to an element of a `numinance.ports.*` or `numinance.plugin.v1` file (for example `numinance.ports.scm.v1.GetFileRequest.path`). A diagnostic that fails either check is rejected and never rendered.
+
+## Enums
+
+### InvokeStatus
+
+InvokeStatus is how the plugin reports a call; the host derives the evidence/v1 ActionOutcome itself and never trusts the claim.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `INVOKE_STATUS_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `INVOKE_STATUS_RUNNING` | Marks a non-terminal message of an OPERATION call; it is rejected on any other call and on the last message; on a target whose method is server-streaming each RUNNING message carries one stream message in ActionResult.result. |
+| 2 | `INVOKE_STATUS_SUCCEEDED` | Claims the action completed; PARTIAL is never claimed, the host derives it when declared evidence is missing. |
+| 3 | `INVOKE_STATUS_FAILED` | Claims the action did not complete. |
+
+### Severity
+
+Severity is the severity of a diagnostic or log entry.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `SEVERITY_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `SEVERITY_DEBUG` | Detail for troubleshooting. |
+| 2 | `SEVERITY_INFO` | A normal event. |
+| 3 | `SEVERITY_WARNING` | An event that needs attention but did not fail the call. |
+| 4 | `SEVERITY_ERROR` | An event that failed the call or part of it. |
+
+### Reason
+
+Reason is the closed vocabulary of diagnostics, log entries and progress reports; there is no free text. The outcomes (REASON_DEPRECATED through REASON_CANCELLED) are valid in Diagnostic and Log; the phases (REASON_STARTED through REASON_COMPLETED) are valid in ReportProgress and Log; a value added later is placed in a subset by its name in this comment, never by its number; the host rejects a value outside the subset of its consumer. This enum may grow.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `REASON_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `REASON_DEPRECATED` | Marks use of a deprecated element named by Diagnostic.subject. |
+| 2 | `REASON_INVALID_ARGUMENT` | Marks input that failed validation. |
+| 3 | `REASON_LIMIT_EXCEEDED` | Marks input or output over a stated bound. |
+| 4 | `REASON_NOT_FOUND` | Marks a target that does not exist. |
+| 5 | `REASON_CONFLICT` | Marks a target whose state prevents the action. |
+| 6 | `REASON_PERMISSION_DENIED` | Marks a refusal by the upstream system. |
+| 7 | `REASON_UPSTREAM_UNAVAILABLE` | Marks an upstream system that could not be reached. |
+| 8 | `REASON_UPSTREAM_ERROR` | Marks an upstream system that answered with an error. |
+| 9 | `REASON_RATE_LIMITED` | Marks a call slowed or refused by a rate limit. |
+| 10 | `REASON_TIMEOUT` | Marks a deadline that passed. |
+| 11 | `REASON_CANCELLED` | Marks a call cancelled by the host. |
+| 12 | `REASON_STARTED` | Marks the start of work. |
+| 13 | `REASON_RUNNING` | Marks work in progress. |
+| 14 | `REASON_WAITING` | Marks work blocked on an upstream system. |
+| 15 | `REASON_COMPLETED` | Marks the end of work. |
+
+## Example: an envelope for a read
+
+This is an illustration of which values the host fills for a read-only call. It is not captured output.
+
+<IllustrativeNote>
+Values are illustrative placeholders; no runtime produced this envelope. Ids follow the documented prefixes.
+</IllustrativeNote>
+
+```text
+method:              /numinance.ports.scm.v1.ScmService/GetFile
+context.invocation_id:     inv_<32 lowercase hex characters>
+context.actor_kind:        PRINCIPAL_KIND_AUTHOR_AGENT
+context.grant_id:          grant_...
+context.policy_decision_id: dec_...
+context.dry_run:           false
+request:             Any, type URL type.googleapis.com/numinance.ports.scm.v1.GetFileRequest
+```
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| Method not in a served `numinance.ports.*` file, or no capability entry in the manifest | Host does not dispatch. |
+| Non-Core capability not negotiated | Host does not dispatch. |
+| Request type URL differs from the method's input type | Rejected. |
+| Plugin reports a side effect above the declared one | Call fails. |
+| Plugin lists an `evidence_id` the host did not issue | Rejected. |
+| `Diagnostic` with phase reason, or unresolvable `field_path` or `subject` | Rejected, never rendered. |
+| Zero or unknown enum number | Rejected (closed enums). |
+
+## Next steps
+
+<Cards>
+  <Card title="PluginService" href="/docs/protocol/plugin-service" description="How the Envelope travels in an Invoke stream." />
+  <Card title="Shared types" href="/docs/protocol/shared-types" description="PrincipalKind, ResidencyClass, DecisionOutcome and the other shared enums." />
+  <Card title="Capability ports" href="/docs/protocol/capability-ports" description="The typed methods an envelope can target." />
+</Cards>

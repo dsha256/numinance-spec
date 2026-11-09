@@ -1,0 +1,72 @@
+---
+title: Operations
+description: The operator's mental model for running Numinance day to day - who approves, who can stop it, how autonomy is earned, and how a bad change is undone.
+---
+
+<FeatureStatus kind="designed">Operations describes how the proprietary Numinance runtime is designed to be run. The runtime is not generally available, and none of the operator surfaces below ship in the open <code>numi</code> build.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/kinds/v1/autonomy_policy.proto", "proto/numinance/kinds/v1/playbook.proto", "proto/numinance/kinds/v1/eval_set.proto"]} note="The public contract for ladder levels, breaker positions, playbook qualification and EvalSet. The operator workflows are design." />
+
+<ShortProductTruth>
+Operating Numinance is not watching an agent. It is owning four dials: how much authority exists, who can approve, who can stop everything, and what counts as proof.
+</ShortProductTruth>
+
+## Day two is about authority, not prompts
+
+Once a repository is onboarded, an operator rarely touches a prompt. The work moves to a small set of controls that sit outside the model:
+
+| Control | What it answers | Page |
+| --- | --- | --- |
+| Where it runs | Whose infrastructure holds code, credentials and evidence | [Installation modes](/docs/operations/installation-modes) |
+| Risk and approval | What is allowed, what needs a human, who that human may be | [Risk and approval](/docs/operations/risk-and-approval) |
+| Circuit breaker | How to cap or halt all autonomous work immediately | [Circuit breaker](/docs/operations/circuit-breaker) |
+| Evaluations | When a playbook has earned more autonomy | [Evaluations](/docs/operations/evaluations) |
+| Rollback and recovery | What happens when a change or a run goes wrong | [Rollback and recovery](/docs/operations/rollback-and-recovery) |
+
+Each control is enforced by the runtime, not requested of the agent. That is the point of "Your policy decides. Not the model."
+
+## The operator's mental model
+
+Think of the system as four layers, from the most permanent to the most immediate.
+
+1. **Floors.** Organization-level limits that no narrower scope can raise. A floor says, for example, that high-risk work never exceeds suggestion. Lower scopes may only tighten.
+2. **Policy.** The [AutonomyPolicy](/docs/configuration/autonomy-policy) assigns a ladder level per scope, risk class and environment. Policy is evaluated before every privileged action, outside the model.
+3. **Grants.** For each work unit, the runtime derives a short-lived, narrow grant from profile, playbook step, risk and level. The agent can ask for less, never more.
+4. **Breaker.** A customer-local switch with four positions that caps effective autonomy over everything above it, and needs no outside service to work.
+
+Operations is mostly about the edges of these layers: tuning floors, reviewing approvals, watching for anomalies, tripping the breaker, and deciding when evidence justifies a promotion.
+
+<AutonomyPolicyExplorer />
+
+## What a human is still for
+
+Full autonomy here is configurable, governed and human-accepted. It is never unrestricted. Humans keep four jobs that no agent identity can take over:
+
+- **Approve** changes that policy routes to approval. The approver is a distinct, attributable human, never the author agent.
+- **Accept promotions.** Evaluations can propose that a playbook has qualified for a higher level. A human accepts. Nothing promotes itself.
+- **Trip and reset the breaker.** Reset requires a human and a reason.
+- **Use break-glass.** A named human, time-boxed, separately logged. See [Circuit breaker](/docs/operations/circuit-breaker).
+
+## A typical week, in design terms
+
+<IllustrativeNote>
+This is a description of the designed operating rhythm, not a transcript, and there is no runtime command to copy.
+</IllustrativeNote>
+
+- Review the approvals queue, with each request showing the plan, the evidence so far and the policy reasons that routed it to a human.
+- Skim denied intents and budget exhaustions. A denial is a signal that policy worked, or that a playbook asks for more than it should.
+- Check qualification per playbook. If a playbook has enough clean runs and no severe event, consider accepting a promotion. If it had a severe event, qualification starts over.
+- Confirm the breaker is where you expect it, and that the runtime reports the position you set.
+
+## Failure modes operators should expect
+
+- **Approval fatigue.** If everything routes to a human, humans stop reading. Tighten playbooks and raise floors deliberately instead of approving by habit.
+- **Silent policy drift.** A policy change is itself a change under protected paths. Review it as code, and treat a widened permission as needing re-approval.
+- **Over-trusting evidence.** Evidence proves provenance and chain integrity under keys you pin. It does not prove the code is correct. See [Evidence and trust](/docs/concepts/evidence-and-trust).
+- **Treating the open CLI as the runtime.** `numi` validates configuration and verifies evidence. It does not run changes. See [Status](/docs/status).
+
+<Cards>
+  <Card title="Installation modes" href="/docs/operations/installation-modes" description="Managed, sovereign and the later air-gapped milestone." />
+  <Card title="Risk and approval" href="/docs/operations/risk-and-approval" description="Risk classes, approvers and separation of duties." />
+  <Card title="Circuit breaker" href="/docs/operations/circuit-breaker" description="Four positions, customer-local, human-reset." />
+</Cards>

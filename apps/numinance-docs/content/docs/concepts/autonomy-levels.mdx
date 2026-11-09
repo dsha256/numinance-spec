@@ -1,0 +1,81 @@
+---
+title: Autonomy levels
+description: The eight-level autonomy ladder, how defaults, rules and floors combine, and why autonomy is qualified and human-accepted before it is raised.
+---
+
+<FeatureStatus kind="public-spec">The ladder and the AutonomyPolicy kind are public and schema-validated. Enforcement happens in the proprietary runtime.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/kinds/v1/autonomy_policy.proto", "schemas/examples/AutonomyPolicy/org-ladder.yaml"]} />
+
+<ShortProductTruth>
+Autonomy is a number you choose per situation, capped by floors nobody below the organization can lower. Start supervised, qualify, authorize.
+</ShortProductTruth>
+
+## The ladder
+
+`AutonomyLevel` is an ordered enum. Each level includes the ones below it.
+
+| Level | Meaning |
+| --- | --- |
+| `AUTONOMY_LEVEL_OBSERVE` | Read and report. No proposals are made. |
+| `AUTONOMY_LEVEL_SUGGEST` | Propose changes without applying them. |
+| `AUTONOMY_LEVEL_IMPLEMENT` | Produce an implementation in an isolated workspace. |
+| `AUTONOMY_LEVEL_PR` | Open a pull request. A human merges. |
+| `AUTONOMY_LEVEL_MERGE` | Merge after the required checks and approvals. |
+| `AUTONOMY_LEVEL_STAGE` | Deploy to a staging environment. |
+| `AUTONOMY_LEVEL_RELEASE` | Release to production through the release pipeline. |
+| `AUTONOMY_LEVEL_OPERATE` | Observe and recover released changes within bounds. |
+
+<AutonomyPolicyExplorer />
+
+## Defaults, rules and floors
+
+An `AutonomyPolicy` has three parts in its `spec`: `defaults`, `rules` and `floors`. This is the organization example from the spec:
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {environment: production}, max_level: AUTONOMY_LEVEL_MERGE}
+```
+
+- A **default** is where a change lands if nothing more specific matches.
+- A **rule** matches on `playbook`, `risk` and `environment` and sets a `level`. Rules can raise or lower the default.
+- A **floor** is a ceiling in practice: it sets a `max_level` for matching changes. A rule cannot exceed it. In the example, high-risk changes can never go above `SUGGEST`, and production never above `MERGE`, whatever a rule says.
+
+Floors are declared with a merge directive that forbids overriding them in lower scopes: a repository policy cannot lift what the organization capped. `numi init` writes a repository policy at `AUTONOMY_LEVEL_PR` with no floors block, because floors set below the org scope are refused.
+
+<Callout type="info" title="What the open build checks">
+`numi validate --files` checks that the document is schema-valid. It does not resolve profiles or apply floors. Ordinary `numi validate` passes the schema checks and then exits 7, because profile resolution needs the proprietary engine.
+</Callout>
+
+## Start supervised, qualify, authorize
+
+A higher level is not granted because a model got better. The intended path is:
+
+1. Start at a supervised level, typically `AUTONOMY_LEVEL_PR`, where a human merges every change.
+2. Qualify: a playbook can declare `qualification` thresholds, such as a minimum number of runs and maximum rework, regression and rollback rates, with zero security escapes. These are measured over real runs.
+3. Authorize: a human accepts the promotion by changing policy. The agent cannot promote itself, and a failed qualification does not raise a level automatically.
+
+If outcomes degrade, the same path works downward: lower the default or add a floor.
+
+## Failure modes
+
+- A rule asks for `MERGE` on a high-risk change: the floor wins and the change stays at `SUGGEST`.
+- A repository tries to set floors: the document is refused.
+- The breaker moves to a more restrictive position: the effective level drops regardless of policy.
+
+## Next steps
+
+<Cards>
+  <Card title="AutonomyPolicy reference" href="/docs/configuration/autonomy-policy" description="All fields and merge behavior." />
+  <Card title="Choose autonomy" href="/docs/guides/choose-autonomy" description="Pick a starting level for a repository." />
+  <Card title="Qualify autonomy" href="/docs/guides/qualify-autonomy" description="Measure before you promote." />
+</Cards>

@@ -1,0 +1,246 @@
+---
+title: "Conformance vectors"
+description: "The evidence/v1 conformance kit: its layout, the expected.json schema, vector statuses, materialize operations, how to run a vector yourself, and a table of real runs against expected outcomes."
+---
+
+<FeatureStatus kind="public-spec">The kit is public data in the spec repository. It currently holds 302 vectors: 294 `shipped` and 8 `target`.</FeatureStatus>
+
+<SourceReference paths={["conformance/evidence/v1/README.md", "conformance/evidence/v1/vectors/index.json", "conformance/evidence/v1/VECTOR-COVERAGE.md", "schemas/evidence/v1/vector-expected.schema.json", "sdk/go/evidenceverify/conformance_test.go"]} />
+
+<ShortProductTruth>
+The vectors are data, not code. A verifier conforms when, for every shipped vector, it reports the same exit code, level and set of finding codes.
+</ShortProductTruth>
+
+## What conformance gives you
+
+Two verifiers that agree on 302 exports, including hundreds of tampered ones, agree on what the specification means. That is the point of the kit: it lets the open Go verifier, the engine's own verifier and any verifier you write in another language be held to the same answers. The open verifier runs every vector, `target` ones included, in `conformance_test.go`. A differential test also compares it with the reference implementation's verifier over every vector and a deterministic mutation corpus.
+
+<Callout type="info" title="Conformance is not certification">
+Passing the vectors shows that a verifier agrees with the specification at a version. It does not audit a deployment, certify a vendor or prove an export is trustworthy. Whether an export is trustworthy depends on the keys you pinned. See [Threat model and limits](/docs/evidence/threat-model-and-limits).
+</Callout>
+
+## Kit layout
+
+<Files>
+  <Folder name="conformance/evidence/v1" defaultOpen>
+    <File name="README.md" />
+    <File name="VECTOR-COVERAGE.md" />
+    <File name="receipt-request-lines.json" />
+    <Folder name="keys">
+      <File name="runner.pub" />
+      <File name="log.pub" />
+      <File name="other-runner.pub" />
+      <File name="third-runner.pub" />
+      <File name="other-log.pub" />
+    </Folder>
+    <Folder name="exports">
+      <File name="closed-basic (and 227 more export directories)" />
+    </Folder>
+    <Folder name="vectors">
+      <File name="index.json" />
+      <File name="forged-record (and 301 more, each with expected.json)" />
+    </Folder>
+  </Folder>
+</Files>
+
+The keys directory also holds a few deliberately odd key files (`runner-uppercase.pub`, `runner-nbsp.pub`, `runner-oversize.pub`, `runner-short.pub`). They test how a key file is read, and a harness must read key files as the shipped command does: a file over 1024 bytes is an error, never a truncated read.
+
+- `exports/<name>/` are golden export directories, generated deterministically by the Numinance evidence code over in-memory adapters with fixed keys, fixed identifiers and a fixed clock. The base exports are verifying Closed changes, an Abandoned, a RolledBack and an open (no terminal record) change, and a Closed change with an attestation gap. Every other export is one of them tampered in one stated way. The generator is private; a vector's meaning is its `description` and its `expect`.
+- `keys/` holds public keys only, one file each, 64 hex characters. No private key is stored and none protects anything.
+- The log origin of every vector is `numinance.test/log`. `runner.pub` is the runner key and `log.pub` the log key. `other-runner.pub` signs only the attacker's export `closed-basic-other-runner-key`. `third-runner.pub` and `other-log.pub` sign nothing and stand for keys a caller pins by mistake.
+
+## One vector: `expected.json`
+
+The shape is defined by `schemas/evidence/v1/vector-expected.schema.json`. This is a real one:
+
+```json title="vectors/closed-allow-unanchored/expected.json"
+{
+  "vector": "closed-allow-unanchored",
+  "description": "--allow-unanchored with no pinned log.",
+  "status": "shipped",
+  "export": "closed-basic",
+  "flags": { "runner_keys": ["keys/runner.pub"], "allow_unanchored": true },
+  "keys": ["keys/runner.pub"],
+  "expect": {
+    "level": "verified, unanchored",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": { "level_enum": "verified", "weakened_by_flags": ["unanchored"] }
+  },
+  "covers": ["level:verified, unanchored", "exit:0"]
+}
+```
+
+| Key | Meaning |
+| --- | --- |
+| `vector` | The name, equal to its directory |
+| `description` | What the vector shows |
+| `status` | `shipped` or `target` (below) |
+| `export` | The directory under `exports/` to verify. Absent only when the vector is about a path that does not exist |
+| `materialize` | Steps to apply, in order, to a fresh copy of the export before verifying |
+| `flags` | The command line, structured |
+| `keys` | The key files under `keys/` the flags name |
+| `expect.level` | The `level` string the report carries, or `null` when the run prints no report |
+| `expect.exit_code` | The process exit code |
+| `expect.finding_codes` | The sorted set of finding codes. Compare as a set, never as an ordered list |
+| `expect.credential_scopes`, `expect.network_policy` | Optional: `sourced` or `unsourced`; report notes, never a level |
+| `expect.target` | The `level_enum` and `weakened_by_flags` a report with the newer JSON keys carries |
+| `covers` | Tags such as `finding:<code>`, `level:<level>`, `exit:<n>`, `rule:<name>`, `mode:<name>` |
+
+## Statuses: shipped and target
+
+| Status | Meaning |
+| --- | --- |
+| `shipped` | The engine's verifier does this today and the Numinance continuous integration proves it. 294 vectors |
+| `target` | Newer behavior: the `--json` keys `level_enum`, `weakened_by_flags` and `anchored_head_record_hash`, and `--expect-change` and `--expect-head`. Both verifiers print it. 8 vectors, all named `target-expect-...` |
+
+A verifier conforms when it matches every `shipped` vector. It conforms to the newer parts of the specification when it also matches the `target` vectors and prints the `expect.target` values.
+
+## Materialize operations
+
+Some conditions cannot be stored portably as data, so a vector asks the harness to build them on a fresh copy of the export:
+
+| `op` | Fields | Effect |
+| --- | --- | --- |
+| `symlink` | `path`, `target` | Replace the file `path` by a symbolic link to `target` |
+| `mkdir` | `path` | Create a directory |
+| `pad_file` | `path`, `size` | Set the file's length to `size` bytes, extending with zero bytes |
+| `add_named_file` | `path` | Create an empty file with that name, for example a name with a control character |
+| `add_files` | `count` | Add `count` empty files named `extra-000.txt` and so on |
+| `export_path_symlink` | none | Verify a symbolic link to the copied directory instead of the directory |
+| `no_directory` | none | Do not create the directory at all |
+| `empty_path` | none | Give the verifier the empty string as the directory path |
+
+Ten vectors use a materialize step. A harness on a system without symbolic links may skip those that need them, and says so.
+
+## Run one vector yourself
+
+From the spec checkout, with the open `numi` built or on `go run`:
+
+1. Make a fresh temporary directory. Copy `exports/<export>` into it. Apply `materialize` in order.
+2. Build the command line from `flags`: `--runner-key <root>/<file>` for each runner key, the mode and allow flags, `--log-key` and `--log-origin`, then `--expect-change` and `--expect-head` for target vectors, then `--json`, then the directory.
+3. Run it. Compare the exit code, the `level`, and the set of `findings[].code` with `expect`. `ok` is true exactly when the exit code is 0.
+
+For a vector without a materialize step, steps 1 to 3 collapse to one command. The vector above is this:
+
+```bash title="conformance/evidence/v1"
+numi evidence verify --runner-key keys/runner.pub --allow-unanchored --json exports/closed-basic
+```
+
+<VerifiedSnippet what="the command above, fields read from the report" exit="0">
+```text
+level='verified, unanchored'  level_enum='verified'  weakened_by_flags=['unanchored']  findings=[]
+```
+</VerifiedSnippet>
+
+A vector with a materialize step needs one preparation. `directory-refused-link` replaces `records.ndjson` with a symbolic link to `summary.json`. Done by hand on a copy of `closed-basic`, the verifier refuses the link and never reads through it:
+
+<VerifiedSnippet what="directory-refused-link, materialized by hand (cp -R, rm records.ndjson, ln -s summary.json records.ndjson)" exit="3">
+```text
+level=failed  findings=[directory_refused]
+```
+</VerifiedSnippet>
+
+### A small harness
+
+This is a complete harness for the vectors without a materialize step. Run it from `conformance/evidence/v1`, passing the path to `numi`.
+
+```python title="run_vector.py"
+#!/usr/bin/env python3
+"""Run conformance vectors against `numi evidence verify`. Run from conformance/evidence/v1.
+Usage: run_vector.py NUMI VECTOR [VECTOR ...]   (vectors with a materialize step are skipped)"""
+import json, subprocess, sys
+
+numi, names = sys.argv[1], sys.argv[2:]
+for name in names:
+    e = json.load(open(f"vectors/{name}/expected.json"))
+    if e.get("materialize"):
+        print(f"{name}: skipped (needs materialize)")
+        continue
+    f = e["flags"]
+    args = [numi, "evidence", "verify"]
+    for k in f.get("runner_keys", []):
+        args += ["--runner-key", k]
+    for key, flag in [("trust_bundle_keys", "--trust-bundle-keys"), ("skip_signatures", "--skip-signatures"),
+                      ("allow_unanchored", "--allow-unanchored"), ("allow_incomplete", "--allow-incomplete"),
+                      ("allow_unsigned", "--allow-unsigned"), ("complete", "--complete")]:
+        if f.get(key):
+            args.append(flag)
+    if f.get("log_key"):
+        args += ["--log-key", f["log_key"]]
+    if f.get("log_origin"):
+        args += ["--log-origin", f["log_origin"]]
+    if f.get("expect_change"):
+        args += ["--expect-change", f["expect_change"]]
+    if f.get("expect_head"):
+        args += ["--expect-head", f["expect_head"]]
+    args += ["--json", "exports/" + e["export"]]
+    p = subprocess.run(args, capture_output=True, text=True)
+    try:
+        rep = json.loads(p.stdout)
+    except ValueError:
+        rep = {}
+    codes = sorted({x["code"] for x in rep.get("findings", [])})
+    x = e["expect"]
+    ok = (p.returncode, rep.get("level"), codes) == (x["exit_code"], x["level"], x["finding_codes"])
+    print(f"{name}: exit {p.returncode} level {rep.get('level')!r} findings {codes} -> {'match' if ok else 'MISMATCH'}")
+```
+
+<VerifiedSnippet what="python3 run_vector.py numi closed-allow-unanchored forged-record directory-missing key-mode-none-is-usage-error" exit="0">
+```text
+closed-allow-unanchored: exit 0 level 'verified, unanchored' findings [] -> match
+forged-record: exit 3 level 'failed' findings ['chain_broken'] -> match
+directory-missing: skipped (needs materialize)
+key-mode-none-is-usage-error: exit 2 level None findings [] -> match
+```
+</VerifiedSnippet>
+
+## Real runs against expected outcomes
+
+The same harness logic was run against the open `numi` (built from the checked-out revision) for the vectors below. Each row is the actual result compared with `expect`. Every row matched.
+
+| Vector | Status | What it shows | Expected / actual exit | Expected / actual level | Expected / actual finding codes |
+| --- | --- | --- | --- | --- | --- |
+| `closed-basic-verified` | shipped | The full pass | 0 / 0 | `verified` | none |
+| `closed-unanchored` | shipped | No log pinned | 5 / 5 | `unanchored` | none |
+| `skip-signatures-unauthenticated` | shipped | Signatures not checked | 5 / 5 | `unauthenticated` | none |
+| `trust-bundle-keys-self-consistent` | shipped | Bundle-stated keys | 5 / 5 | `self-consistent` | none |
+| `open-prefix-incomplete` | shipped | Chain with no terminal record | 5 / 5 | `incomplete` | none |
+| `abandoned-unsigned` | shipped | Abandoned change | 5 / 5 | `unsigned` | none |
+| `closed-allow-unanchored` | shipped | An allowance in the level | 0 / 0 | `verified, unanchored` | none |
+| `forged-record` | shipped | Record edited, hash left | 3 / 3 | `failed` | `chain_broken` |
+| `dropped-middle-record` | shipped | A record removed | 3 / 3 | `failed` | `chain_broken` |
+| `reordered-chain` | shipped | Records reordered | 3 / 3 | `failed` | `chain_broken` |
+| `signature-edited-in-place` | shipped | Signature bytes changed | 3 / 3 | `failed` | `signature_invalid` |
+| `wrong-runner-key` | shipped | Pinned key did not sign | 3 / 3 | `failed` | `signer_untrusted` |
+| `summary-mismatch` | shipped | Summary disagrees with the chain | 3 / 3 | `failed` | `summary_mismatch` |
+| `file-changed-after-manifest` | shipped | File edited after signing | 3 / 3 | `failed` | `diff_mismatch`, `manifest_mismatch` |
+| `wrong-log-key` | shipped | Wrong log key pinned | 3 / 3 | `failed` | `anchor_invalid`, `attestation_proof`, `manifest_mismatch` |
+| `target-expect-head-mismatch` | target | Head differs from `--expect-head` | 3 / 3 | `failed` | `expectation_mismatch` |
+| `key-mode-none-is-usage-error` | shipped | No key mode given | 2 / 2 | no report | none |
+| `directory-refused-link` | shipped | `records.ndjson` is a symlink (materialized by hand) | 3 / 3 | `failed` | `directory_refused` |
+
+Beyond these 18, the harness was run over every vector that has no materialize step, 292 of the 302. All 292 matched on exit code, level and finding codes. The ten with a materialize step were not run through the harness; one of them, `directory-refused-link`, was reproduced by hand above. The open verifier's own test, `go test ./sdk/go/evidenceverify`, passed in the same checkout and runs all 302 together with the cases no vector can hold.
+
+## What has no vector
+
+| Case | Why |
+| --- | --- |
+| `too_many_records` | A chain of 32769 valid records is about 20 MB. The verifier tests the bound at its edge with a lowered limit in its own unit test |
+| Exit 1, 6, 7 and 8 | They depend on the environment. Exit 6 is never produced by `verify` |
+| Export-level vectors that carry a receipt record | Not yet in the kit; the request-line grammar has hand-written cases in `receipt-request-lines.json` |
+
+`VECTOR-COVERAGE.md` is generated and lists, for every finding code, level and exit code, which vectors cover it, and the cases that have none.
+
+## Writing a verifier in another language
+
+1. Implement the strict decoder and canonical form first. The `canon-*` vectors (key order, case-variant keys, number forms, escapes, timestamps, non-printable characters in `executor_id`) exist because these are where independent implementations drift. The printable-character set is the Unicode table of the Go release that builds the reference verifier, and the vectors name the code points that must be refused.
+2. Add the chain walk and signatures, then the index and manifest, then the anchor and attestation.
+3. Run every `shipped` vector. Compare finding codes as sets.
+4. Add the report keys `level_enum`, `weakened_by_flags` and `anchored_head_record_hash`, then the `target` vectors.
+
+<Cards>
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="The verifier you are testing against." />
+  <Card title="Integration conformance" href="/docs/integrations/conformance" description="The plugin-side conformance kits." />
+  <Card title="Threat model and limits" href="/docs/evidence/threat-model-and-limits" description="What conformance does not establish." />
+</Cards>

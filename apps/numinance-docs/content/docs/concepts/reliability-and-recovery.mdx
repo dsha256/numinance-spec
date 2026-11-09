@@ -1,0 +1,52 @@
+---
+title: Reliability and recovery
+description: How independent verification, bounded repair, canary releases, rollback and escalation limit the cost of a wrong change.
+---
+
+<FeatureStatus kind="designed">Verification, repair and recovery run in the proprietary runtime. Playbook and verifier contracts are public-spec.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/kinds/v1/playbook.proto", "proto/numinance/types/v1/types.proto"]} />
+
+<ShortProductTruth>
+Failure is expected. The design makes it small, finite and visible.
+</ShortProductTruth>
+
+## Independent verification
+
+The agent that wrote a change does not decide that it is good. Verifiers run under the reviewer identity, in a workspace the author does not control, against the toolchain declared for the repository. A `LanguageToolchain` names the verifiers, for example unit tests, lint and type checking, and the playbook says which must pass for a step.
+
+A verifier that cannot run says so. In the generated Python profile, unit tests execute candidate code and are reported unavailable in the live verifier provider until its nested sandbox exists. Unavailable is not the same as passed.
+
+<VerificationAndRepair />
+
+## Bounded repair
+
+When verification fails, the change can enter repair: the failure is given back to the author agent for another attempt. This loop is finite. A playbook sets `max_repair_attempts`, and the generated `bugfix-bounded` playbook uses 2. There is no unbounded recursion, no "keep trying until green", and each attempt is a recorded state transition. When attempts are exhausted the change moves to `CHANGE_STATE_ESCALATED`.
+
+This is bounded repair, not open-ended autonomy. The system performs a small number of governed retries, checks them independently, and hands over to a human.
+
+## Canary, observation and rollback
+
+If the autonomy level allows release, the release pipeline uses the playbook's canary window. During `CHANGE_STATE_OBSERVING` signals are compared against the thresholds. A regression leads to `CHANGE_STATE_RECOVERING`, and a successful recovery ends at `CHANGE_STATE_ROLLED_BACK`. Rollback is performed by the release-pipeline identity under its own grant, so the recovery path has authority designed for it rather than borrowed from the author.
+
+## Escalation
+
+Escalation is a normal outcome, not an error. It happens when repair is exhausted, a gate denies or requires approval, context is insufficient, or the breaker trips. The change waits for a human signal and carries its evidence with it, so the person picking it up sees what was tried.
+
+## Failure modes
+
+| Failure | Response |
+| --- | --- |
+| Verifier fails | Bounded repair, then escalation. |
+| Verifier unavailable | Reported as unavailable. The step does not count as passed. |
+| Evidence cannot be sealed | The failure trips the breaker. |
+| Release regresses | Recover and roll back. |
+| Breaker trips | Pause, then resume on reset. |
+
+## Next steps
+
+<Cards>
+  <Card title="Verification and recovery" href="/docs/architecture/verification-recovery" description="Components and interfaces." />
+  <Card title="Rollback and recovery" href="/docs/operations/rollback-and-recovery" description="Operating recovery." />
+  <Card title="Bugfix with verification" href="/docs/guides/bugfix-with-verification" description="A bounded bugfix flow." />
+</Cards>

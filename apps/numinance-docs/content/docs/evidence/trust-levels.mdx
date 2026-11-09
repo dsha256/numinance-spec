@@ -1,0 +1,204 @@
+---
+title: Trust levels
+description: The result levels of the evidence verifier, the three key modes that bound them, why trust roots must be pinned by the caller, and the exact test automation must use for a full pass.
+---
+
+<FeatureStatus kind="public-spec">The levels, the key modes and the report fields are normative for `evidence/v1` and implemented by the open verifier.</FeatureStatus>
+
+<SourceReference paths={["docs/evidence/verification.md", "sdk/go/evidenceverify/level.go", "sdk/go/evidenceverify/options.go", "conformance/evidence/v1/vectors"]} />
+
+<ShortProductTruth>
+A chain that is consistent with itself proves nothing about who wrote it. Trust enters through keys you choose before you open the export.
+</ShortProductTruth>
+
+## Why levels exist
+
+Anyone can build a chain whose hashes agree: generate a key, write records, sign them, and ship the directory. Internal consistency is therefore not evidence of provenance. The verifier separates three questions and reports the strength of each:
+
+1. **Is the export consistent?** Do records link, hash and end as stated, and do the files match their index and manifest?
+2. **Who signed it?** Do the signatures verify under keys *you* pinned, or only under keys the export names for itself?
+3. **Is it the export the log committed to?** Does the head verify under a transparency log *you* pinned?
+
+The answer is one **level** plus, when it fails, a set of findings.
+
+## Caller-pinned trust roots
+
+There is no built-in trust root. A level of `verified` needs three things, each chosen by the caller and supplied out of band:
+
+| Pin | Flag | Why it cannot come from the export |
+| --- | --- | --- |
+| Runner public key(s) | `--runner-key FILE` | An export that names its own signer would let an attacker sign everything with a key of their own |
+| Log public key | `--log-key FILE` | A checkpoint signed by a log the export names proves nothing about the real log |
+| Log origin | `--log-origin ORIGIN` | The checkpoint's origin is compared byte for byte with the one you pinned |
+
+`provenance/signers.json` states the keys and the log the exporter says were used. It is a claim. It is never a trust anchor, and a key that comes from the bundle never reaches `verified`. The verifier chooses among exactly three key modes, and refuses to guess:
+
+| Key mode | Flag | Best possible level |
+| --- | --- | --- |
+| Pinned | one or more `--runner-key` | `verified` |
+| Bundle keys | `--trust-bundle-keys` | `self-consistent` |
+| Skip signatures | `--skip-signatures` | `unauthenticated` |
+
+None, or two, is a usage error (exit 2). The verifier never defaults to trusting the directory. The log pin is independent of the key mode. Without it, the head proof is not checked and the best outcome is `unanchored`, unless you explicitly allow it.
+
+<Callout type="info" title="Pinning more than one runner key">
+Any pinned runner key may sign any record, the attestation and the manifest. Version 1 has no per-role key separation, no rotation, expiry or revocation. If a key was rotated, you pin the keys that were valid for the change you are checking. See [Threat model and limits](/docs/evidence/threat-model-and-limits).
+</Callout>
+
+## The levels
+
+| Level | Exit | What it proves | Real fixture that produces it |
+| --- | --- | --- | --- |
+| `verified` | 0 | Signatures verified under pinned keys, the chain ended, the head proved under the pinned log, nothing allowed was needed | `closed-basic-verified` |
+| `failed` | 3 | At least one finding | `forged-record` |
+| `unauthenticated` | 5 | Links, digests and re-derivations hold, but no signature was checked | `skip-signatures-unauthenticated` |
+| `self-consistent` | 5 | Signatures verified only under keys the export itself claims | `trust-bundle-keys-self-consistent` |
+| `incomplete` | 5 | The chain has no terminal record (it may be a prefix), or the attestation of a Closed change was not made | `open-prefix-incomplete` |
+| `unsigned` | 5 | The change ended Abandoned or RolledBack, so it has no attestation and no signed manifest | `abandoned-unsigned` |
+| `unanchored` | 5 | The head was not proved under a pinned log | `closed-unanchored` |
+| `verified, unanchored` | 0 | A pass where `--allow-unanchored` covered a missing anchor | `closed-allow-unanchored` |
+| `verified, incomplete` | 0 | A pass where `--allow-incomplete` covered a missing terminal record | `open-prefix-allow-incomplete` |
+| `verified, unsigned export` | 0 | A pass where `--allow-unsigned` covered an Abandoned or RolledBack change | `abandoned-allow-unsigned` |
+| `verified, unanchored, incomplete` | 0 | Both of the first two | `open-prefix-unanchored-allow-both` |
+| `verified, unanchored, unsigned export` | 0 | `--allow-unanchored` and `--allow-unsigned` | `abandoned-unanchored-allow-both` |
+
+Exit 5 is "a consistent export weaker than `verified`". The precedence is fixed: if any finding exists the level is `failed`. Otherwise weaknesses are collected in order (skipped or bundle-only signatures, an attestation gap, a missing terminal record, a missing anchor, a non-Closed ending) and the first one names the level. If there are none, the level is `verified` plus the suffixes of any allowances that were actually needed.
+
+## Real outputs at each level
+
+All runs below are the open verifier against the golden exports in `conformance/evidence/v1`, with test keys. They are fixtures, not real engineering runs.
+
+### verified
+
+<VerifiedSnippet what="runner key, log key and origin all pinned (filtered to the level lines)" exit="0">
+```text
+level: verified
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+result: verified
+```
+</VerifiedSnippet>
+
+### unanchored, then verified with an allowance
+
+Same export (`closed-basic`), runner key pinned, no log:
+
+<VerifiedSnippet what="no log pin, then --allow-unanchored (filtered)" exit="5, then 0">
+```text
+level: unanchored
+anchor: not checked (no log pinned)
+WEAK the head was not proved under a pinned log
+result: unanchored
+
+level: verified, unanchored
+anchor: not checked (no log pinned)
+result: verified, unanchored (a pass with an allowance: unanchored)
+```
+</VerifiedSnippet>
+
+### self-consistent: the attacker's chain passes
+
+`closed-basic-other-runner-key` is an attacker's chain, signed by a key the runner does not hold. With `--trust-bundle-keys` it is accepted at the weak level. With the real runner key pinned it fails.
+
+<VerifiedSnippet what="the same export under bundle keys, then under the pinned runner key (filtered)" exit="5, then 3">
+```text
+level: self-consistent
+signatures: verified under keys the export states only
+WEAK signatures verified only under keys the export states
+result: self-consistent
+
+level: failed
+FAIL signer_untrusted: a record names a key that is not trusted
+result: failed
+```
+</VerifiedSnippet>
+
+This pair is the whole case for caller-pinned keys in two outputs. The only difference between "looks fine" and "rejected" is who chose the key.
+
+### unauthenticated
+
+With `--skip-signatures` the JSON report names what was not done:
+
+<VerifiedSnippet what="numi evidence verify --skip-signatures --json on closed-author (fields shown)" exit="5">
+```json
+{"ok":false,"level":"unauthenticated","level_enum":"unauthenticated","weakened_by_flags":[],
+ "weaknesses":["no signature was checked","the head was not proved under a pinned log"],
+ "signatures":"not checked (--skip-signatures)","anchor":"not checked (no log pinned)"}
+```
+</VerifiedSnippet>
+
+### incomplete and unsigned
+
+<VerifiedSnippet what="open-prefix (two records, no terminal record) and abandoned (filtered)" exit="5 for each">
+```text
+state: open (no terminal record)
+level: incomplete
+WEAK the chain has no terminal record and may be a prefix of a longer chain
+result: incomplete
+
+state: ended Abandoned
+level: unsigned
+WEAK the change did not end Closed: the files are vouched for only by the unsigned index
+result: unsigned
+```
+</VerifiedSnippet>
+
+### Allowances that carry a suffix
+
+<VerifiedSnippet what="fields read from the --json reports of four runs" exit="0 for each">
+```text
+open-prefix + --allow-incomplete (log pinned):
+  level='verified, incomplete'  level_enum='verified'  weakened_by_flags=['incomplete']  ok=True
+abandoned + --allow-unsigned (log pinned):
+  level='verified, unsigned export'  level_enum='verified'  weakened_by_flags=['unsigned export']  ok=True
+open-prefix + --allow-unanchored --allow-incomplete (no log):
+  level='verified, unanchored, incomplete'  level_enum='verified'  weakened_by_flags=['unanchored', 'incomplete']  ok=True
+closed-basic + all three allow flags (log pinned, nothing needed):
+  level='verified'  level_enum='verified'  weakened_by_flags=[]  ok=True
+```
+</VerifiedSnippet>
+
+The last run is the rule that keeps allowances honest: a flag covers only a weakness that is present. A fully pinned, anchored, Closed export is a bare `verified` whatever flags were given.
+
+## What a flag can and cannot do
+
+- **A flag never lifts a weaker level than the one it covers.** `--allow-unanchored` does not cover a missing terminal record. `--allow-incomplete` does not cover a missing anchor.
+- **No allow flag lifts `unauthenticated` or `self-consistent`.** With `--trust-bundle-keys` and all three allow flags, the same export is still `self-consistent` and exits 5. Those levels name the first weakness; the rest appear in `weaknesses`.
+- **No allow flag turns a failure into anything else.** An export with a finding is `failed` and exits 3 whatever flags were given.
+
+## The automation rule
+
+<Callout type="warn" title="Never match a prefix of level">
+`verified, unanchored`, `verified, incomplete` and `verified, unsigned export` exit 0 and report `ok: true`. A prefix test on `verified` accepts them. For a full pass, require all of:
+
+1. exit code `0`,
+2. `level_enum == "verified"`,
+3. `weakened_by_flags` is empty (`[]`),
+
+and, if every part of the design list must be present, also read the `absent` list (or pass `--complete`). A `verified` result can still declare parts absent; the text report ends such a result with `PARTIAL`.
+</Callout>
+
+```bash title="A CI gate that accepts only a full pass"
+numi evidence verify --json \
+  --runner-key keys/runner.pub --log-key keys/log.pub --log-origin numinance.test/log \
+  --complete DIR > report.json || exit 1
+# then require level_enum == "verified" and weakened_by_flags == [] in report.json
+```
+
+A pipeline that wants to accept one allowance, for example reviewing an Abandoned change, should state that choice in its configuration (`--allow-unsigned`) and require `weakened_by_flags` to equal exactly `["unsigned export"]`.
+
+## Failure modes and troubleshooting
+
+| Symptom | Cause |
+| --- | --- |
+| You get `unanchored` although the export includes checkpoint files | No log pin was given. The verifier does not decode or trust anchor files that it was not told to check |
+| You get `self-consistent` in CI | The job used `--trust-bundle-keys`. Pin the runner key from a source other than the export |
+| You get `failed` with `signer_untrusted` | A record names a key you did not pin. Either you pinned the wrong key or the export is not from the runner you expect |
+| You pinned the right key and still get `anchor_invalid` | The log key or origin is wrong. Compare the origin byte for byte |
+| `verified` but the change surprises you | Evidence proves who did what, not that it was good. See [Threat model and limits](/docs/evidence/threat-model-and-limits) |
+
+<Cards>
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="Flags, JSON report and exit codes." />
+  <Card title="Anchoring and receipts" href="/docs/evidence/anchoring-and-receipts" description="What the log pin adds." />
+  <Card title="Threat model and limits" href="/docs/evidence/threat-model-and-limits" description="What a verified result cannot tell you." />
+</Cards>

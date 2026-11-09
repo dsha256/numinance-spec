@@ -1,0 +1,169 @@
+---
+title: Bugfix with verification
+description: A designed walkthrough of a bug fix that ends in a pull request, showing independent verification, bounded repair, escalation and the evidence each stage emits.
+---
+
+<FeatureStatus kind="designed">
+This is a storyboard of the Numinance engine, which is proprietary and not generally available. The configuration shown is exactly what `numi init` generates and validates with the open CLI. There is no runnable engine command in this guide.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/playbook.proto", "proto/numinance/kinds/v1/stage_registry.proto", "proto/numinance/kinds/v1/language_toolchain.proto"]} note="The Playbook, StageRegistry and LanguageToolchain below are the init output for a Python repository." />
+
+<ShortProductTruth>Repair is bounded, not open-ended. The agent gets a finite number of attempts, independent checks decide whether each attempt passed, and when the budget runs out a human is asked.</ShortProductTruth>
+
+## When to use this
+
+Read this guide when you want to understand how a bug fix is expected to be shaped, verified and stopped, before you let any agent open pull requests against your code. It builds on [Onboard a repository](/docs/guides/onboard-repository), whose generated files are the configuration discussed here.
+
+## The configuration that drives it
+
+The generated playbook has one step for each identity kind that touches a bug fix:
+
+```yaml title=".numinance/policy/playbook-bugfix-bounded.yaml"
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: bugfix-bounded, scope: SCOPE_REPO}
+spec:
+  change_type: bugfix
+  steps:
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_MEDIUM, evidence: [diff, pr-ref], verifiers: [unit-tests, lint, typecheck]}
+    - {name: review, capability_set: review, risk: RISK_CLASS_LOW}
+    - {name: pr-status, capability_set: release, risk: RISK_CLASS_LOW}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+```
+
+The verifier names resolve through the `LanguageToolchain`, which says which provider and check each name runs:
+
+```yaml title=".numinance/policy/toolchain-python.yaml"
+  verifiers:
+    - {name: unit-tests, provider: dev.numinance.verifier-python, config: {check: pytest, timeout_seconds: 300}}
+    - {name: lint, provider: dev.numinance.verifier-python, config: {check: ruff, timeout_seconds: 60}}
+    - {name: typecheck, provider: dev.numinance.verifier-python, config: {check: mypy, timeout_seconds: 120}}
+```
+
+And the stage registry maps those stages onto the fixed lifecycle, with a plan gate decided by policy and a final human gate:
+
+```yaml title=".numinance/policy/stage-registry.yaml (excerpt)"
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+    - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+```
+
+<Callout type="warn" title="Honest limits of the live verifier">
+`unit-tests` runs candidate code, which the Python verifier provider refuses to do outside a nested sandbox that is not built yet. Today only the replaying build serves it, so a live run of `unit-tests` is unavailable. `lint` and `typecheck` are static and run.
+</Callout>
+
+## How verification and repair fit together
+
+<VerificationAndRepair />
+
+Three properties carry the design:
+
+1. **The verifier is not the author.** The author-agent produces a candidate. The verifier provider and your CI run the checks, and the reviewer-agent holds a separate identity from the author. A check passing is a recorded fact, not the agent's claim.
+2. **Repair is bounded.** `max_repair_attempts` is 2 in the generated playbook, between 0 and 10 in the contract. The repair state loops back to verification at most that many times.
+3. **Exhaustion escalates.** When attempts run out, the change moves to the escalated state and waits on a human signal. It does not widen its own grant, skip a verifier or retry indefinitely.
+
+## The storyboard
+
+<Steps>
+<Step>
+
+### Understand and classify
+
+The engine resolves repository context for the bug report and fixes the playbook (`bugfix-bounded`) and risk class. The `fix` step declares MEDIUM, so the change is at least MEDIUM. With the generated autonomy policy the level is PR.
+
+</Step>
+<Step>
+
+### Plan gate
+
+The plan names the work units, the risk of each and the evidence required. Policy evaluates it before any side effect. A plan that touches a protected path, such as `.numinance/policy/**` or a workflow file, is denied and the denial is recorded.
+
+</Step>
+<Step>
+
+### Implement under an author grant
+
+The author-agent works in a per-change sandbox. The `implement` capability set allows the branch push and the pull request. It does not allow merging or deploying.
+
+*Evidence emitted:* `diff`.
+
+</Step>
+<Step>
+
+### Verify, then repair or pass
+
+`verify-static` runs `lint` and `typecheck` through the verifier provider. `ci-github-actions` then runs the workflow your repository already defines, through the CI executor port. On a failure, the finding goes back to the author for one repair attempt, and the full verifier set runs again.
+
+</Step>
+<Step>
+
+### Review and the human gate
+
+The reviewer-agent reads the candidate under the `review` set, which grants `verifier.run` and nothing that writes. At `pr-gate` a human maintainer approves, and policy rejects an approver that is the author or reviewer identity.
+
+*Evidence emitted:* `pr-ref`. The change ends at the pull request; no stage merges.
+
+</Step>
+</Steps>
+
+## An illustrative stage log
+
+<IllustrativeNote>
+Hand-written to show shape and ordering. This is not output from a real run, and no command in the open build produces it.
+</IllustrativeNote>
+
+```text title="illustrative stage log"
+plan-review      allow                 decision recorded
+implement        candidate ready       evidence: diff
+verify-static    lint ok, typecheck FAIL (finding recorded)
+repair           attempt 1 of 2        candidate updated
+verify-static    lint ok, typecheck ok
+ci-github-actions workflow passed      run reference recorded
+review           reviewer-agent        no blocking findings
+pr-gate          awaiting human        approver_role=maintainer, not author or reviewer
+```
+
+And the path where repair does not work:
+
+```text title="illustrative escalation"
+verify-static    typecheck FAIL
+repair           attempt 2 of 2        candidate updated
+verify-static    typecheck FAIL
+escalated        attempts exhausted    waiting on a human signal
+```
+
+## What a human approves
+
+- The pull request, at the human gate, with a distinct identity from the agents.
+- A decision after escalation: a human may supply a signal, ask for more work within the existing grant, or abandon the change.
+- Any later promotion of this playbook, based on its qualification record.
+
+## Failure modes and safeguards
+
+| Failure | Safeguard |
+| --- | --- |
+| The agent claims a test passed | The pass is recorded from the verifier or CI run, not from the claim. |
+| Declared evidence is missing | The step is `PARTIAL`, not success. |
+| Repair keeps failing | The loop ends after `max_repair_attempts` and the change escalates. |
+| The fix edits policy or CI files | Protected paths are denied by mount and by branch protection. |
+| A flaky or unavailable verifier | `unit-tests` is currently unavailable live; do not treat a skipped check as a pass. Evidence records what ran. |
+
+Evidence from such a change can be checked offline later. A `verified` result proves the chain and signatures under keys you pin; it does not prove the fix is correct or the tests thorough. "Don't trust the agent. Check the evidence." See [Verify a run](/docs/guides/verify-a-run).
+
+## Check the configuration today
+
+```bash title="validate the generated documents"
+go run ./cli/numi validate --files .numinance
+```
+
+This is the schema and loader check from [Onboard a repository](/docs/guides/onboard-repository), exit 0 on the generated tree.
+
+## Next steps
+
+<Cards>
+  <Card title="Verification and recovery" href="/docs/architecture/verification-recovery" description="The verifier pipeline and recovery loops." />
+  <Card title="Verify a run" href="/docs/guides/verify-a-run" description="Check an evidence export offline." />
+  <Card title="Release and incident response" href="/docs/guides/release-and-incident" description="What happens after a merge reaches production." />
+</Cards>

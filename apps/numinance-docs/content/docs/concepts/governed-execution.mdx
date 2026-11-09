@@ -1,0 +1,63 @@
+---
+title: Governed execution
+description: How policy outside the model, capability grants, four distinct identities, protected paths, the circuit breaker and break-glass keep an agent's actions bounded.
+---
+
+<FeatureStatus kind="designed">Enforcement is in the proprietary runtime. The identity, decision and breaker types are public-spec.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/annotations/v1/annotations.proto"]} note="PrincipalKind, DecisionOutcome, BreakerPosition, RiskClass." />
+
+<ShortProductTruth>
+Your policy decides. Not the model. A proposed action is not an authorized action.
+</ShortProductTruth>
+
+## Policy outside the model
+
+Before any privileged action, the request goes to a policy decision made by a component that is not the model. The result is a `DecisionOutcome`: `DECISION_OUTCOME_ALLOW`, `DECISION_OUTCOME_DENY` or `DECISION_OUTCOME_REQUIRE_APPROVAL`. A model cannot talk its way to a different answer, because it is not asked. Denials are recorded in evidence like any other decision.
+
+<SystemBoundaryExplorer />
+
+## Grants and capabilities
+
+A **grant** is explicit, bounded authority: scope, risk class, environment and expiry. A **capability** is a typed ability to perform a kind of action through a governed port. Plugins and executors receive capabilities, not ambient access. Operations in the protocol are annotated with a `RiskClass` (`RISK_CLASS_READ`, `LOW`, `MEDIUM`, `HIGH`, `PRIVILEGED`), so the policy knows what an action is before it decides.
+
+Credentials follow the same rule. The design gives providers host-issued credential handles instead of reusable secrets, with an egress proxy applying the token at the boundary. Receipts from those components are chain records.
+
+## Four identities and separation of duties
+
+`PrincipalKind` names who is acting. Four of them carry the separation of duties:
+
+| Identity | Role | Cannot |
+| --- | --- | --- |
+| `PRINCIPAL_KIND_AUTHOR_AGENT` | Implements work units. | Approve, review or release its own work. |
+| `PRINCIPAL_KIND_REVIEWER_AGENT` | Reviews and runs independent verifiers. | Author the change it reviews. |
+| `PRINCIPAL_KIND_RELEASE_PIPELINE` | The only identity that deploys. | Author code. |
+| `PRINCIPAL_KIND_HUMAN_APPROVER` | Approves gates. | Approve a change they authored. |
+
+Other principals serve the system: `PRINCIPAL_KIND_RUNNER` writes evidence, and `PRINCIPAL_KIND_BROKER` and `PRINCIPAL_KIND_EGRESS_PROXY` handle credentials and network egress. `PRINCIPAL_KIND_BREAK_GLASS` is described below.
+
+## Protected paths
+
+Some paths, such as the policy that governs the agent, CI definitions and the repository's own ownership rules, are protected. An agent can propose a change to them, but cannot apply it through its normal grant. This stops the obvious escape: editing the rules that bound it.
+
+## Circuit breaker
+
+The breaker is customer-local, so stopping the system never depends on the vendor. `BreakerPosition` has four values: `BREAKER_POSITION_FULL_AUTO`, `BREAKER_POSITION_PR_ONLY`, `BREAKER_POSITION_READ_ONLY` and `BREAKER_POSITION_STOPPED`. Moving to a more restrictive position takes effect over any autonomy level in policy, and in-flight changes pause. Note that `PR_ONLY` is a breaker position, not a ladder level.
+
+## Break-glass
+
+Break-glass is the emergency path, and it is human-only. An agent cannot invoke it, and its use is recorded. It exists so that humans are never locked out by the system's own controls. It is not a way to grant more autonomy.
+
+## Failure modes
+
+- An agent requests an action outside its grant: denied, recorded, change continues or escalates.
+- An author tries to approve: rejected, since approver and author must differ.
+- An extension is unsigned or its digest does not match: it is not loaded.
+
+## Next steps
+
+<Cards>
+  <Card title="Authority and policy" href="/docs/architecture/authority-and-policy" description="The components behind these decisions." />
+  <Card title="Circuit breaker" href="/docs/operations/circuit-breaker" description="Operate the breaker." />
+  <Card title="Risk and approval" href="/docs/operations/risk-and-approval" description="How risk classes route to approval." />
+</Cards>

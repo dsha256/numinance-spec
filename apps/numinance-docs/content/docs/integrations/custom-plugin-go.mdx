@@ -1,0 +1,670 @@
+---
+title: Write a plugin in Go
+description: Build a capability provider with the Go plugin SDK, using the sample knowledge provider as a line-by-line reference, and prove it against the conformance kit.
+---
+
+<FeatureStatus kind="pre-alpha">
+The Go plugin SDK and the sample provider are in the public tree and build today. The sample is a teaching and conformance target, not a product connector. There is no plugin host in the open tree, so a provider you write cannot be launched end to end by open code alone.
+</FeatureStatus>
+<SourceReference paths={["plugins/examples/sample-knowledge/main.go", "plugins/examples/sample-knowledge/provider/server.go", "plugins/examples/sample-knowledge/provider/source.go", "sdk/go/plugin/serve.go", "sdk/go/plugin/descriptor_set.go", "conformance/knowledge/v1/kit.go"]} />
+
+<ShortProductTruth>A Go provider is a `main` that calls `plugin.Serve`, a `PluginService` that returns an honest manifest and descriptors, and a `dispatch` that decodes the envelope and answers with one typed result. Build once against the contract.</ShortProductTruth>
+
+## When to use this
+
+Use this page when you want the exact shape of a working provider before writing your own, or when you need to know what the SDK does for you and what it leaves to you. It supersedes the older adapter development outline; the guide at [Build a custom plugin](/docs/guides/build-custom-plugin) is the task-oriented version, and [First plugin](/docs/get-started/first-plugin) walks the first build.
+
+## Prerequisites
+
+- A clone of `numinance-spec` and the Go toolchain `go.mod` asks for (`go 1.27`, `toolchain go1.27.3`). See [Install](/docs/get-started/install).
+- Familiarity with gRPC server-streaming in Go.
+- The port you implement. Read its `.proto` header comment first: it states who may call it, the authority model, and the bounds.
+
+## Imports and module path
+
+The module path is `github.com/numinance/numinance-spec`. The repository is cloned from `github.com/dsha256/numinance-spec`, but the Go module name inside `go.mod` is the one you import. The sample uses the following imports.
+
+```go title="plugins/examples/sample-knowledge/main.go (imports)"
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+
+	"google.golang.org/grpc"
+
+	"github.com/numinance/numinance-spec/plugins/examples/sample-knowledge/provider"
+	"github.com/numinance/numinance-spec/sdk/go/plugin"
+)
+```
+
+```go title="plugins/examples/sample-knowledge/provider/server.go (imports)"
+import (
+	annotationsv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/annotations/v1"
+	pluginv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/plugin/v1"
+	knowledgev1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/ports/knowledge/v1"
+	typesv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/types/v1"
+	"github.com/numinance/numinance-spec/sdk/go/plugin"
+)
+```
+
+`sdk/go/plugin` is the handwritten runtime support (handshake, `Serve`, `DescriptorSet`, `StreamCheck`). The `sdk/go/gen/...` packages are the generated stubs of the protocol files.
+
+## The entry point
+
+`main.go` is the whole process wiring. This is the complete file.
+
+```go title="plugins/examples/sample-knowledge/main.go"
+// Command sample-knowledge is the sample knowledge provider: a capability provider of numinance.ports.knowledge.v1 over a
+// small in-memory source. A plugin host launches it as a subprocess; run by hand it refuses and says so.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+
+	"google.golang.org/grpc"
+
+	"github.com/numinance/numinance-spec/plugins/examples/sample-knowledge/provider"
+	"github.com/numinance/numinance-spec/sdk/go/plugin"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "sample-knowledge:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	digest, err := provider.ExecutableDigest()
+	if err != nil {
+		return err
+	}
+	return plugin.Serve(ctx, os.Getenv, os.Stdout, func(s *grpc.Server, rt plugin.Runtime) {
+		provider.New(digest, rt.Stop).Register(s)
+	})
+}
+```
+
+What `plugin.Serve` does for you:
+
+1. Checks `NUMINANCE_PLUGIN_COOKIE` against `plugin.MagicCookie` and returns `plugin.ErrNotLaunchedByHost` otherwise.
+2. Parses the host's protocol offer and picks `AppProtocolVersion` if it is in the offer.
+3. Listens on a Unix socket inside a new `0700` directory and removes it on return.
+4. Calls your `register` function with the gRPC server and a `plugin.Runtime`.
+5. Prints the handshake line and serves until the context ends or `Runtime.Stop` is called.
+
+## What Runtime offers
+
+```go title="sdk/go/plugin/serve.go"
+type Runtime struct {
+	// HostAddr is the gRPC target of the host's HostService, "" when the host passed none.
+	HostAddr string
+	// Stop ends Serve; PluginService.Shutdown calls it after it answers.
+	Stop func()
+}
+```
+
+- **`Stop`** is how your `Shutdown` handler ends the process after it has answered. The sample calls it in a goroutine so the reply is sent first.
+- **`HostAddr`** is how you reach `HostService`. The sample is read-only and ignores it. A provider that needs a credential handle or emits evidence dials it: the official GitHub providers call `ghprovider.DialHost(rt.HostAddr)` and, if that fails, call `rt.Stop()`.
+
+## The PluginService
+
+The provider type embeds the generated `UnimplementedPluginServiceServer` and implements the six lifecycle RPCs. It is shown in full; the numbered comments below the listing explain each choice.
+
+<Accordions>
+<Accordion title="provider/server.go, complete file">
+
+```go title="plugins/examples/sample-knowledge/provider/server.go"
+package provider
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"os"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/durationpb"
+
+	annotationsv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/annotations/v1"
+	pluginv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/plugin/v1"
+	knowledgev1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/ports/knowledge/v1"
+	typesv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/types/v1"
+	"github.com/numinance/numinance-spec/sdk/go/plugin"
+)
+
+// SpecVersion is the spec version the sample was built against.
+const SpecVersion = "1.0.0"
+
+const (
+	pluginID   = "dev.numinance.sample-knowledge"
+	portName   = "numinance.ports.knowledge.v1"
+	typePrefix = "type.googleapis.com/"
+	svc        = "/numinance.ports.knowledge.v1.KnowledgeService/"
+)
+
+// Server is the PluginService of the sample provider.
+type Server struct {
+	pluginv1.UnimplementedPluginServiceServer
+	source   *Source
+	manifest *pluginv1.Manifest
+	stop     func()
+}
+
+// New returns the server. digest is the content digest the manifest declares; main passes the digest of its own
+// executable, so the declared digest is a real one. stop ends the process after Shutdown.
+func New(digest string, stop func()) *Server {
+	ref := func(key string) *typesv1.Reference {
+		sum := sha256.Sum256([]byte("sample:" + key))
+		return &typesv1.Reference{ArtifactRef: key, Sha256: &typesv1.Digest{Value: "sha256:" + hex.EncodeToString(sum[:])}, ArtifactType: "sample"}
+	}
+	capability := func(verb string) *pluginv1.CapabilityDescriptor {
+		return &pluginv1.CapabilityDescriptor{
+			Name: "knowledge." + verb, RiskFloor: annotationsv1.RiskClass_RISK_CLASS_READ, SideEffect: pluginv1.SideEffect_SIDE_EFFECT_READ,
+			Idempotency: pluginv1.Idempotency_IDEMPOTENCY_NATURAL, EnvironmentScope: []string{"dev", "staging"},
+			ConformanceSuite: "conformance/knowledge/v1/basic", LlmDescription: "Reads documents of a small in-memory sample source.",
+			Timeout: durationpb.New(10_000_000_000),
+		}
+	}
+	return &Server{source: NewSource(), stop: stop, manifest: &pluginv1.Manifest{
+		PluginId: pluginID, Version: "1.0.0", Digest: &typesv1.Digest{Value: digest}, SignerIdentity: "https://numinance.dev/samples|sample-knowledge",
+		Kind: pluginv1.ExtensionClass_EXTENSION_CLASS_CAPABILITY_PROVIDER, Ports: []string{portName},
+		Capabilities: []*pluginv1.CapabilityDescriptor{capability("search"), capability("fetch"), capability("resolve")},
+		SbomRef:      ref("sbom/sample-knowledge"), ProvenanceRef: ref("provenance/sample-knowledge"),
+	}}
+}
+
+// ExecutableDigest returns "sha256:" plus the hex digest of the running executable.
+func ExecutableDigest() (string, error) {
+	path, err := os.Executable()
+	if err != nil {
+		return "", err
+	}
+	b, err := os.ReadFile(path) //nolint:gosec // the path of the running executable
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b)
+	return "sha256:" + hex.EncodeToString(sum[:]), nil
+}
+
+// Register registers the PluginService on s.
+func (s *Server) Register(g *grpc.Server) { pluginv1.RegisterPluginServiceServer(g, s) }
+
+// Handshake implements PluginService.
+func (s *Server) Handshake(_ context.Context, req *pluginv1.HandshakeRequest) (*pluginv1.HandshakeResponse, error) {
+	for _, v := range req.GetProtocolVersions() {
+		if v == plugin.AppProtocolVersion {
+			return &pluginv1.HandshakeResponse{ProtocolVersion: plugin.AppProtocolVersion, SpecVersion: SpecVersion}, nil
+		}
+	}
+	return nil, status.Error(codes.FailedPrecondition, "no common protocol version")
+}
+
+// GetManifest implements PluginService.
+func (s *Server) GetManifest(context.Context, *pluginv1.GetManifestRequest) (*pluginv1.GetManifestResponse, error) {
+	return &pluginv1.GetManifestResponse{Manifest: s.manifest}, nil
+}
+
+// GetDescriptors implements PluginService: the knowledge port file and every file it imports.
+func (s *Server) GetDescriptors(context.Context, *pluginv1.GetDescriptorsRequest) (*pluginv1.GetDescriptorsResponse, error) {
+	set, err := plugin.DescriptorSet(knowledgev1.File_numinance_ports_knowledge_v1_knowledge_proto)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "descriptors")
+	}
+	return &pluginv1.GetDescriptorsResponse{DescriptorSet: set}, nil
+}
+
+// Health implements PluginService.
+func (s *Server) Health(context.Context, *pluginv1.HealthRequest) (*pluginv1.HealthResponse, error) {
+	return &pluginv1.HealthResponse{Status: pluginv1.HealthStatus_HEALTH_STATUS_SERVING}, nil
+}
+
+// Shutdown implements PluginService: it answers, then stops the process.
+func (s *Server) Shutdown(context.Context, *pluginv1.ShutdownRequest) (*pluginv1.ShutdownResponse, error) {
+	if s.stop != nil {
+		go s.stop()
+	}
+	return &pluginv1.ShutdownResponse{}, nil
+}
+
+// Invoke implements PluginService: one terminal message per call, SUCCEEDED with the typed result or FAILED with one
+// diagnostic reason.
+func (s *Server) Invoke(req *pluginv1.InvokeRequest, stream grpc.ServerStreamingServer[pluginv1.InvokeResponse]) error {
+	env := req.GetEnvelope()
+	if env.GetContext().GetInvocationId() == "" || env.GetContext().GetPolicyDecisionId() == "" {
+		return status.Error(codes.InvalidArgument, "no host-assigned context")
+	}
+	resp, err := s.dispatch(env)
+	var res *pluginv1.ActionResult
+	var failure *CallError
+	switch {
+	case err == nil:
+		packed, merr := anypb.New(resp)
+		if merr != nil {
+			return status.Error(codes.Internal, "marshal")
+		}
+		res = &pluginv1.ActionResult{Status: pluginv1.InvokeStatus_INVOKE_STATUS_SUCCEEDED, Result: packed}
+	case errors.As(err, &failure):
+		res = &pluginv1.ActionResult{Status: pluginv1.InvokeStatus_INVOKE_STATUS_FAILED, Diagnostics: []*pluginv1.Diagnostic{{Reason: failure.Reason, Severity: pluginv1.Severity_SEVERITY_ERROR}}}
+	default:
+		return err
+	}
+	return stream.Send(&pluginv1.InvokeResponse{Result: res})
+}
+
+func (s *Server) dispatch(env *pluginv1.Envelope) (proto.Message, error) {
+	in := func(m proto.Message) error {
+		if env.GetRequest().GetTypeUrl() != typePrefix+string(m.ProtoReflect().Descriptor().FullName()) {
+			return status.Error(codes.InvalidArgument, "request type")
+		}
+		return proto.Unmarshal(env.GetRequest().GetValue(), m)
+	}
+	switch env.GetMethod() {
+	case svc + "Search":
+		var r knowledgev1.SearchRequest
+		if err := in(&r); err != nil {
+			return nil, err
+		}
+		return s.source.Search(&r)
+	case svc + "Fetch":
+		var r knowledgev1.FetchRequest
+		if err := in(&r); err != nil {
+			return nil, err
+		}
+		return s.source.Fetch(&r)
+	case svc + "Resolve":
+		var r knowledgev1.ResolveRequest
+		if err := in(&r); err != nil {
+			return nil, err
+		}
+		return s.source.Resolve(&r)
+	}
+	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("method %d bytes", len(env.GetMethod())))
+}
+```
+
+</Accordion>
+</Accordions>
+
+- **`New`** builds the manifest once. `Kind` is `EXTENSION_CLASS_CAPABILITY_PROVIDER`, `Ports` names `numinance.ports.knowledge.v1`, and each of the three verbs gets a `CapabilityDescriptor` with `RiskFloor` READ, `SideEffect` READ and `Idempotency` NATURAL, because a read-only verb may not claim more. `ConformanceSuite` names the kit the host will look up.
+- **`ExecutableDigest`** hashes the running binary so the declared digest is real. `main` passes it in.
+- **`Handshake`** accepts only a protocol version equal to `plugin.AppProtocolVersion` and answers with the spec version the sample was built against. It declares no non-Core capability.
+- **`GetDescriptors`** returns `plugin.DescriptorSet(knowledgev1.File_numinance_ports_knowledge_v1_knowledge_proto)`: the generated port file and everything it imports, source info dropped. Do not edit these.
+- **`Invoke`** refuses a call that has no host-assigned `invocation_id` or `policy_decision_id`, dispatches by `Envelope.Method`, and sends exactly one terminal message: `SUCCEEDED` with the packed result, or `FAILED` with one `Diagnostic` whose `Reason` comes from the closed vocabulary. There is no free text, so no provider output can inject instructions into a log.
+- **`dispatch`** checks the request's type URL equals `type.googleapis.com/` plus the method's input type before unmarshalling, and answers an unknown method with `Unimplemented`.
+
+## The source
+
+The provider calls a small in-memory `Source`. The code shows how a provider validates inputs against the port's bounds and never repairs them.
+
+<Accordions>
+<Accordion title="provider/source.go, complete file">
+
+```go title="plugins/examples/sample-knowledge/provider/source.go"
+// Package provider is the sample knowledge provider: a read-only provider of numinance.ports.knowledge.v1 over a small
+// in-memory source, written against the public SDK only. It exists to be launched, validated and invoked by a plugin
+// host, and to be the target of the knowledge conformance kit; it is not a product connector.
+package provider
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
+	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	pluginv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/plugin/v1"
+	knowledgev1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/ports/knowledge/v1"
+	typesv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/types/v1"
+)
+
+// CallError is a call the provider answers with FAILED and one diagnostic reason, as the port's status codes map onto
+// plugin/v1 reasons: INVALID_ARGUMENT and NOT_FOUND.
+type CallError struct{ Reason pluginv1.Reason }
+
+// Error implements error.
+func (f *CallError) Error() string { return f.Reason.String() }
+
+// document is one seeded document.
+type document struct {
+	scope, ref, title, mediaType string
+	versions                     []string // oldest first; the last is the latest
+	content                      map[string]string
+	modified                     time.Time
+}
+
+// Source is the seeded source of the knowledge conformance kit: scope "kit" with documents "doc-a" (two versions) and
+// "doc-b", and scope "other" with "doc-o", which matches the same query as doc-a and must never be returned for scope
+// "kit".
+type Source struct{ docs []document }
+
+// NewSource returns the seeded source.
+func NewSource() *Source {
+	t := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	return &Source{docs: []document{
+		{scope: "kit", ref: "kit/doc-a", title: "Alpha guide", mediaType: "text/plain", versions: []string{"v1", "v2"}, modified: t,
+			content: map[string]string{"v1": "alpha first draft: deploy notes", "v2": "alpha second draft: deploy notes and rollback"}},
+		{scope: "kit", ref: "kit/doc-b", title: "Beta reference", mediaType: "text/plain", versions: []string{"v1"}, modified: t,
+			content: map[string]string{"v1": "beta reference: monitoring"}},
+		{scope: "other", ref: "other/doc-o", title: "Omega deploy notes", mediaType: "text/plain", versions: []string{"v1"}, modified: t,
+			content: map[string]string{"v1": "omega deploy notes: not for scope kit"}},
+	}}
+}
+
+const (
+	maxScopes   = 256
+	maxScopeLen = 256
+	maxQuery    = 1024
+	maxVersion  = 256
+	maxFetch    = 1 << 20
+)
+
+// scopeSegments checks the scope grammar: 1 to 256 unique entries, each a "/"-joined list of non-empty segments of
+// [A-Za-z0-9_-]. No segment can be "." or "..", and no entry is decoded or normalised, so an encoded dot segment
+// (kit/%2E%2E/other) breaks the grammar too.
+func scopeOK(scope []string) bool {
+	if len(scope) < 1 || len(scope) > maxScopes {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, e := range scope {
+		if e == "" || len(e) > maxScopeLen || seen[e] {
+			return false
+		}
+		seen[e] = true
+		for seg := range strings.SplitSeq(e, "/") {
+			if seg == "" {
+				return false
+			}
+			for i := range len(seg) {
+				c := seg[i]
+				if !segmentByte(c) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// segmentByte reports whether c may appear in a scope segment: [A-Za-z0-9_-].
+func segmentByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-'
+}
+
+// inScope reports whether a document lies in one of the scope entries, comparing whole segments.
+func inScope(d document, scope []string) bool {
+	for _, e := range scope {
+		if d.ref == e || strings.HasPrefix(d.ref, e+"/") || d.scope == e {
+			return true
+		}
+	}
+	return false
+}
+
+func invalid() error  { return &CallError{Reason: pluginv1.Reason_REASON_INVALID_ARGUMENT} }
+func notFound() error { return &CallError{Reason: pluginv1.Reason_REASON_NOT_FOUND} }
+
+// printableRune reports whether r is a letter, mark, number, punctuation, symbol or the space: the control, format
+// (zero-width and bidi), line and paragraph separator characters are not.
+func printableRune(r rune) bool {
+	return r == ' ' || unicode.In(r, unicode.L, unicode.M, unicode.N, unicode.P, unicode.S)
+}
+
+// clean keeps U+0009 and U+000A when allowed, replaces every other character that is not printable with U+FFFD, and
+// shortens at a character boundary.
+func clean(s string, limit int, keepNewline bool) string {
+	var b strings.Builder
+	for _, r := range s {
+		if (!keepNewline || (r != '\t' && r != '\n')) && !printableRune(r) {
+			r = utf8.RuneError
+		}
+		if b.Len()+utf8.RuneLen(r) > limit {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
+// Search returns the documents of the requested scope whose title or latest content contains the query as plain text.
+func (s *Source) Search(req *knowledgev1.SearchRequest) (*knowledgev1.SearchResponse, error) {
+	q := req.GetQuery()
+	if q == "" || len(q) > maxQuery || !scopeOK(req.GetScope()) || req.GetMaxResults() < 1 || req.GetMaxResults() > 100 {
+		return nil, invalid()
+	}
+	out := &knowledgev1.SearchResponse{}
+	for _, d := range s.docs {
+		if !inScope(d, req.GetScope()) {
+			continue
+		}
+		latest := d.versions[len(d.versions)-1]
+		if !strings.Contains(strings.ToLower(d.title+" "+d.content[latest]), strings.ToLower(q)) {
+			continue
+		}
+		if len(out.Results) >= int(req.GetMaxResults()) {
+			break
+		}
+		out.Results = append(out.Results, &knowledgev1.SearchResult{
+			Ref: d.ref, Title: clean(d.title, 1024, false), Snippet: clean(d.content[latest], 4096, true), SourceVersion: latest,
+		})
+	}
+	return out, nil
+}
+
+func (s *Source) find(ref string, scope []string) (document, bool) {
+	for _, d := range s.docs {
+		if d.ref == ref && inScope(d, scope) {
+			return d, true
+		}
+	}
+	return document{}, false
+}
+
+// Fetch returns the content of a document, cut at max_bytes on a character boundary.
+func (s *Source) Fetch(req *knowledgev1.FetchRequest) (*knowledgev1.FetchResponse, error) {
+	if req.GetRef() == "" || len(req.GetRef()) > 1024 || len(req.GetVersion()) > maxVersion || req.GetMaxBytes() < 1 || req.GetMaxBytes() > maxFetch || !scopeOK(req.GetScope()) {
+		return nil, invalid()
+	}
+	d, ok := s.find(req.GetRef(), req.GetScope())
+	if !ok {
+		return nil, notFound()
+	}
+	version := req.GetVersion()
+	if version == "" {
+		version = d.versions[len(d.versions)-1]
+	}
+	content, ok := d.content[version]
+	if !ok {
+		return nil, notFound()
+	}
+	total := len(content)
+	if len(content) > int(req.GetMaxBytes()) {
+		content = content[:cutAt(content, int(req.GetMaxBytes()))]
+	}
+	sum := sha256.Sum256([]byte(content))
+	return &knowledgev1.FetchResponse{
+		Content: []byte(content), Digest: &typesv1.Digest{Value: "sha256:" + hex.EncodeToString(sum[:])}, TotalBytes: uint64(total), //nolint:gosec // a length
+		Version: version, LastModified: timestamppb.New(d.modified), MediaType: d.mediaType,
+	}, nil
+}
+
+// cutAt returns the largest index at most n that is a character boundary of s.
+func cutAt(s string, n int) int {
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return n
+}
+
+// Resolve returns the canonical ref of a document.
+func (s *Source) Resolve(req *knowledgev1.ResolveRequest) (*knowledgev1.ResolveResponse, error) {
+	if req.GetRef() == "" || len(req.GetRef()) > 1024 || !scopeOK(req.GetScope()) {
+		return nil, invalid()
+	}
+	ref := strings.TrimSuffix(req.GetRef(), "/")
+	d, ok := s.find(ref, req.GetScope())
+	if !ok {
+		return nil, notFound()
+	}
+	return &knowledgev1.ResolveResponse{CanonicalRef: d.ref}, nil
+}
+```
+
+</Accordion>
+</Accordions>
+
+Notes on what it models, because these are the habits a real provider needs:
+
+- Every request is validated against the port grammar (query length, scope entries, `max_results` between 1 and 100) before the source is touched. A violation returns `INVALID_ARGUMENT`.
+- Scope entries are compared as whole segments, never as raw string prefixes, and are never decoded or normalised, so `kit/%2E%2E/other` fails the grammar.
+- Returned text is cleaned: control, format and bidi characters become U+FFFD, and truncation happens at a character boundary.
+- A document outside the requested scope is `NOT_FOUND`, never `PERMISSION_DENIED`, so existence is not leaked.
+
+## Build it
+
+These commands were run against the pinned checkout in the documentation environment. The offline module cache and a local toolchain were needed there; with network access a plain `go build` is enough.
+
+```bash title="Environment used for the verified run"
+export GOTOOLCHAIN=local GOCACHE=$TMPDIR/gocache GOMODCACHE=$HOME/go/pkg/mod GOPROXY=off GOFLAGS=-mod=mod
+go build -o "$TMPDIR/sample-knowledge" ./plugins/examples/sample-knowledge
+```
+
+<VerifiedSnippet what="go build of the sample (Go 1.27.2 local toolchain)" exit="0">
+
+```text
+(no output; exit 0)
+```
+
+</VerifiedSnippet>
+
+The only message printed was a Go cache warning about writing a stat-cache entry that the sandbox denied; it did not affect the result.
+
+Run it by hand to see the guard:
+
+<VerifiedSnippet what="the built binary started from a shell" exit="1">
+
+```text
+sample-knowledge: this binary is a Numinance provider and is started by the plugin host
+```
+
+</VerifiedSnippet>
+
+`go vet ./plugins/examples/...` exited 0. `go test ./plugins/examples/...` printed `[no test files]` for both packages: **the sample has no tests of its own**. Its tests are the conformance kit.
+
+## Test it against the conformance kit
+
+`conformance/knowledge/v1` is a Go package, `knowledgekit`, that runs a fixed list of cases against anything implementing a three-method `Target` interface.
+
+```go title="conformance/knowledge/v1/kit.go"
+type Target interface {
+	Search(context.Context, *knowledgev1.SearchRequest) (*knowledgev1.SearchResponse, error)
+	Fetch(context.Context, *knowledgev1.FetchRequest) (*knowledgev1.FetchResponse, error)
+	Resolve(context.Context, *knowledgev1.ResolveRequest) (*knowledgev1.ResolveResponse, error)
+}
+```
+
+The kit judges only what comes back. How you reach the provider is up to you: a real host dispatching `Invoke`, a replay, or a direct call. The kit's own test calls the sample's `Source` directly with a thin adapter that translates the provider's `CallError` into the kit's, and runs it with `knowledgekit.Run(t, direct{provider.NewSource()})`. A second test feeds the kit three deliberately broken providers (one that ignores scope, one that accepts `kit/../other`, one that splices query text) and asserts each fails at least one case.
+
+```bash title="Run the knowledge kit against the sample"
+go test -count=1 -v ./conformance/knowledge/...
+```
+
+<VerifiedSnippet what="knowledge kit against the sample provider (excerpt)" exit="0">
+
+```text
+--- PASS: TestKit_TheSampleProviderPassesTheSkeleton (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-001 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-002 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-003 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-004 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-005 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-007 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-008 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-012 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-013 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-014 (0.00s)
+    --- PASS: TestKit_TheSampleProviderPassesTheSkeleton/CORE-015 (0.00s)
+--- PASS: TestKit_FailsABrokenProvider (0.00s)
+--- PASS: TestKit_CasesAreListedInTheREADME (0.00s)
+PASS
+ok  	github.com/numinance/numinance-spec/conformance/knowledge/v1	0.186s
+```
+
+</VerifiedSnippet>
+
+What this does **not** prove. The kit runs eleven of the cases in the README table against a seeded source. The remaining cases (principals, a one-megabyte document, a broken or unreachable source, a rate-limited source) need fixtures the skeleton does not carry. The host checks (scope refusal before `Invoke`, digest and bounds checks, unknown-field rejection, egress against metadata and private addresses) are enforced by the plugin host, which is not in the open tree. A pass here is evidence that your verb logic matches the port's core cases; it is not a pass of the full port and not a security review.
+
+## Write your own
+
+<Steps>
+<Step>
+
+### Choose the port and read its header
+
+The header of `proto/numinance/ports/<port>/v1/<port>.proto` states callers, authority and bounds. Take the generated stub from `sdk/go/gen/numinance/ports/<port>/v1`.
+
+</Step>
+<Step>
+
+### Declare honestly
+
+For each verb you implement, add a `CapabilityDescriptor` at or above the port's risk and side-effect floors. Declare every credential, network and filesystem intent you need and nothing else. If a verb is above `READ`, declare the evidence it emits. See [Manifest and capabilities](/docs/integrations/manifest-and-capabilities).
+
+</Step>
+<Step>
+
+### Serve with the SDK
+
+Call `plugin.Serve` with your `register` function. Return the generated descriptor via `plugin.DescriptorSet`. Dispatch on `Envelope.Method`, check the request type URL, and answer with exactly one terminal message on a unary-shaped verb.
+
+</Step>
+<Step>
+
+### Never hold credentials
+
+Ask `HostService.RequestCredential` for a handle and send requests through the egress proxy the response names. Do not read tokens from the environment: your environment is the three handshake variables.
+
+</Step>
+<Step>
+
+### Build a `Target` and run the kit
+
+Write a test that adapts your provider to the port's `Target` and calls the kit's `Run`. Add your own tests for what the kit does not cover.
+
+</Step>
+</Steps>
+
+## Failure modes
+
+| Symptom | Cause |
+| --- | --- |
+| `Serve` returns `ErrNotLaunchedByHost` | Started without the cookie. Expected outside a host |
+| `the host serves no protocol version this provider speaks` | `NUMINANCE_PLUGIN_PROTOCOLS` does not include `plugin.AppProtocolVersion` |
+| Kit case fails with a reason mismatch | A bound violation returned the wrong `Reason` (for example `NOT_FOUND` for an invalid argument) |
+| Host would reject a stream | A `RUNNING` message carried a result on a unary target, or a terminal message carried none on success |
+| Install would refuse the package | Placeholder SBOM and provenance references, as in the sample |
+
+## Next steps
+
+<Cards>
+  <Card title="Conformance" href="/docs/integrations/conformance" description="All kits, their modes and what a pass means." />
+  <Card title="Go SDK" href="/docs/sdk/go" description="The handwritten packages and the generated stubs." />
+  <Card title="Official providers" href="/docs/integrations/official-providers" description="Larger providers that use HostService for credentials and evidence." />
+</Cards>

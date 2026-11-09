@@ -1,0 +1,77 @@
+---
+title: Architecture
+description: The system map for Numinance - planes, components, identities and where the open contract ends and the private runtime begins.
+---
+
+<FeatureStatus kind="designed">
+  This page maps the designed system. The planes and the runtime are under development; the contracts they speak are the public part.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/plugin/v1/plugin.proto", "proto/numinance/ports/authorexecutor/v1/authorexecutor.proto", "proto/numinance/types/v1/types.proto"]} note="Only the contracts are public. The runtime behind them is not." />
+
+<ShortProductTruth>
+  The harness owns intelligence. Numinance owns authority. Every privileged action passes a decision made outside the model.
+</ShortProductTruth>
+
+## System boundary explorer
+
+Select a component to see what it holds, what it may reach and which identity it runs as.
+
+<SystemBoundaryExplorer />
+
+## The model in one paragraph
+
+A change enters a durable lifecycle. Context is resolved from the customer's own systems into a small bundle. A coding harness runs inside a sandbox and proposes tool actions. Each action becomes an intent that a policy decision point evaluates against a scoped, immutable grant. Allowed actions execute through brokered credentials and an egress proxy; denied actions are recorded. Independent verification and a distinct reviewer identity judge the result before a release identity, not the author, merges or deploys. Everything is written to an append-only evidence chain by the runner identity, which an offline verifier can check without trusting the engine.
+
+## Planes and components
+
+| Component | Plane | Responsibility | Status |
+| --- | --- | --- | --- |
+| Open `numi` CLI, schemas, protobuf contracts, conformance kits, evidence verifier | Public | The contract and the tools that check it | `public-spec` |
+| Runner | Customer data plane | Creates sandboxes, supervises the broker and egress proxy, is the only writer of evidence | `designed` |
+| Engine and workflow orchestration | Customer data plane | Owns the change lifecycle, issues grants, calls the policy decision point | `designed` |
+| Policy decision point and trust kernel | Customer data plane | Decides allow, deny or require approval before every privileged action | `designed` |
+| Capability broker | Customer data plane | Turns a grant into handles for one step; never hands out reusable credentials | `designed` |
+| Egress proxy | Customer data plane | Default-deny network path that applies credentials outside the sandbox | `designed` |
+| Plugin host and plugins | Customer data plane | Runs out-of-process providers behind typed gRPC services | `public-spec` contract, `designed` host |
+| Author and reviewer executors | Customer data plane | Drive a coding harness for authoring and for independent review | `designed` |
+| Artifact store and evidence store | Customer data plane | Hold content by reference and the append-only chain | `designed` |
+| Control plane | Vendor | Metadata-only fleet, licence and registry services | `designed` |
+
+<Callout type="warn" title="What is and is not available">
+  Installing `numi` does not install an autonomous engineer. The open build validates files against the schemas and verifies evidence exports. The Numinance engine is proprietary and not generally available. See [Open versus proprietary](/docs/concepts/open-vs-proprietary).
+</Callout>
+
+## Who holds what authority
+
+| Party | Holds | Does not hold |
+| --- | --- | --- |
+| Model and harness | Proposals: plans, edits, tool intents | Any ability to grant, approve or deploy |
+| Policy decision point | The decision for each action | Credentials; the ability to act |
+| Capability broker | Short-lived handles scoped to one step | The decision; the code |
+| Author agent | Write access to its own worktree under a grant | Release, merge-on-its-own-work approval, protected paths |
+| Reviewer agent | Read-only access, a different model vendor | Write access, the final verdict |
+| Release pipeline | Merge and deploy where policy allows | Authorship of the change it releases |
+| Human approver | Approval where policy requires one | Nothing the policy floor forbids |
+| Runner | The right to append evidence | Customer credentials |
+
+## Failure cases the architecture is built around
+
+- A compromised or prompt-injected model asks for a wider tool: the intent is denied and the denial is recorded. Its maximum effect is its grant.
+- The orchestrator is replayed or restarted: it resumes from durable state and carries only references, so no content is lost or leaked.
+- The control plane is unreachable: in sovereign deployments authorised work and evidence export continue.
+- A plugin is swapped: its signed, digest-pinned manifest no longer matches and the host refuses to start it.
+
+## Read the architecture in order
+
+<Cards>
+  <Card title="Data and control planes" href="/docs/architecture/data-and-control-planes" description="What stays in the customer account and what may cross." />
+  <Card title="Trust kernel" href="/docs/architecture/trust-kernel" description="The fixed core that no pack or profile can change." />
+  <Card title="Temporal orchestration" href="/docs/architecture/temporal-orchestration" description="The durable lifecycle, signals, timeouts and recovery." />
+  <Card title="Context resolver" href="/docs/architecture/context-resolver" description="How a small, cited bundle is built per stage." />
+  <Card title="Agent harnesses" href="/docs/architecture/agent-harnesses" description="The authorexecutor port and its event stream." />
+  <Card title="Plugin host" href="/docs/architecture/plugin-host" description="Out-of-process providers and their sandbox boundary." />
+  <Card title="Authority and policy" href="/docs/architecture/authority-and-policy" description="Grants, identities, no self-approval and the breaker." />
+  <Card title="Verification and recovery" href="/docs/architecture/verification-recovery" description="Checks, review, bounded repair, canary and rollback." />
+  <Card title="Deployment modes" href="/docs/architecture/deployment-modes" description="Managed, sovereign and air-gapped." />
+</Cards>

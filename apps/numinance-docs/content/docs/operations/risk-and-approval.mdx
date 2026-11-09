@@ -1,0 +1,100 @@
+---
+title: Risk and approval
+description: How risk classes route work to autonomy, human approval or denial, and how separation of duties keeps an agent from approving itself.
+---
+
+<FeatureStatus kind="designed">The risk and autonomy contracts are public-spec. The approval workflow and the decision point that enforces them live in the proprietary runtime and are designed, not shipped.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/annotations/v1/annotations.proto", "proto/numinance/kinds/v1/autonomy_policy.proto", "schemas/examples/AutonomyPolicy/org-ladder.yaml"]} note="RiskClass, the AutonomyPolicy kind and a real example." />
+
+<ShortProductTruth>
+Approval is a signal the policy engine consumes, from a human who is not the author. It is never something an agent can grant itself.
+</ShortProductTruth>
+
+## Risk classes
+
+Every action has a risk class, from lowest to highest: `RISK_CLASS_READ`, `LOW`, `MEDIUM`, `HIGH` and `PRIVILEGED`. A change's risk class is the maximum over its playbook steps. A capability declares a risk floor that no provider and no customer can lower, and lowering the risk of an existing capability in a later release is a contract-breaking change.
+
+Step risk can only be raised by the playbook author. The resolved risk is the maximum of the step's declared risk and the risk of every capability its grant allows.
+
+## From risk to a decision
+
+Before every privileged action the runtime evaluates policy outside the model. The result is one of three decisions:
+
+| Decision | Meaning |
+| --- | --- |
+| allow | The action proceeds, possibly with obligations such as extra evidence |
+| deny | The action does not happen, and the denial is recorded |
+| require approval | The action waits for approvers who satisfy the rule |
+
+Inputs include the action and its risk floor, the acting identity, the change and environment, the autonomy level and floor, residency, remaining budget, the evidence present and required, and time windows. Floors are evaluated first and default to deny.
+
+<AutonomyPolicyExplorer />
+
+## An autonomy policy in practice
+
+This is the shipped example from the spec. It defaults to opening pull requests, lets a low-risk dependency playbook reach merge, and floors high-risk work at suggestion.
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {environment: production}, max_level: AUTONOMY_LEVEL_MERGE}
+```
+
+The open CLI can check that this file is well formed with `numi validate --files`. It cannot tell you what the runtime would decide, because the open build does not resolve profiles or evaluate floors. See [Autonomy policy](/docs/configuration/autonomy-policy).
+
+## The approval workflow
+
+The designed workflow has five parts.
+
+1. **Request.** Policy returns `require_approval` with the approver group, a required count and an exclusion of the author principal. The change pauses at a gate.
+2. **Presentation.** The approver sees the plan, the evidence so far, the verifier results and the policy reasons by rule id.
+3. **Decision.** An authenticated human approves or rejects. The control plane or the customer's identity provider supplies the principal. The runtime validates the approver against the author identity before it accepts the decision.
+4. **Signal.** The approval enters policy as input, not as an override. Policy still decides whether the action proceeds.
+5. **Record.** The approval, the principal, the reason and the policy decision id are written to the evidence chain by the runner identity.
+
+An approval applies to a specific plan digest. If the plan changes, the approval does not carry over.
+
+## Separation of duties
+
+Four identities act in a change, and the policy treats them as structurally different.
+
+| Identity | May | May not |
+| --- | --- | --- |
+| Author agent | Propose and implement inside its sandbox | Approve, edit protected paths, deploy |
+| Reviewer agent | Review and report findings | Approve as a human, deploy |
+| Release pipeline | Deploy, and is the only identity that does | Author code |
+| Human approver | Approve, reject, escalate | Be the author of the change they approve |
+
+Policy denies an approver equal to the author, and an approver that shares the author's run. Protected paths such as policy files, CI definitions and permission definitions are out of reach for agents by mount and by source-control branch protection. The kernel that enforces all this sits outside every grant.
+
+## Grants expire and cannot widen
+
+For each work unit the runtime derives a grant from the profile, playbook step, risk class and autonomy level. A grant names capabilities, resource scope, budgets, environment and an expiry. A grant is immutable. A holder can request a narrower grant for a sub-step and can never widen its own. Credentials are issued just in time for one step and revoked when it completes or when the breaker trips.
+
+## Failure modes and safeguards
+
+- **Self-approval attempt.** Denied structurally and recorded as a denial.
+- **Instruction injected through a ticket or document.** Retrieved text is treated as data. Only signed policy and the kernel can create enforceable authority.
+- **Stale approval.** An approval bound to an old plan digest is not valid for a new plan.
+- **Approver fatigue.** Mitigate by narrowing what routes to humans, not by adding more approvers to rubber-stamp.
+
+## Troubleshooting
+
+- *A change is stuck at a gate.* Check the approver group and count. If the only eligible approver is the author, nobody can approve by design.
+- *An action was denied that you expected to run.* Read the policy reasons by rule id in the decision record, then check floors before rules.
+- *A promotion did not apply.* Floors and narrower scopes can only tighten. See [Evaluations](/docs/operations/evaluations).
+
+<Cards>
+  <Card title="Choose autonomy" href="/docs/guides/choose-autonomy" description="Pick a starting level per playbook and risk." />
+  <Card title="Authority and policy" href="/docs/architecture/authority-and-policy" description="The decision point and trust classes in depth." />
+  <Card title="Circuit breaker" href="/docs/operations/circuit-breaker" description="Cap or stop everything above policy." />
+</Cards>

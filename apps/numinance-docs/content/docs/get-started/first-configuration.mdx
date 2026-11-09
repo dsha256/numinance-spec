@@ -1,0 +1,305 @@
+---
+title: First configuration
+description: Read every file numi init writes, protect the policy location, change the autonomy level safely, and see what validation does not check.
+---
+
+<FeatureStatus kind="public-spec">The files and commands here are in the open build. What the engine does with them is designed, not runnable from the public tree.</FeatureStatus>
+<SourceReference paths={["cli/README.md", "proto/numinance/kinds/v1/autonomy_policy.proto", "proto/numinance/kinds/v1/playbook.proto", "proto/numinance/kinds/v1/stage_registry.proto", "proto/numinance/kinds/v1/language_toolchain.proto", "proto/numinance/kinds/v1/sdlc_profile.proto"]} />
+
+<ShortProductTruth>Configuration is typed YAML kept in your repository and reviewed like code. The agent reads it; it cannot rewrite it.</ShortProductTruth>
+
+## Prerequisites
+
+You ran `numi init --ci github-actions .` in a Python repository, as in the [quickstart](/docs/get-started/quickstart). Everything below describes that real output.
+
+## The generated tree
+
+<Files>
+  <Folder name=".numinance" defaultOpen>
+    <File name="README.md" />
+    <Folder name="policy" defaultOpen>
+      <File name="sdlc-profile.yaml" />
+      <File name="autonomy.yaml" />
+      <File name="stage-registry.yaml" />
+      <File name="playbook-bugfix-bounded.yaml" />
+      <File name="toolchain-python.yaml" />
+    </Folder>
+  </Folder>
+</Files>
+
+Every document starts with `apiVersion: numinance.dev/v1`, a `kind`, and `metadata` with a `name` and a `scope`. Here the scope is `SCOPE_REPO`. The org scope appears later.
+
+## sdlc-profile.yaml
+
+The profile binds names defined in this tree, or granted by an organization policy repository, to this repository.
+
+```yaml title=".numinance/policy/sdlc-profile.yaml"
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.12]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+```
+
+- `playbooks` and `toolchains` list the names this repository uses. They must match documents elsewhere in the tree.
+- `adapters` selects one provider per port: source control and CI execution. `instance` names the configured instance of that provider.
+- The GitHub Actions provider starts a `workflow_dispatch` workflow that your repository must already define on its default branch. A live run of that provider is not yet verified.
+
+## autonomy.yaml
+
+```yaml title=".numinance/policy/autonomy.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: pr-only, scope: SCOPE_REPO}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+```
+
+`defaults.level` is the level used when no rule matches. `AUTONOMY_LEVEL_PR` means the agent may open pull requests and may never merge. The ladder runs from `OBSERVE` through `SUGGEST`, `IMPLEMENT`, `PR`, `MERGE`, `STAGE`, `RELEASE` to `OPERATE`. `PR_ONLY` is not a ladder level: it is a state of the engine's circuit breaker.
+
+There is no `floors` block, and a repository cannot have one. Floors are ceilings, and only the org scope or a control pack may set them. Without an organization document, the engine applies its shipped floor: at most SUGGEST for HIGH risk and above, and at most PR for the rest. That caps every change at PR whatever you write here.
+
+## stage-registry.yaml
+
+```yaml title=".numinance/policy/stage-registry.yaml (excerpt)"
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+    - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+    - name: pr-gate
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: maintainer
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        required_approvals: 1
+      requires: [ci-github-actions]
+```
+
+A registry maps your stage names onto the fixed Change state machine. A stage only names a state; it does not add states. `requires` orders stages, and the order must agree with the state machine. Two properties are the point:
+
+- No stage maps to the Merging state, so no stage of this registry can merge.
+- The last stage is a human gate. `approver_role` names who may approve, `sod.distinct_from` lists identities the approver must differ from, and the author is always excluded.
+
+Only the org scope selects a registry (through `SDLCProfile.stages`). In a repository-only tree the registry is defined but not selected.
+
+## playbook-bugfix-bounded.yaml
+
+```yaml title=".numinance/policy/playbook-bugfix-bounded.yaml (excerpt)"
+spec:
+  change_type: bugfix
+  steps:
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_MEDIUM, evidence: [diff, pr-ref], verifiers: [unit-tests, lint, typecheck]}
+    - {name: review, capability_set: review, risk: RISK_CLASS_LOW}
+    - {name: pr-status, capability_set: release, risk: RISK_CLASS_LOW}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+```
+
+- One step per identity kind: the author-agent implements, the reviewer-agent reviews, and the release-pipeline reads pull-request status. No step merges.
+- `capability_set` names the set a step's grant is derived from. `risk` is the action risk of every RPC the set grants. `evidence` names what the step must record; a missing declared item turns success into partial. `verifiers` run on the step's output.
+- `max_repair_attempts` bounds the repair loop, from 0 to 10, with a default of 2. Repair is finite: when it is exhausted the change escalates to a human rather than trying again.
+- `qualification` is what a playbook needs before its autonomy can be promoted. Rates are in basis points, so `1000` means 10 percent and `0` means none. A narrower scope may only tighten a threshold.
+
+## toolchain-python.yaml
+
+```yaml title=".numinance/policy/toolchain-python.yaml (excerpt)"
+spec:
+  language: python
+  version: "3.12"
+  verifiers:
+    - {name: unit-tests, provider: dev.numinance.verifier-python, config: {check: pytest, timeout_seconds: 300}}
+    - {name: lint, provider: dev.numinance.verifier-python, config: {check: ruff, timeout_seconds: 60}}
+    - {name: typecheck, provider: dev.numinance.verifier-python, config: {check: mypy, timeout_seconds: 120}}
+  package_manager: uv
+```
+
+The toolchain is explicit: language, version, package manager and verifier set come from your flags or from detection, and you edit them here. `unit-tests` runs candidate code, which the verifier provider refuses to do outside a nested sandbox that does not exist yet. A live run of `unit-tests` is unavailable; `lint` and `typecheck` are static and run. If you want to avoid declaring a verifier that cannot run live, pass `--verifiers lint,typecheck` to `numi init`.
+
+## The protected policy location
+
+`.numinance/policy/` is the protected location. A document there carries authority only when it is read from the protected branch of the repository. Set it up before anything depends on it:
+
+1. Enable branch protection on the default branch, with required reviews.
+2. Add a CODEOWNERS entry for `.numinance/policy/**` that names a group which does not include the agent identities.
+3. Require that group's approval for any change to that path.
+
+The reason is architectural. An agent must not be able to change its own gates, so policy that an agent can edit is not policy. A document outside `policy/` carries no authority.
+
+## Change the autonomy level safely
+
+Edit a copy first. Level changes widen what an agent may do, so treat them as policy changes with a reviewer.
+
+```yaml title=".numinance/policy/autonomy.yaml (edited copy)"
+spec:
+  defaults: {level: AUTONOMY_LEVEL_IMPLEMENT}
+```
+
+Re-validate:
+
+```bash title="Schema and loader check"
+numi validate --files .numinance
+```
+
+<VerifiedSnippet what="run on an edited copy that sets AUTONOMY_LEVEL_IMPLEMENT" exit="0">
+
+```text
+revision: "files"
+ok       file "policy/autonomy.yaml" AutonomyPolicy "pr-only"
+ok       file "policy/playbook-bugfix-bounded.yaml" Playbook "bugfix-bounded"
+ok       file "policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+ok       file "policy/stage-registry.yaml" StageRegistry "pr-only"
+ok       file "policy/toolchain-python.yaml" LanguageToolchain "python-3.12"
+```
+
+</VerifiedSnippet>
+
+A misspelled level fails, which is what you want:
+
+<VerifiedSnippet what="the same copy with AUTONOMY_LEVEL_BOGUS" exit="3">
+
+```text
+revision: "files"
+invalid  file "policy/autonomy.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/defaults/level\": enum
+ok       file "policy/playbook-bugfix-bounded.yaml" Playbook "bugfix-bounded"
+ok       file "policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+ok       file "policy/stage-registry.yaml" StageRegistry "pr-only"
+ok       file "policy/toolchain-python.yaml" LanguageToolchain "python-3.12"
+```
+
+</VerifiedSnippet>
+
+And a floors block in a repository is refused:
+
+<VerifiedSnippet what="a copy with a spec.floors block added to the repository autonomy.yaml" exit="3">
+
+```text
+invalid  repo ".numinance/policy/autonomy.yaml": kind: invalid: numinance.kinds.v1.AutonomyPolicySpec.floors is set only at the org scope
+```
+
+</VerifiedSnippet>
+
+<Callout type="warn" title="A passing level is not a granted level">
+  The validator accepted `AUTONOMY_LEVEL_MERGE` in the same copy. Validation checks shape, not consequence. Whether the level actually takes effect depends on floors, control packs, grants, qualification and the circuit breaker, all of which are applied by the engine. Do not read a green schema check as permission to run at that level.
+</Callout>
+
+## What validate does not check
+
+- It does not resolve the profile, so it does not tell you which playbook, toolchain or adapter binding the org granted to this repository.
+- It does not apply floors. Floors come from the org scope or control packs and cap whatever the repository says.
+- It does not check that a named provider is installed, reachable or authorized. A Jenkins binding validates even though no Jenkins provider exists.
+- It does not check that your `workflow_dispatch` workflow exists on the default branch.
+- It does not check the always-on kernel floors, which belong to the engine and cannot be weakened by any document.
+
+## An organization tree with --org-dir
+
+Only the org scope selects the stage registry and grants playbook, toolchain and adapter names to repositories. `--org-dir` writes those documents into an organization policy repository, and the repository keeps its profile only.
+
+```bash title="Repository and org policy repository"
+numi init --ci github-actions --org-dir ../org-policy .
+```
+
+<VerifiedSnippet what="init with --org-dir into scratch directories (absolute paths shortened to placeholders)" exit="0">
+
+```text
+numi init: repository "/path/to/repo"
+chose: package manager uv (detected from pyproject.toml with no package manager table, the default)
+chose: python 3.12 (default)
+chose: verifiers unit-tests lint typecheck (default)
+chose: ci github-actions (flag)
+chose: language python (default)
+chose: scm github (default)
+chose: tickets none (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/README.md"
+organization policy repository "/path/to/org-policy"
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/policy/autonomy.yaml"
+wrote ".numinance/policy/stage-registry.yaml"
+wrote ".numinance/policy/playbook-bugfix-bounded.yaml"
+wrote ".numinance/policy/toolchain-python.yaml"
+wrote ".numinance/README.md"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: unit-tests (pytest) runs candidate code and is UNAVAILABLE in the live verifier provider until its nested sandbox exists
+next: numi validate "/path/to/repo"
+```
+
+</VerifiedSnippet>
+
+<Files>
+  <Folder name="org-policy" defaultOpen>
+    <Folder name=".numinance" defaultOpen>
+      <File name="README.md" />
+      <Folder name="policy" defaultOpen>
+        <File name="sdlc-profile.yaml" />
+        <File name="autonomy.yaml" />
+        <File name="stage-registry.yaml" />
+        <File name="playbook-bugfix-bounded.yaml" />
+        <File name="toolchain-python.yaml" />
+      </Folder>
+    </Folder>
+  </Folder>
+  <Folder name="repo" defaultOpen>
+    <Folder name=".numinance" defaultOpen>
+      <File name="README.md" />
+      <Folder name="policy" defaultOpen>
+        <File name="sdlc-profile.yaml" />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
+
+The org `autonomy.yaml` is where floors live. This is the real generated block:
+
+```yaml title="org-policy/.numinance/policy/autonomy.yaml (excerpt)"
+metadata: {name: pr-only, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {risk: RISK_CLASS_READ}, max_level: AUTONOMY_LEVEL_PR}
+```
+
+A floor matches the risk class it names and every higher one. Matching `RISK_CLASS_READ`, the lowest class, makes the PR cap apply to every change, while HIGH stays at SUGGEST. The org `sdlc-profile.yaml` adds `stages: pr-only`, which is what selects the registry. Pass the org tree to the open validator with `--org`:
+
+<VerifiedSnippet what="numi validate --org org-policy repo" exit="7">
+
+```text
+revision: "working tree (uncommitted changes included)"
+ok       org ".numinance/policy/autonomy.yaml" AutonomyPolicy "pr-only"
+ok       org ".numinance/policy/playbook-bugfix-bounded.yaml" Playbook "bugfix-bounded"
+ok       org ".numinance/policy/sdlc-profile.yaml" SDLCProfile "org-baseline"
+ok       org ".numinance/policy/stage-registry.yaml" StageRegistry "pr-only"
+ok       org ".numinance/policy/toolchain-python.yaml" LanguageToolchain "python-3.12"
+ok       repo ".numinance/policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+numi validate: profile resolution needs the Numinance engine build
+```
+
+</VerifiedSnippet>
+
+`--org-dir` naming the repository itself, under any spelling, is refused with exit 3. Keep the org tree in its own repository with its own, stricter protection.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| `.numinance already has files` (exit 5) | You ran `init` twice. | Review and edit the files, or pass `--force` to overwrite only the files `init` writes. |
+| `floors is set only at the org scope` (exit 3) | A repository document has a `floors` block. | Move it to the org policy repository. |
+| `enum` violation at `/spec/defaults/level` | Misspelled level name. | Use an `AUTONOMY_LEVEL_` name from the ladder above. |
+| Exit 7 from `numi validate` | Expected in the open build. | Use `--files` for a schema-only check, or the engine build for resolution. |
+
+## Next steps
+
+<Cards>
+  <Card title="Autonomy policy" href="/docs/configuration/autonomy-policy" description="Defaults, rules and floors in full." />
+  <Card title="Choose an autonomy level" href="/docs/guides/choose-autonomy" description="How to decide, qualify and promote a level." />
+  <Card title="Onboard a repository" href="/docs/guides/onboard-repository" description="The end-to-end guide that builds on this page." />
+</Cards>

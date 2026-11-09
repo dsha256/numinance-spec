@@ -1,0 +1,18 @@
+---
+title: RFCs
+description: The proposal process for changing numinance-spec and the RFCs in the tree.
+---
+
+<FeatureStatus kind="public-spec"/>
+
+<SourceReference paths={["rfcs/0000-template.md", "GOVERNANCE.md"]} />
+
+
+RFCs are in `numinance-spec/rfcs/`. A change beyond `contract-additive` needs one, open for comment at least 14 days. The template `0000-template.md` has these sections: Status (draft, open, accepted or rejected), Author, Opened, Change class (`contract-additive`, `contract-breaking` or `protocol`), Problem, Proposal, Alternatives, Compatibility and migration, Security considerations and Open questions.
+
+| RFC | Subject | Status shown in the file |
+| --- | --- | --- |
+| 0001 | The `host_only` field annotation | Accepted |
+| 0002 | The `resource_name` field annotation | Accepted |
+| 0003 | The `evidence/v1` chain format ([Evidence](/docs/evidence)) | Open (acceptance follows reviews) |
+| 0004 | The `EvalSet` kind | Accepted; the kind, schema, example and loader have landed and some migration work is still owed |

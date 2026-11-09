@@ -1,0 +1,66 @@
+---
+title: Evidence and trust
+description: What an evidence receipt can and cannot prove, why trust roots belong to the verifier, and the three levels that matter most.
+---
+
+<FeatureStatus kind="public-spec">The evidence format and the offline verifier are public and runnable. Producing exports is done by the proprietary runtime.</FeatureStatus>
+
+<SourceReference paths={["conformance/evidence/v1", "sdk/go/evidenceverify"]} />
+
+<ShortProductTruth>
+Don't trust the agent. Check the evidence.
+</ShortProductTruth>
+
+## What evidence is
+
+For every change the runtime writes an append-only chain of records under the runner identity: decisions, actions, denials, verifier results and outcomes. The chain is exported as a portable `evidence/v1` directory that the open verifier checks offline, without the engine and without network access. Decisions that were denied are in the chain, which is why a clean-looking history is more than a list of successes.
+
+<EvidenceChainInspector />
+
+## Trust roots belong to the verifier
+
+A chain whose hashes agree proves only that the records agree with each other, and anyone can build one. Trust comes from keys and a log origin the **caller** chooses in advance. There is no built-in root, and a key supplied by the export itself never earns the top result.
+
+## Three levels to know
+
+The verifier reports a level. The three that matter most:
+
+| Level | Meaning | How you get it |
+| --- | --- | --- |
+| `verified` | The chain links and hashes correctly, signatures check under keys you pinned, and the head is proved under the log you pinned. | Pin runner key, log key and log origin. |
+| `self-consistent` | The export agrees with itself, but its signatures were checked only against keys the export states. | `--trust-bundle-keys`. |
+| `unauthenticated` | No signature was checked. | `--skip-signatures`. |
+
+Other levels (`failed`, `incomplete`, `unsigned`, `unanchored`) cover broken, partial or unanchored exports. The exit code is 0 for `verified`, 5 for a consistent export weaker than verified, and 3 for failure. See [trust levels](/docs/evidence/trust-levels) for the full list.
+
+## What a receipt can prove
+
+Under keys you pinned, `verified` shows that:
+
+- the records were produced by the runner identity you trust and have not been altered or reordered;
+- the chain ended as it states, for example `Closed`;
+- parts declared not applicable, such as deployment at PR level, are consistent with the chain;
+- a particular decision, denial or verifier result is on the record.
+
+## What it cannot prove
+
+`verified` is about provenance and integrity. It does not prove:
+
+- that the code is correct or the tests are thorough;
+- that the model reasoned well;
+- that a compromised host logged every event it should have;
+- statements the export marks `unsourced`, such as credential scopes or network policy when no broker or proxy statement is attested.
+
+Treat evidence as the basis for a good review, not a substitute for one. No page on this site is an audit or certification claim.
+
+## Failure modes
+
+A wrong pinned key produces `FAIL signer_untrusted`, exit 3. A missing key mode is a usage error, because the verifier never defaults to trusting the export.
+
+## Next steps
+
+<Cards>
+  <Card title="Verify a run" href="/docs/guides/verify-a-run" description="Run the verifier on a sample export." />
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="Flags, outputs and exit codes." />
+  <Card title="Threat model and limits" href="/docs/evidence/threat-model-and-limits" description="What the format does not defend." />
+</Cards>

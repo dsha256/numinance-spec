@@ -1,0 +1,83 @@
+---
+title: numi CLI
+description: The open numi command line, how it differs from the private engine build, and the status of every command.
+---
+
+<FeatureStatus kind="pre-alpha">
+  The open build runs from a source checkout. It validates, scaffolds and verifies. It does not run an autonomous engineer.
+</FeatureStatus>
+
+<SourceReference paths={["cli/README.md", "cli/numi/", "sdk/go/cli/"]} />
+
+<ShortProductTruth>
+  `numi` is a command line over public code. Installing it installs no engine: running changes, exporting evidence and reaching a runtime belong to the private Numinance engine.
+</ShortProductTruth>
+
+## Three different objects
+
+People conflate these. Keep them apart.
+
+| Object | What it is | License and availability |
+| --- | --- | --- |
+| The open `numi` CLI | `cli/numi` in the numinance-spec repository. A thin `main` over the public Go package `sdk/go/cli`. | Apache-2.0, buildable today from source |
+| The numinance-spec repository | Protocol `.proto` files, JSON Schemas, SDKs, sample and official plugins, conformance kits, the evidence verifier and the open CLI | Apache-2.0, public |
+| The Numinance engine (proprietary runtime) | Orchestration, the profile resolver, the policy kernel, the autonomous engineer | Private and not generally available |
+
+The engine build of `numi` is a fourth thing worth naming: it runs the same `sdk/go/cli` code and injects the profile resolver that needs the private context.
+
+## Open build versus engine build
+
+| | Open build (`cli/numi`) | Engine build |
+| --- | --- | --- |
+| `validate` | Schema-validates every kind document of the org, repo and component trees, then exits 7 with `profile resolution needs the Numinance engine build`. A schema pass can never be mistaken for a full one. | Reads a pinned commit, resolves the profile, prints the digest and the provenance of each field. Exit 7 there means a dependency was unavailable. |
+| `validate --files` | Exits 0 after the schema and loader check only. No resolver, no floors. | Not available; exits 2. |
+| `--rev` | Any non-empty value is a usage error (exit 2). The open build reads the working tree. | Defaults to `HEAD`; reads a private copy of the repository, never the working tree. |
+| `init` | Available. Needs no resolver. | Available. |
+| `evidence verify` | Available; a wrapper over the public `evidenceverify` package. | Runs its own verify until a later release makes it delegate. |
+| `evidence export` | Not in the build (unknown subcommand, exit 2). | The engine exports. |
+
+## Command index
+
+| Command | Open build | Status | Page |
+| --- | --- | --- | --- |
+| `numi version` | Yes | <StatusBadge kind="pre-alpha" /> | [Install](/docs/cli/install) |
+| `numi init` | Yes | <StatusBadge kind="pre-alpha" /> | [numi init](/docs/cli/init) |
+| `numi validate --files` | Yes | <StatusBadge kind="pre-alpha" /> | [numi validate](/docs/cli/validate) |
+| `numi validate` (repository mode) | Schema pass, then exit 7 | <StatusBadge kind="pre-alpha" /> | [numi validate](/docs/cli/validate) |
+| `numi evidence verify` | Yes | <StatusBadge kind="public-spec" /> | [numi evidence verify](/docs/cli/evidence-verify) |
+| `numi evidence export` | No | <StatusBadge kind="designed" /> | [Commands and exit codes](/docs/cli/commands-and-exit-codes) |
+| `numi discover`, `connect`, `plan`, `run`, `status`, `approve`, `doctor`, `extension`, `breaker` | No | <StatusBadge kind="designed" /> | [Commands and exit codes](/docs/cli/commands-and-exit-codes) |
+
+<Callout type="warn" title="Designed commands are not in the open build">
+  Do not look for `numi run` in a checkout. It, and the rest of the designed surface, are described on the commands page and are not runnable from the open build.
+</Callout>
+
+## Exit codes (stable)
+
+| Code | Meaning |
+| --- | --- |
+| 0 | OK |
+| 1 | Internal, and any unknown kind |
+| 2 | Usage |
+| 3 | Invalid |
+| 4 | Not found |
+| 5 | Conflict |
+| 6 | Policy denied |
+| 7 | Unavailable |
+| 8 | Timeout |
+
+Individual commands narrow some codes. The full table with command-specific meanings is on [Commands and exit codes](/docs/cli/commands-and-exit-codes).
+
+## Failure modes
+
+- A CI job that treats `numi validate` exit 7 as success has read the open build wrongly. Exit 7 here means the schema pass succeeded and nothing more was checked.
+- A CI job that runs `numi validate --files` and calls the repository validated has skipped the resolver and the floors.
+- `verified` from `numi evidence verify` proves provenance and chain integrity under keys you pinned. It does not prove the code is correct.
+
+## Next steps
+
+<Cards>
+  <Card title="Install" href="/docs/cli/install" description="Build numi from a source checkout." />
+  <Card title="numi init" href="/docs/cli/init" description="Scaffold a .numinance directory and check it." />
+  <Card title="numi validate" href="/docs/cli/validate" description="--files, repository mode and why exit 7 is not a pass." />
+</Cards>

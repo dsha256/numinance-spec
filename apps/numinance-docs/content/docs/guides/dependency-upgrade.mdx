@@ -1,0 +1,167 @@
+---
+title: Dependency upgrade
+description: A designed walkthrough of a low-risk dependency upgrade change, from triage to a pull request, tied to the real Playbook and AutonomyPolicy examples.
+---
+
+<FeatureStatus kind="designed">
+This is a storyboard of the Numinance engine, which is proprietary and not generally available. The configuration documents shown are real and validate with the open CLI. There is no runnable engine command in this guide.
+</FeatureStatus>
+<SourceReference paths={["schemas/examples/Playbook/dependency-upgrade.yaml", "schemas/examples/AutonomyPolicy/org-ladder.yaml", "proto/numinance/kinds/v1/playbook.proto"]} />
+
+<ShortProductTruth>A dependency upgrade is the change type most worth automating first: reversible, narrow, and checkable by tests you already trust. The playbook bounds it, the policy caps it, and a human decides what merges.</ShortProductTruth>
+
+## When to use this
+
+Read this guide to see what you would configure, and what you would approve, if you let an autonomous engineer open dependency bumps for you. It assumes you have completed [Onboard a repository](/docs/guides/onboard-repository) and read [Choose an autonomy level](/docs/guides/choose-autonomy).
+
+## The configuration that drives it
+
+The Playbook is the public example from the spec. It has two steps, each with its own capability set and declared risk.
+
+```yaml title="schemas/examples/Playbook/dependency-upgrade.yaml"
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: dependency-upgrade, scope: SCOPE_ORG}
+spec:
+  change_type: dependency-upgrade
+  steps:
+    - {name: bump, capability_set: scm-write, risk: RISK_CLASS_LOW, evidence: [diff, lockfile-digest], verifiers: [unit-tests, lint]}
+    - {name: open-pr, capability_set: scm-pr, risk: RISK_CLASS_MEDIUM, evidence: [pr-ref], rehearse: false}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+```
+
+Read the fields as obligations:
+
+- `capability_set` names the set a step's grant is derived from. The playbook shapes a grant and never widens it.
+- `evidence` lists what the step must record. Missing declared evidence turns success into `PARTIAL`.
+- `verifiers` run on the step's output, independently of the agent that produced it.
+- `max_repair_attempts: 2` bounds the repair loop. The proto allows 0 to 10 and defaults to 2.
+- `qualification` is what must be shown before this playbook's autonomy can be promoted. Rates are basis points out of 10000, so `max_rework_rate: 1000` is a tenth of runs.
+
+The org AutonomyPolicy example pairs with it:
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml (rules)"
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+```
+
+<Callout type="warn" title="Read the examples together">
+A change's risk class is the maximum over its playbook steps, and the resolved risk of a step is at least the highest action risk of the RPCs its capability set grants. The example playbook declares `open-pr` as `RISK_CLASS_MEDIUM`, so a change that runs it resolves to MEDIUM and the LOW-only rule above does not match; the default `AUTONOMY_LEVEL_PR` applies. To earn the `MERGE` rule you would need a playbook whose steps and granted actions all resolve to LOW. Check this before you rely on a rule.
+</Callout>
+
+## The storyboard
+
+The lifecycle states below are the fixed `ChangeState` machine. Stage names in your StageRegistry map onto them.
+
+<ChangeLifecycleTimeline />
+
+<Steps>
+<Step>
+
+### Opened and understood
+
+A dependency alert or ticket is accepted at intake and the change is opened. The context resolver then builds the picture of the repository: the code graph, repository docs and the approved knowledge bundle. Retrieved material is treated as untrusted guidance and cannot create authority.
+
+*Evidence emitted:* the intake reference and the context bundle digest.
+
+</Step>
+<Step>
+
+### Classified
+
+The playbook (`dependency-upgrade`) and the risk class are fixed, and the initial grant is derived from profile, playbook step, risk and the resolved autonomy level. This is where the AutonomyPolicy and its floors apply. The agent cannot change the outcome.
+
+</Step>
+<Step>
+
+### Planned and plan gate
+
+The plan lists work units, a risk per step and the evidence each requires. Policy evaluates the plan before any side effect. In the generated stage registry this is the `GATE_KIND_PLAN` stage; it is decided by policy, not by a person, and the denial or approval is recorded.
+
+</Step>
+<Step>
+
+### Implementing: the bump step
+
+The author-agent runs in a sandbox under the `scm-write` grant. It edits the manifest and lockfile on a branch. It does not hold merge or deploy capability, and it cannot edit `.numinance/policy/`.
+
+*Evidence emitted:* `diff` and `lockfile-digest`.
+
+</Step>
+<Step>
+
+### Verifying and bounded repair
+
+The `unit-tests` and `lint` verifiers run against the candidate. These checks are separate from the author. If one fails, the change enters the repair state, where the author may try again, at most `max_repair_attempts` times. After the last attempt, the change escalates to a human rather than looping.
+
+</Step>
+<Step>
+
+### Release gate and the pull request
+
+The release gate evaluates policy on all evidence. At the pull-request level the `open-pr` step opens a PR under the `scm-pr` grant, and a human maintainer reviews it. The reviewer-agent and author-agent cannot approve it. At a level that allows merging, policy permits the merge only if no matching floor caps it.
+
+*Evidence emitted:* `pr-ref`. The change closes and the evidence is sealed.
+
+</Step>
+</Steps>
+
+## An illustrative stage log
+
+<IllustrativeNote>
+Hand-written to show shape and order. It is not output from a real run, the stage names are examples, and there is no command that produces it.
+</IllustrativeNote>
+
+```text title="illustrative stage log"
+change      dependency-upgrade   opened
+context     resolved             graph, docs, knowledge bundle (digests recorded)
+classify    risk=MEDIUM          level=PR (default; no rule matched)
+plan-gate   allow                decision recorded
+bump        implementing         grant=scm-write
+verify      unit-tests FAIL      -> repair attempt 1 of 2
+verify      unit-tests ok, lint ok
+open-pr     pull request opened  evidence: pr-ref
+release     awaiting human       approver_role=maintainer
+```
+
+## What a human approves
+
+- The org policy that sets the level and floors, by reviewing a change to `.numinance/policy/`.
+- The pull request itself, through the human gate in the stage registry.
+- Any promotion of this playbook's autonomy after its qualification record exists.
+
+## Failure and escalation paths
+
+| Situation | Designed outcome |
+| --- | --- |
+| Verifier fails after the last repair attempt | The change escalates and waits for a human signal. It does not retry further. |
+| Declared evidence missing | The step is `PARTIAL`, not success. |
+| Plan gate denies | No side effect occurs; the denial is recorded. |
+| Budget exhausted | The run pauses and escalates. |
+| Breaker trips | The change is paused at the next checkpoint. See [Release and incident response](/docs/guides/release-and-incident). |
+
+Rehearsal is off for this playbook (`rehearse: false`): a dependency bump touches no migration or infrastructure, so there is no disposable environment step.
+
+## Verify what you can today
+
+You can validate the Playbook and AutonomyPolicy examples with the open CLI.
+
+<VerifiedSnippet what="numi validate --files on the AutonomyPolicy example" exit="0">
+```text
+revision: "files"
+ok       file "org-ladder.yaml" AutonomyPolicy "org-ladder"
+```
+</VerifiedSnippet>
+
+```bash title="validate the Playbook example"
+go run ./cli/numi validate --files schemas/examples/Playbook
+```
+
+## Next steps
+
+<Cards>
+  <Card title="Playbooks" href="/docs/configuration/playbooks" description="Every Playbook field." />
+  <Card title="Bugfix with verification" href="/docs/guides/bugfix-with-verification" description="The same lifecycle with independent checks and repair." />
+  <Card title="Qualify autonomy" href="/docs/guides/qualify-autonomy" description="How a playbook earns a higher level." />
+</Cards>

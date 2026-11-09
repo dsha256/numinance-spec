@@ -1,0 +1,84 @@
+---
+title: Guides
+description: Task-oriented walkthroughs for configuring Numinance, from onboarding a repository to a governed release, with each guide marked as runnable today or designed.
+---
+
+<ShortProductTruth>Guides follow a job to be done, not a module. Each one says up front whether you can run it today with the open `numi` CLI or whether it is a designed walkthrough of the proprietary engine.</ShortProductTruth>
+
+<FeatureStatus kind="public-spec">
+Guides marked "Runnable today" use only the open `numi` CLI, the numinance-spec repository and its SDKs. Guides marked "Designed walkthrough" describe the Numinance engine, which is proprietary and not generally available. Installing `numi` does not install an autonomous engineer.
+</FeatureStatus>
+
+## How to read the executability labels
+
+| Label | Meaning | What you need |
+| --- | --- | --- |
+| Runnable today | Every command in the guide exists in the open build and was run to produce the output shown. | A clone of the spec repository and the Go toolchain. See [Install](/docs/get-started/install). |
+| Partly runnable | The configuration and checks are real and runnable; the live behaviour they configure belongs to the engine. | Same as above. The guide marks where it stops. |
+| Designed walkthrough | A storyboard of the engine, tied to real configuration documents. There is no runnable engine command. | Nothing to run. Read it to learn what you would configure and what you would approve. |
+
+The open build validates documents (`numi validate --files`), generates a starting configuration (`numi init`) and verifies evidence offline (`numi evidence verify`). Running a change, exporting evidence, tripping the breaker and approving a gate are engine features. See [Status](/docs/status) for the full matrix.
+
+## The journey
+
+<PathCards
+  cols={2}
+  items={[
+    { title: 'Onboard a repository', href: '/docs/guides/onboard-repository', description: 'Run numi init on a Python repository, validate the output, and protect .numinance/policy. Runnable today.', status: 'public-spec' },
+    { title: 'Choose an autonomy level', href: '/docs/guides/choose-autonomy', description: 'Decide defaults, rules and floors with the ladder; validate the org example. Runnable today (configuration).', status: 'public-spec' },
+    { title: 'Connect source control and CI', href: '/docs/guides/connect-source-control-and-ci', description: 'Bind the GitHub and CI providers in the profile. Partly runnable: bindings validate, live runs are the engine.', status: 'public-spec' },
+    { title: 'Connect knowledge', href: '/docs/guides/connect-knowledge', description: 'Declare a KnowledgeConnection for read-only context. Partly runnable: the document validates, resolution is the engine.', status: 'public-spec' },
+    { title: 'Build a custom plugin', href: '/docs/guides/build-custom-plugin', description: 'Implement a provider against the plugin contract and run its conformance kit. Runnable today.', status: 'public-spec' },
+    { title: 'Verify a run', href: '/docs/guides/verify-a-run', description: 'Check an evidence export offline under pinned keys. Runnable today against the conformance vectors.', status: 'public-spec' },
+    { title: 'Extend a harness', href: '/docs/guides/extend-harness', description: 'Where an agent harness plugs in and what it is never given. Designed walkthrough of the engine side.', status: 'designed' },
+    { title: 'Qualify autonomy', href: '/docs/guides/qualify-autonomy', description: 'Qualification thresholds are configurable; promotion is proposed by evidence and accepted by a human. Designed walkthrough.', status: 'designed' },
+    { title: 'Dependency upgrade', href: '/docs/guides/dependency-upgrade', description: 'A low-risk change type from triage to a pull request. Designed walkthrough.', status: 'designed' },
+    { title: 'Bugfix with verification', href: '/docs/guides/bugfix-with-verification', description: 'Independent checks, bounded repair and escalation for a bug fix. Designed walkthrough.', status: 'designed' },
+    { title: 'Release and incident response', href: '/docs/guides/release-and-incident', description: 'Canary, rollback, breaker positions and human-only break-glass. Designed walkthrough.', status: 'designed' },
+  ]}
+/>
+
+## Suggested order
+
+<Steps>
+<Step>
+
+### Get a configuration on disk
+
+Start with [Onboard a repository](/docs/guides/onboard-repository). It is the only guide that produces files you keep: five documents under `.numinance/policy/` that name your toolchain, playbook, stage registry and autonomy level.
+
+</Step>
+<Step>
+
+### Decide how far the agent may go
+
+[Choose an autonomy level](/docs/guides/choose-autonomy) turns the ladder into a policy. The shipped starting point is the pull-request level. Raising it is a policy change that a human reviews, not something an agent can ask for.
+
+</Step>
+<Step>
+
+### Wire in your systems and your own capabilities
+
+[Connect source control and CI](/docs/guides/connect-source-control-and-ci), [Connect knowledge](/docs/guides/connect-knowledge) and [Build a custom plugin](/docs/guides/build-custom-plugin) cover the provider side of the contract.
+
+</Step>
+<Step>
+
+### Read the storyboards, then check the evidence
+
+The three change-type guides show what the engine is designed to do with that configuration. [Verify a run](/docs/guides/verify-a-run) shows how you check the outcome without trusting the engine that produced it.
+
+</Step>
+</Steps>
+
+<Callout type="info" title="One pass through the rules">
+Every guide inherits the same invariants: policy is evaluated outside the model before every privileged action, the author and reviewer agents cannot approve their own work, only the release pipeline deploys, and evidence is written by the runner. "Your policy decides. Not the model."
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Get started" href="/docs/get-started" description="Install the open CLI and run the first validation." />
+  <Card title="Concepts" href="/docs/concepts" description="The change lifecycle, autonomy levels and governed execution." />
+  <Card title="Status" href="/docs/status" description="What is public, pre-alpha, designed or planned." />
+</Cards>

@@ -1,0 +1,2 @@
+# Verified command output keeps its trailing space; do not strip it.
+content/docs/** -whitespace

@@ -1,0 +1,145 @@
+---
+title: Record chain
+description: The canonical form, fields, hash links and signatures of an evidence/v1 record, how a verifier walks the chain, and why denied actions are recorded.
+---
+
+<FeatureStatus kind="public-spec">The record format and the chain rules are public and normative for `evidence/v1` (spec 1.0.0). The records are written by the proprietary runtime; any verifier can read them.</FeatureStatus>
+
+<SourceReference paths={["docs/evidence/records-and-chain.md", "docs/evidence/canonical-form.md", "schemas/evidence/v1/record.schema.json", "proto/numinance/evidence/v1/record.proto"]} />
+
+<ShortProductTruth>
+A record is the runner's signed statement that an action happened, under which decision, with which outcome. The chain proves those statements are in order and unaltered under a key you trust.
+</ShortProductTruth>
+
+## When to read this page
+
+Read it when you write or review a verifier, when you need to explain to a security team why a chain cannot be quietly edited, or when a `chain_broken` or `record_invalid` finding needs a diagnosis. Operators who only run `numi evidence verify` can start at [Offline verification](/docs/evidence/offline-verification).
+
+## Mechanism
+
+Every action a change takes, including lifecycle transitions and refused actions, becomes one record. The record is written by the **runner** identity. The agent that did the work does not write, edit or sign its own account. Three properties tie the records into a chain:
+
+1. Each record names the hash of the previous record (`previous_record_hash`), absent only at `sequence` 1.
+2. Each record carries its own `record_hash`, the SHA-256 of its canonical bytes without `record_hash` and `signature`.
+3. Each record is signed with Ed25519 over a context string and a digest that includes the chain fields, so a record cannot be moved to another position or another change.
+
+```text
+record 1 --hash--> record 2 --hash--> record 3 ... record n (ChangeClosed.v1) --> seal (optional)
+   |                  |                  |
+ signed             signed             signed          one runner key, pinned by the verifier
+```
+
+A verifier does not take any of this on faith. It re-derives `record_hash` from the bytes as stored, compares it with the stored value, follows the link to the previous record, and only then checks the signature against the key it was told to trust.
+
+## One real record
+
+This is record 2 of the conformance fixture `closed-author`: the runner moving the change from `new` to `planning`. The fixture is a generated golden export with fixed test keys, not a real engineering run. The line is shown exactly as stored, in canonical form.
+
+```json title="conformance/evidence/v1/exports/closed-author/records.ndjson (line 2)"
+{"action":"ChangeTransitioned.v1","action_outcome":"succeeded","actor_kind":"runner","actor_principal":"runner-1","canon_version":2,"change_id":"chg_01010101010101010101010101010101","ev_id":"ev_02020202020202020202020202020202","lifecycle":{"author_run_id":"run_09090909090909090909090909090909","from":"new","row_version":1,"to":"planning"},"policy_bundle_digest":"sha256:95d78bff6f47b59c8787f8a980af18faa3ca6d34401348abf4afc6f8642ba2de","previous_record_hash":"sha256:badc6909e742411775874470cfd60d09ec13e2d81018d3f74027ca1145276067","profile_digest":"sha256:1900eab6c028483d7126599ee6f50de0d27907b5c65fa90524580b4b0f9852b0","record_hash":"sha256:ca2bbf4b81dcd943e8c2630b8cadb01e19d0b6743eb80a721c7cbc1b9c70865e","risk_class":"READ","sequence":2,"signature":"p2fWkY5ME54o0d7/iu0F8XGp9ZViGYKh3dUUceXjYuTgOd8J9wY98ZtzU5oiPEwHIrZwSIibNTxQ3W3vMgFqAQ==","signing_key_id":"sha256:34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e","timestamp":"2026-11-01T12:00:02Z"}
+```
+
+Note what is absent: no `inputs`, no `executor_id`. In canonical form an empty field is not written at all, so the record is exactly the fields that carry information.
+
+## Exact fields
+
+The JSON Schema is `schemas/evidence/v1/record.schema.json`. The keys, with the rules a verifier enforces:
+
+| Key | Presence | Rule |
+| --- | --- | --- |
+| `ev_id` | required | `ev_` and 32 lowercase hexadecimal characters |
+| `change_id` | required | `chg_` and 32 lowercase hexadecimal characters |
+| `sequence` | required | integer, 1 to 2^53-1 |
+| `action` | required | a capability `port.verb`, or a versioned lifecycle event such as `ChangeClosed.v1`; at most 128 bytes |
+| `actor_principal` | required | 1 to 256 bytes of printable ASCII, no leading or trailing space |
+| `actor_kind` | required | `author-agent`, `reviewer-agent`, `release-pipeline`, `human-approver`, `runner`, `break-glass`; `broker` or `egress-proxy` on a receipt record only |
+| `actor_run_id` | optional | `run_` and 32 hex; required for `author-agent` and `reviewer-agent` |
+| `policy_decision_id` | optional | `dec_` and 32 hex; required on a capability record |
+| `grant_id` | optional | `grant_` and 32 hex; required on a capability record unless it was denied |
+| `risk_class` | required | `READ`, `LOW`, `MEDIUM`, `HIGH` or `PRIVILEGED` |
+| `profile_digest`, `policy_bundle_digest` | required | the profile and policy bundle in force, as digests |
+| `plan_digest`, `executor_id`, `model_id` | optional | the plan, executor and model the action ran under |
+| `sandbox_image_digest`, `sandbox_profile` | optional, together | set exactly together; `process`, `container`, `gvisor` or `microvm` |
+| `inputs`, `outputs` | optional | artifacts `{ref, sha256}`, at most 1024 each. Digests, never content |
+| `action_outcome` | required | `succeeded`, `partial`, `failed` or `denied` |
+| `corrects_record_hash` | optional | names an earlier record this one corrects |
+| `previous_record_hash` | optional | absent exactly at sequence 1 |
+| `record_hash`, `signature`, `signing_key_id` | required in an export | see below |
+| `timestamp` | required | RFC 3339 UTC |
+| `canon_version` | required | 2 |
+| `lifecycle` | optional | `{from, to, row_version, author_run_id?, max_repair_attempts?}` on lifecycle events with outcome `succeeded` only |
+
+Three details matter for people who build tooling:
+
+- The four identities appear as `actor_kind`: `author-agent`, `reviewer-agent`, `release-pipeline` and `human-approver`. The verifier checks the field's form. The separation of duties itself is enforced by policy before the action; the chain is where you read that it held.
+- `inputs` and `outputs` name artifacts by reference and digest. The chain holds no diff content, no log text and no credentials.
+- A record that has an `executor_id` has both `sandbox_profile` and `sandbox_image_digest`. An action cannot be attributed to an executor without saying where it ran.
+
+## Canonical form, digests and signatures
+
+Every digest and signature is computed over bytes, so the bytes are specified. The canonical form of a record is deterministic JSON, and it is not RFC 8785 (JCS): key order and number rules differ.
+
+| Rule | Consequence |
+| --- | --- |
+| Members sorted by the UTF-8 bytes of the key | Two producers cannot disagree on order |
+| No whitespace outside strings, no trailing newline | The line is the record |
+| Integers only: no sign, leading zero, fraction or exponent | `1.0` and `01` are refused |
+| An empty field is absent | `"inputs":[]` is not canonical |
+| Enums are names, bytes are padded base64, timestamps are UTC with `Z` | One spelling for every value |
+| Digest is `sha256:` and 64 lowercase hex | Uppercase hex is not a digest |
+
+A verifier reads each document strictly: no duplicate or unknown keys, no case-variant keys, types exactly as defined, and finally the decoded model written back in canonical form must equal the input byte for byte. That last step refuses every non-canonical spelling at once, which is why a record cannot be altered by whitespace or key tricks and still pass.
+
+```text
+record_hash    = sha256( canonical(record without record_hash and signature) )
+signing_digest = sha256( canonical(record without signature) )
+domain_tag     = "numinance.evidence.v1.Record"
+signature      = Ed25519( runner_key, domain_tag || signing_digest )
+```
+
+The signature covers `sequence`, `previous_record_hash` and `record_hash`, so it binds position as well as content. A signature made in one context never verifies in another: the attestation, the manifest and the checkpoint each have their own context string. A key id is the digest of the raw 32-byte public key.
+
+## How a verifier walks the chain
+
+A verifier is told the change (from `summary.json`) and walks `records.ndjson` from the first line. For record `n` it applies these rules, and the first failure ends the walk:
+
+| Step | Failure code |
+| --- | --- |
+| The line decodes strictly and satisfies the record validity rules | `record_invalid` |
+| `record_hash` is present, the chain has not already ended, `change_id` matches, `ev_id` is new | `chain_broken` |
+| `sequence` equals `n`, `previous_record_hash` equals the hash of record `n-1`, and re-derived `record_hash` equals the stored one | `chain_broken` |
+| The signature verifies under the key named by `signing_key_id`, which must be a trusted key | `signature_invalid`, `signer_untrusted` |
+
+Limits: a line is at most 3 MiB, the file at most 256 MiB, and a chain at most 32768 records (`too_many_records`). A chain ends at `ChangeClosed.v1`, `ChangeAbandoned.v1` or `ChangeRolledBack.v1`. Only an optional seal record, `EvidenceSealed.v1`, may follow, with exactly one output (the checkpoint reference) and no inputs. A chain whose last record is neither terminal nor a seal "may be a prefix of a longer chain", and the verifier reports it as `incomplete` instead of passing it.
+
+## Denied actions are records
+
+Policy is evaluated before every privileged action, outside the model. When policy refuses, the runner still writes a record, with `action_outcome` of `denied`. A denied capability record carries its `policy_decision_id` but may omit `grant_id`. This is the denial from the `closed-basic` fixture: the runner was refused `scm.merge_pull_request`.
+
+```json title="conformance/evidence/v1/exports/closed-basic/records.ndjson (line 3)"
+{"action":"scm.merge_pull_request","action_outcome":"denied","actor_kind":"runner","actor_principal":"runner-1","actor_run_id":"run_03030303030303030303030303030303","canon_version":2,"change_id":"chg_01010101010101010101010101010101","ev_id":"ev_03030303030303030303030303030303","grant_id":"grant_03030303030303030303030303030303","policy_bundle_digest":"sha256:95d78bff6f47b59c8787f8a980af18faa3ca6d34401348abf4afc6f8642ba2de","policy_decision_id":"dec_03030303030303030303030303030303","previous_record_hash":"sha256:144c4c24bc7c5825b4dfd423b754df5ad8b7f0c4a746bbacdb8a997f2504b656","profile_digest":"sha256:1900eab6c028483d7126599ee6f50de0d27907b5c65fa90524580b4b0f9852b0","record_hash":"sha256:571265f468fcd1ec01661959ad4e53b196a7c8275965d313aeaf302a943da296","risk_class":"READ","sequence":3,"signature":"xVUEZLD31a/yOX6EzJmq49HX+7OdE9k8YlxnIkkNypegICpsWx+RwVNFV5FkGdvcK0BtPwZgmBjLzbKsSpiHCw==","signing_key_id":"sha256:34750f98bd59fcfc946da45aaabe933be154a4b5094e1c4abf42866505f3c97e","timestamp":"2026-11-01T12:00:03Z"}
+```
+
+The summary counts them: that export's `summary.json` has `"denied":1`. The denial matters because a history that lists only successes cannot show that the boundary held. Here the boundary is visible: the attempt, the decision that refused it, and the next record in the chain.
+
+## Corrections instead of edits
+
+Nothing is updated or deleted. A correction is a new record whose `corrects_record_hash` names an earlier record. A verifier checks only that the named record exists earlier in the chain. It does not interpret the correction.
+
+## Failure modes and safeguards
+
+| Symptom | Finding | What it usually means |
+| --- | --- | --- |
+| A record edited after signing | `chain_broken`, with the message "a record does not match its record_hash" | The bytes changed; the real example is in [Offline verification](/docs/evidence/offline-verification) |
+| A record removed or reordered | `chain_broken` | Sequence or link no longer matches |
+| A record signed by an unexpected key | `signer_untrusted` | The key is not one you pinned; see [Trust levels](/docs/evidence/trust-levels) |
+| Non-canonical spelling (key order, escapes, number form) | `record_invalid` | A producer bug or tampering; a verifier never "fixes" the line |
+| A record after a terminal record other than a seal | `chain_broken` | The chain was extended after it ended |
+
+What the chain does **not** say: it holds no clock beyond each record's `timestamp`, and timestamps are not checked against each other or against real time. It proves these records, in this order, were signed by the pinned runner key. It does not by itself prove they are the whole chain. Completeness rests on the terminal record, the signed manifest and the transparency log; see [Anchoring and receipts](/docs/evidence/anchoring-and-receipts) and [Threat model and limits](/docs/evidence/threat-model-and-limits).
+
+<Cards>
+  <Card title="Export format" href="/docs/evidence/export-format" description="The files that surround records.ndjson and how each is checked." />
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="Which keys decide whether signatures count." />
+  <Card title="Evidence and trust" href="/docs/concepts/evidence-and-trust" description="The concept-level view of why the chain exists." />
+</Cards>

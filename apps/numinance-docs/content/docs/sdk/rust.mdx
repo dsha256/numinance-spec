@@ -1,0 +1,51 @@
+---
+title: Rust SDK
+description: The Rust SDK is not available yet. What it is intended to cover, and how to interoperate from Rust today.
+---
+
+<FeatureStatus kind="coming-soon">
+  There is no Rust SDK to install, build or import.
+</FeatureStatus>
+
+<ComingSoon title="Rust SDK: coming soon">
+  A Rust SDK is on the roadmap. Nothing is published: there is no package name, version, install command, import path or date, and this page does not invent one. Do not depend on any name you may see elsewhere.
+</ComingSoon>
+
+<ShortProductTruth>
+  Rust is coming soon. The contract is already open, so you can generate Protobuf clients from the public `.proto` files today; that is interoperability, not an official SDK.
+</ShortProductTruth>
+
+## What the SDK is intended to cover
+
+In general terms, and subject to change before anything ships:
+
+- Typed messages and service clients for the plugin, host and port services.
+- Helpers for building a provider that implements a port and speaks the plugin handshake.
+- Loading and validating configuration kinds.
+- Offline verification of an evidence export under caller-pinned keys.
+
+These mirror what the [Go SDK](/docs/sdk/go) offers today. The list is an intention, not a commitment to scope, order or timing.
+
+## What you can do today
+
+Any language with a Protobuf toolchain can generate clients from the public definitions. The repository's `proto/` directory is a buf module, and `buf build` and `buf lint` pass on it (see [Generating clients](/docs/sdk/generating-clients)).
+
+A Rust team can therefore:
+
+1. Clone `https://github.com/dsha256/numinance-spec.git`.
+2. Point its own Protobuf and gRPC code generator at `proto/`.
+3. Treat the `.proto` files, the conformance kits and the evidence conformance vectors as the specification of correct behavior.
+
+This is **not** an official SDK. Numinance does not ship, test or support the generated Rust code, and the repository's conformance kits are written in Go.
+
+<Callout type="warn" title="Safety boundary">
+  A generated client only sends and receives messages. The host decides what a plugin may do: policy is evaluated outside the model before every privileged action, and a provider cannot widen its own grants. A Rust client gets no extra authority.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Generating clients" href="/docs/sdk/generating-clients" description="How to build a client from the public .proto files, and what is and is not tested." />
+  <Card title="Go SDK" href="/docs/sdk/go" description="The one SDK with handwritten helpers today." />
+  <Card title="Roadmap" href="/docs/roadmap" description="Where SDK work sits relative to the rest of the project." />
+</Cards>

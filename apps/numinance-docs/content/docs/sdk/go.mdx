@@ -1,0 +1,173 @@
+---
+title: Go SDK
+description: The Go packages under sdk/go, their real import paths, a compile-checked example that loads a kind document, and how to run the tests.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Handwritten packages plus generated stubs, all in one untagged Go module. Surfaces can change before the first tag.
+</FeatureStatus>
+
+<SourceReference paths={["go.mod", "sdk/go/", "sdk/go/kindyaml/README.md", "sdk/go/evidenceverify/README.md"]} />
+
+<ShortProductTruth>
+  Go is the only language with handwritten SDK code. The official providers, the `numi` command line and the offline evidence verifier are all built from these packages.
+</ShortProductTruth>
+
+## Module and toolchain
+
+The repository is a single Go module. Its `go.mod` declares:
+
+```text title="go.mod"
+module github.com/numinance/numinance-spec
+
+go 1.27
+
+toolchain go1.27.3
+```
+
+Every import path below is that module path plus the directory. The module is not tagged yet, so consume it from a checkout (a `replace` directive, a `go.work` workspace or a vendored copy) rather than assuming a published version.
+
+<Callout type="info" title="Clone URL and module path differ">
+  You clone `https://github.com/dsha256/numinance-spec.git`, but the Go module path is `github.com/numinance/numinance-spec`. Imports use the module path.
+</Callout>
+
+## Packages
+
+| Import path | Role |
+| --- | --- |
+| `github.com/numinance/numinance-spec/sdk/go/plugin` | Plugin handshake line parsing, `Serve`, the `ResolveReference` reference check, and `StreamCheck`, the shape check for an `Invoke` stream. Imports no port: a port supplies a `PortRule`. |
+| `github.com/numinance/numinance-spec/sdk/go/ports/authorexecutor` | The author-executor port rules: `NewExecuteRule`, `NewPlanRule` and `ValidatePlanRequest`. This is the only package under `sdk/go/ports` today. |
+| `github.com/numinance/numinance-spec/sdk/go/kindyaml` | The strict loader for configuration kinds: `NewLoader`, `Loader.Decode`, `Loader.Encode`. |
+| `github.com/numinance/numinance-spec/sdk/go/schema` | JSON Schema 2020-12 compilation and validation for the schemas generated from `numinance.kinds.v1`. Implements only the keywords the generator emits and fails closed on any other. |
+| `github.com/numinance/numinance-spec/sdk/go/cli` | The command logic behind `numi`: dispatch, `validate`, `init`, `evidence verify` and the stable exit-code table. Public so the open and engine builds run the same code. |
+| `github.com/numinance/numinance-spec/sdk/go/evidenceverify` | The open verifier of an `evidence/v1` export. Standard library only, offline, read-only and size-bounded. |
+| `github.com/numinance/numinance-spec/sdk/go/gen/numinance/...` | Generated Protobuf, gRPC and Connect stubs for `annotations`, `events`, `evidence`, `kinds`, `plugin`, `ports` and `types`. |
+
+There is also `sdk/go/internal/annotationlint`, which is internal and not importable from outside the module.
+
+### plugin
+
+The package comment states the split of responsibility: `plugin` holds the reference checks that a host, a provider and a conformance kit must apply the same way, namely the shape of an `Invoke` stream and the references `HostService.ResolveReference` may serve. `StreamCheck` bounds the message count (at most 1024), a `RUNNING` message (64 KiB) and the terminal message (4 MiB), and checks placement, result presence and type, and strict decoding. The host still has to check the things that need its own registry or state. The package comment lists them.
+
+### ports
+
+`ports/authorexecutor` supplies the `PortRule` for the `Execute` and `Plan` streams. A `Plan` stream is read only: a `FILE_CHANGED` event breaks it. `ValidatePlanRequest` rejects a request that names a work unit, allows paths, names a credential capability, or allows a capability that writes.
+
+### kindyaml
+
+`NewLoader` compiles the embedded schema of every kind. `Decode` runs four stages and stops at the first failure: size cap (128 KiB), strict single-document YAML (no anchors, aliases, merge keys or explicit tags), the kind's generated JSON Schema, then the loader checks that a schema cannot express. Each error wraps one sentinel and never quotes a value of the document. Two behaviors matter to callers:
+
+- A produced kind (`ContextBundle`) is never loaded as configuration.
+- `EvalSet` is a pre-GA kind at `numinance.dev/v1alpha1`. `NewLoader()` refuses it; `NewLoader(WithAlphaKinds())` accepts it.
+
+A document that decodes has no authority by decoding. `metadata.scope` is the document's own claim; authority comes from where the document was loaded (a protected path or a signed policy bundle), decided outside this package.
+
+### evidenceverify
+
+A call passes the export directory plus pinned runner keys, a log key and a log origin. There is no built-in trust root, so a key stated by the export never reaches `verified`. The result is `Report`, which carries `LevelEnum` and `WeakenedByFlags`. Automation that needs a full pass tests `LevelEnum == "verified"` and an empty `WeakenedByFlags`, never a prefix of the human-readable level. See [offline verification](/docs/evidence/offline-verification) and the [`numi evidence verify`](/docs/cli/evidence-verify) command.
+
+## Example: load a kind document
+
+This program decodes one kind document with `kindyaml` and reads typed fields from the generated stub.
+
+<SourceReference paths={["schemas/examples/AutonomyPolicy/org-ladder.yaml", "sdk/go/kindyaml/loader.go"]} note="The program loads the shipped example document." />
+
+```go title="main.go"
+package main
+
+import (
+	"fmt"
+	"os"
+
+	kindsv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1"
+	"github.com/numinance/numinance-spec/sdk/go/kindyaml"
+)
+
+func main() {
+	b, err := os.ReadFile(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	loader, err := kindyaml.NewLoader()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	msg, err := loader.Decode(b)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "decode:", err)
+		os.Exit(3)
+	}
+	if p, ok := msg.(*kindsv1.AutonomyPolicy); ok {
+		fmt.Println("kind:", p.GetKind(), "name:", p.GetMetadata().GetName())
+		fmt.Println("default level:", p.GetSpec().GetDefaults().GetLevel())
+		fmt.Println("rules:", len(p.GetSpec().GetRules()))
+	}
+}
+```
+
+The module that builds it points at a checkout with a `replace` directive:
+
+```text title="go.mod"
+module example.test/loadkind
+
+go 1.27
+
+require github.com/numinance/numinance-spec v0.0.0
+
+replace github.com/numinance/numinance-spec => /path/to/numinance-spec
+```
+
+<VerifiedSnippet what="go vet, then go run . schemas/examples/AutonomyPolicy/org-ladder.yaml, built against the checkout at revision 3c74d59" exit="0">
+```text
+kind: AutonomyPolicy name: org-ladder
+default level: AUTONOMY_LEVEL_PR
+rules: 1
+```
+</VerifiedSnippet>
+
+`go vet ./...` passed on the module. It was built offline against the local module cache with `GOTOOLCHAIN=local` (the local toolchain was Go 1.27.2, while `go.mod` asks for go1.27.3), so expect the toolchain line to matter on your machine.
+
+Feeding the same program a document whose `kind` is not a known kind fails in the schema stage:
+
+<VerifiedSnippet what="program run against a file containing only `kind: Nope`">
+```text
+decode: kind: unknown kind
+```
+</VerifiedSnippet>
+
+## Run the tests
+
+From the root of a checkout:
+
+```bash
+go test ./sdk/go/... ./cli/...
+```
+
+Narrower commands the repository documents:
+
+| Command | Covers |
+| --- | --- |
+| `go test ./sdk/go/kindyaml` | The loader: one failing case per refused construct and per loader check |
+| `go test -race ./sdk/go/evidenceverify/` | Every vector of `conformance/evidence/v1/` plus bounds, cancellation and key-file cases |
+| `go test ./cli/... ./sdk/go/cli ./sdk/go/evidenceverify` | The `numi` command logic and the verifier |
+
+In a sandboxed run for this page, `sdk/go/ports/authorexecutor`, `sdk/go/schema`, `cli/numi` and `sdk/go/evidenceverify` passed. `sdk/go/plugin` did not finish: `TestServe_PrintsTheLineAndStopsOnStop` hung until the 10-minute test timeout and the package reported FAIL. The sandbox may have blocked signal or process handling, so this is unconfirmed as a defect; run the suite in your own environment. The sample plugin under `plugins/examples/` has no test files.
+
+## Failure modes
+
+| Symptom | Cause | Response |
+| --- | --- | --- |
+| A toolchain error mentioning Go 1.27 | Local Go is older than `go.mod` | Install the toolchain `go.mod` names |
+| The module cannot be resolved by version | The module is not tagged, so there is no version to resolve | Use a `replace` directive or a workspace |
+| `ErrAlpha` from `Decode` | The document is an `EvalSet` | Construct the loader with `WithAlphaKinds()` |
+| `unknown kind` | `kind` is missing, misspelled, or names a produced kind | Use a configuration kind from the [kinds reference](/docs/protocol/kinds-and-jsonschema) |
+
+## Next steps
+
+<Cards>
+  <Card title="Build a custom plugin in Go" href="/docs/integrations/custom-plugin-go" description="Serve a port with sdk/go/plugin and the generated stubs." />
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="Check an evidence export with pinned keys." />
+  <Card title="Kinds and JSON Schema" href="/docs/protocol/kinds-and-jsonschema" description="The schemas kindyaml validates against." />
+</Cards>

@@ -1,0 +1,103 @@
+---
+title: Rollback and recovery
+description: Bounded repair, rehearsal, canary and rollback for changes, and how to recover and prove recovery after an incident.
+---
+
+<FeatureStatus kind="designed">The repair, rehearsal and qualification fields are public-spec. The verification, canary, rollback and incident workflows run in the proprietary runtime and are designed.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/kinds/v1/playbook.proto", "proto/numinance/types/v1/types.proto"]} note="Playbook max_repair_attempts and step rehearse; ChangeState and BreakerPosition." />
+
+<ShortProductTruth>
+Numinance does not heal itself. It repairs a bounded number of times, checks independently, rolls back, and escalates to a human.
+</ShortProductTruth>
+
+## Bounded repair
+
+When a verifier fails, the runtime may let the agent try again, but only within limits:
+
+- The attempts are finite per playbook. `max_repair_attempts` is 0 to 10, and the generated default playbook uses 2.
+- Each attempt runs under the same grant, budgets and policy as the first.
+- Independent verifiers, not the author agent, decide whether a repair worked. Deterministic checks go first and the reviewer is one input among several.
+- When attempts are exhausted the change escalates to a human or ends. It does not loop.
+
+<VerificationAndRepair />
+
+## Rehearsal and canary
+
+A playbook step can set `rehearse`, which means the step runs first in a disposable environment. Rehearsal catches what unit tests miss, such as a migration that fails against realistic data, before it touches a real target.
+
+For releases the designed flow adds a canary window. A small portion is released, health signals are watched against thresholds, and the release either proceeds or rolls back. Canary and rollback outcomes feed [qualification](/docs/operations/evaluations), so a playbook with frequent rollbacks cannot promote.
+
+## Rollback
+
+A rollback is a change, not a side channel. It goes through the same policy, grants, approvals and evidence as any other, and it is performed by the release pipeline identity, the only identity allowed to deploy. The author agent cannot roll back its own release by reaching around the pipeline.
+
+Where the playbook includes a rollback plan, the runtime records the plan before the release and the result after. A rollback scenario is also an adversarial case in an EvalSet, so you can test it before you need it.
+
+## Escalation
+
+Escalation is the planned end of every bounded path. The runtime escalates when repair attempts are exhausted, a budget is spent, a policy returns require-approval, verifier results conflict, or confidence is low. An escalation is a handoff to a named human with the plan, the evidence so far and the reasons. It is not a failure state to hide.
+
+## Recovery after an incident
+
+The designed incident workflow, triggered by an abnormal action or a tripped breaker, runs in this order:
+
+1. Freeze the run at the next checkpoint.
+2. Revoke credential handles.
+3. Downgrade the component to PR-only or read-only.
+4. Snapshot the sandbox.
+5. Seal the evidence sequence.
+6. Record the executor, model, extension and policy versions in force.
+7. Open an incident change and notify your paging and security systems.
+8. Require explicit human recovery, with a reason.
+
+Runs resume from the last content-addressed snapshot, not mid-turn. Budgets count across restarts.
+
+<Steps>
+<Step>
+
+**Contain.** Move the [circuit breaker](/docs/operations/circuit-breaker) to the position the incident needs.
+
+</Step>
+<Step>
+
+**Understand.** Export the evidence for the affected changes and verify it under keys you pinned.
+
+</Step>
+<Step>
+
+**Fix cause.** Correct policy, the playbook, the extension or the eval set. Qualification for the affected playbook restarts if the event was severe.
+
+</Step>
+<Step>
+
+**Recover.** A human resets the breaker with a reason. Work resumes at the lower level and climbs only through normal qualification.
+
+</Step>
+</Steps>
+
+## Evidence of recovery
+
+Recovery should leave a record that others can check without trusting you. The breaker trip, the reset, the human principal and the reason, any approval, any rollback and the incident change are all written to the evidence chain by the runner identity. The open verifier can check the chain offline:
+
+```bash title="Verify an export (open CLI)"
+numi evidence verify --runner-key runner.pub --log-key log.pub --log-origin <origin> --complete <export-dir>
+```
+
+A `verified` result shows provenance and chain integrity under the keys you pinned. It does not show that the fix was correct or that every event on a compromised host was logged. See [Verify a run](/docs/guides/verify-a-run) and [Threat model and limits](/docs/evidence/threat-model-and-limits).
+
+## Upgrades and disaster recovery
+
+Runners are designed to pull a new release during your window, verify signatures, drain work at a checkpoint, switch, and revert automatically if health checks fail. Database state is backed up continuously, evidence storage is write-once, and the data plane can be re-provisioned from infrastructure-as-code against restored backups. Loss of the vendor control plane does not lose evidence or stop in-flight authorised work.
+
+## Failure modes
+
+- **Repair that hides a defect.** A change that passes only after several repairs is a signal. Repair counts feed qualification.
+- **Rollback that was never rehearsed.** Include rollback cases in your EvalSet.
+- **Resuming too quickly.** Reset the breaker only after the cause is addressed, or the same trigger recurs.
+
+<Cards>
+  <Card title="Reliability and recovery" href="/docs/concepts/reliability-and-recovery" description="The concept behind bounded repair." />
+  <Card title="Release and incident guide" href="/docs/guides/release-and-incident" description="A worked release and incident flow." />
+  <Card title="Verification and recovery" href="/docs/architecture/verification-recovery" description="Layers of verification in the architecture." />
+</Cards>

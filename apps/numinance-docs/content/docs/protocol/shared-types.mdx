@@ -1,0 +1,228 @@
+---
+title: Shared types
+description: The enums, Digest and Reference of numinance.types.v1, with exact names and numbers for every value.
+---
+
+<FeatureStatus kind="public-spec">`numinance.types.v1` is part of the Apache-2.0 numinance-spec protocol. Enum numbers are fixed identifiers of the Numinance runtime.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto"]} />
+
+<ShortProductTruth>
+One wire definition per shared value. Plugin, evidence, event, port and kind packages import these types and must not copy them.
+</ShortProductTruth>
+
+## When to use this page
+
+Use it as the lookup for an enum value you see in a policy file, a protobuf message, an evidence record or a log line. The tables below were generated from `types.proto` by script, so names and numbers are exact.
+
+## Closed enums
+
+The package has no services. Every element is `since: "1.0.0"`; enum values cannot carry the field option.
+
+Enums are closed. A consumer must reject the zero value and any number it does not recognise, before any comparison, exactly as it rejects a missing value. A value added in a minor release therefore fails closed at an older consumer instead of being misread. The zero member of each enum is `*_UNSPECIFIED` and is never valid input.
+
+In YAML, enum values are spelled by their full proto name, for example `AUTONOMY_LEVEL_PR` or `RISK_CLASS_HIGH`. Words like HIGH or PR in explanatory text elsewhere on this site are display text; the full names below are the real values. The risk and execution-mode enums are on [Governance annotations](/docs/protocol/governance-annotations#riskclass).
+
+| Enum | Used for |
+|---|---|
+| [`PrincipalKind`](#principalkind) | Which identity an actor acts as. |
+| [`ResidencyClass`](#residencyclass) | Where compute and inference run. |
+| [`TrustClass`](#trustclass) | How far a piece of content is trusted. |
+| [`AutonomyLevel`](#autonomylevel) | The autonomy ladder. |
+| [`ChangeState`](#changestate) | The states of a Change. |
+| [`FindingSeverity`](#findingseverity) | Verifier finding severity. |
+| [`DecisionOutcome`](#decisionoutcome) | Result of a policy decision. |
+| [`BreakerPosition`](#breakerposition) | Circuit breaker positions. |
+| [`ExecutorCapability`](#executorcapability) | What an author executor can do. |
+
+## Enums
+
+### PrincipalKind
+
+PrincipalKind is the identity an actor acts as. It is a claim, not an authentication: the host sets it from the verified transport identity.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `PRINCIPAL_KIND_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `PRINCIPAL_KIND_AUTHOR_AGENT` | Writes in a sandbox and opens PRs. |
+| 2 | `PRINCIPAL_KIND_REVIEWER_AGENT` | Read-only and runs on a different model vendor. |
+| 3 | `PRINCIPAL_KIND_RELEASE_PIPELINE` | The only identity that invokes CD or merges when policy allows. |
+| 4 | `PRINCIPAL_KIND_HUMAN_APPROVER` | A customer OIDC principal. |
+| 5 | `PRINCIPAL_KIND_RUNNER` | Writes evidence and holds no customer credentials. |
+| 6 | `PRINCIPAL_KIND_BREAK_GLASS` | A named human, time-boxed, impossible for any agent identity to invoke. |
+| 7 | `PRINCIPAL_KIND_ENGINE` | Producer of Engine facts on the event transport. Valid only as an event envelope producer; never an actor. A consumer that reads an actor must reject it. |
+| 8 | `PRINCIPAL_KIND_BROKER` | The capability broker, as author of its own evidence receipts. Valid only as the actor_kind of a broker receipt record; a consumer that reads an actor for any other purpose must reject it. |
+| 9 | `PRINCIPAL_KIND_EGRESS_PROXY` | The egress proxy, as author of its own evidence receipts. The same receipt-only rule as BROKER applies. |
+
+### ResidencyClass
+
+ResidencyClass is the data-residency class of an executor and model combination. It is derived from manifest dimensions, never declared. It is unordered: a number never implies strictness, and a residency floor is compared through an explicit order table, never through the numbers.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `RESIDENCY_CLASS_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `RESIDENCY_CLASS_IN_ACCOUNT` | Runs compute and inference in the customer account. |
+| 2 | `RESIDENCY_CLASS_PRIVATE_ENDPOINT` | Reaches a vendor model over a private network path. |
+| 3 | `RESIDENCY_CLASS_VENDOR_ZDR` | A vendor endpoint with zero data retention. |
+| 4 | `RESIDENCY_CLASS_VENDOR_STANDARD` | A vendor endpoint with standard retention. |
+| 5 | `RESIDENCY_CLASS_AIRGAPPED` | Has no external network path. |
+
+### TrustClass
+
+TrustClass is the trust class of an input the Engine reasons over. Numbers are an enumeration, not a lattice; only SIGNED_POLICY and KERNEL may create enforceable authority.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `TRUST_CLASS_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `TRUST_CLASS_UNTRUSTED_RETRIEVED` | Knowledge, tool output, tickets and comments. |
+| 2 | `TRUST_CLASS_REPOSITORY_AUTHORED` | A file in the worktree. |
+| 3 | `TRUST_CLASS_SIGNED_SKILL` | A signed skill; it may advise and never widen a grant. |
+| 4 | `TRUST_CLASS_SIGNED_POLICY` | A pack, a profile or a floor. |
+| 5 | `TRUST_CLASS_KERNEL` | The kernel itself. |
+
+### AutonomyLevel
+
+AutonomyLevel is a rung of the autonomy ladder; ordered by number, higher is more autonomy. A consumer compares levels only after rejecting unknown numbers, so a rung it does not know never counts as more autonomy than OPERATE. A rung added in a minor takes the next number above all existing rungs; any other change of order is a new major.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `AUTONOMY_LEVEL_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `AUTONOMY_LEVEL_OBSERVE` | Reads only. |
+| 2 | `AUTONOMY_LEVEL_SUGGEST` | Proposes and writes nothing. |
+| 3 | `AUTONOMY_LEVEL_IMPLEMENT` | Writes in a sandbox. |
+| 4 | `AUTONOMY_LEVEL_PR` | Opens pull requests. |
+| 5 | `AUTONOMY_LEVEL_MERGE` | Merges when policy allows. |
+| 6 | `AUTONOMY_LEVEL_STAGE` | Deploys to pre-production. |
+| 7 | `AUTONOMY_LEVEL_RELEASE` | Deploys to production. |
+| 8 | `AUTONOMY_LEVEL_OPERATE` | Runs operations against production. |
+
+### ChangeState
+
+ChangeState is the state of a Change; numbers are identifiers, not an order. The state machine fixes the allowed transitions. PAUSED is an overlay on an active state, so a consumer also carries the previous state.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `CHANGE_STATE_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `CHANGE_STATE_OPENED` | Entered when intake accepted a ticket, incident or intent. |
+| 2 | `CHANGE_STATE_UNDERSTOOD` | Entered when the code graph, repository docs and knowledge bundle are resolved. |
+| 3 | `CHANGE_STATE_CLASSIFIED` | Entered when the playbook and risk class are fixed and the initial grant is derived. |
+| 4 | `CHANGE_STATE_PLANNED` | Entered when the plan with work units, risk per step and required evidence is produced. |
+| 5 | `CHANGE_STATE_PLAN_GATE` | Entered when policy is evaluated on the plan. |
+| 6 | `CHANGE_STATE_IMPLEMENTING` | Entered when work units run under author grants. |
+| 7 | `CHANGE_STATE_INTEGRATED` | Entered when the candidate is assembled from work units. |
+| 8 | `CHANGE_STATE_VERIFYING` | Entered when the verifier pipeline runs. |
+| 9 | `CHANGE_STATE_REPAIRING` | Entered for the bounded repair loop (max max_repair_attempts). |
+| 10 | `CHANGE_STATE_REHEARSING` | Entered when migrations or infra are applied to a disposable environment. |
+| 11 | `CHANGE_STATE_RELEASE_GATE` | Entered when policy is evaluated on all evidence. |
+| 12 | `CHANGE_STATE_MERGING` | Entered when the PR is opened, or merged when autonomy allows. |
+| 13 | `CHANGE_STATE_RELEASING` | Entered when the customer pipeline is invoked under the release identity. |
+| 14 | `CHANGE_STATE_OBSERVING` | Entered for the canary window against SLOs and invariants. |
+| 15 | `CHANGE_STATE_RECOVERING` | Entered for rollback through the CD provider; a corrective Change is opened. |
+| 16 | `CHANGE_STATE_ESCALATED` | Entered when a human is required; it waits on a signal. |
+| 17 | `CHANGE_STATE_PAUSED` | Entered when the circuit breaker trips (overlay on any active state). |
+| 18 | `CHANGE_STATE_CLOSED` | Terminal; the evidence is sealed. |
+| 19 | `CHANGE_STATE_ABANDONED` | Terminal; the evidence is sealed. |
+| 20 | `CHANGE_STATE_ROLLED_BACK` | Terminal; the evidence is sealed. |
+
+### FindingSeverity
+
+FindingSeverity is the severity of a verifier finding and of the rule that produces it; higher is more severe, and a value added in a minor takes the next number. What a severity blocks is policy, not this enum.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `FINDING_SEVERITY_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `FINDING_SEVERITY_INFO` | Advisory. |
+| 2 | `FINDING_SEVERITY_LOW` | A minor deviation. |
+| 3 | `FINDING_SEVERITY_MEDIUM` | A deviation that needs a fix. |
+| 4 | `FINDING_SEVERITY_HIGH` | A deviation that risks correctness or security. |
+| 5 | `FINDING_SEVERITY_CRITICAL` | A deviation that risks a security escape or data loss. |
+
+### DecisionOutcome
+
+DecisionOutcome is the result of one policy decision.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `DECISION_OUTCOME_UNSPECIFIED` | The zero value; it is rejected. |
+| 1 | `DECISION_OUTCOME_ALLOW` | Lets the action proceed. |
+| 2 | `DECISION_OUTCOME_DENY` | Refuses the action; the denial is recorded like an allow. |
+| 3 | `DECISION_OUTCOME_REQUIRE_APPROVAL` | Holds the action until the named approvers decide. |
+
+### BreakerPosition
+
+BreakerPosition is a position of the circuit breaker. Order from least to most restrictive: FULL_AUTO, PR_ONLY, READ_ONLY, STOPPED. A value added in a minor states its place in this order in its comment; consumers compare positions by that order, never by number alone.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `BREAKER_POSITION_UNSPECIFIED` | The zero value; it is rejected. |
+| 1 | `BREAKER_POSITION_FULL_AUTO` | Caps nothing beyond the autonomy policy. |
+| 2 | `BREAKER_POSITION_PR_ONLY` | Caps effective autonomy at PR. |
+| 3 | `BREAKER_POSITION_READ_ONLY` | Allows no write. |
+| 4 | `BREAKER_POSITION_STOPPED` | Pauses every run. |
+
+### ExecutorCapability
+
+ExecutorCapability is one capability an author executor declares. Playbooks require capabilities by name, never vendors; a declared capability grants nothing, since the sandbox, egress proxy and broker enforce every request.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `EXECUTOR_CAPABILITY_UNSPECIFIED` | The zero value; it is rejected by the host. |
+| 1 | `EXECUTOR_CAPABILITY_FILESYSTEM_READ` | Reads files of the worktree. |
+| 2 | `EXECUTOR_CAPABILITY_FILESYSTEM_WRITE` | Writes files of the worktree. |
+| 3 | `EXECUTOR_CAPABILITY_SHELL` | Runs commands. |
+| 4 | `EXECUTOR_CAPABILITY_NETWORK` | Makes network requests through the egress proxy. |
+| 5 | `EXECUTOR_CAPABILITY_SUBAGENTS` | Starts subagents of its own. |
+| 6 | `EXECUTOR_CAPABILITY_BROWSER` | Drives a browser. |
+| 7 | `EXECUTOR_CAPABILITY_MCP` | Calls MCP tools attached by the adapter. |
+| 8 | `EXECUTOR_CAPABILITY_CHECKPOINT` | Emits checkpoints it can resume from. |
+| 9 | `EXECUTOR_CAPABILITY_STRUCTURED_PLAN` | Returns a structured plan before acting. |
+| 10 | `EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS` | Asks the host before a tool call. |
+| 11 | `EXECUTOR_CAPABILITY_NATIVE_SANDBOX` | Has a sandbox of its own inside the work-unit sandbox. |
+| 12 | `EXECUTOR_CAPABILITY_CONTEXT_PERSISTENCE` | Keeps context across runs. |
+
+## Digest
+
+```proto title="proto/numinance/types/v1/types.proto"
+message Digest {
+  string value = 1;
+}
+```
+
+`value` is exactly `sha256:` plus 64 lowercase hex characters. Any other length, case or prefix, and an empty value in a present message, is rejected. Absence is the unset message.
+
+## Reference
+
+```proto title="proto/numinance/types/v1/types.proto"
+message Reference {
+  string artifact_ref = 1;
+  Digest sha256 = 2;
+  string artifact_type = 3;
+}
+```
+
+A `Reference` is a claim-check pointer to content in the artifact store. It carries a store key and a digest, never content.
+
+| Field | Rule |
+|---|---|
+| `artifact_ref` | Required. An opaque store key matching `^[A-Za-z0-9][A-Za-z0-9._/-]{0,1023}$` with no `..` segment. Resolved only through the artifact store, never as a URL or a filesystem path. |
+| `sha256` | Required. The digest of the artifact content. |
+| `artifact_type` | Required. A token matching `^[a-z0-9][a-z0-9._-]{0,127}$` that names the kind of content, checked against the host's allow-list. |
+
+References are how orchestration payloads stay free of content. A plugin reads the bytes only through [`HostService.ResolveReference`](/docs/protocol/host-service#resolvereference), which verifies the digest first. Evidence records use `Reference` and `Digest` in their `inputs` and `outputs`; see [Record chain](/docs/evidence/record-chain).
+
+## Failure modes
+
+| Situation | Result |
+|---|---|
+| Zero or unknown enum number | Rejected by the consumer. |
+| `Digest.value` with uppercase hex, a missing prefix or the wrong length | Rejected. |
+| `Reference` with `..` in `artifact_ref`, or a URL where a key belongs | Rejected. |
+| `PRINCIPAL_KIND_ENGINE` as an actor | Rejected by any consumer that reads an actor. |
+
+## Next steps
+
+<Cards>
+  <Card title="Envelope, ActionContext and ActionResult" href="/docs/protocol/envelope-action-context" description="Where PrincipalKind, ResidencyClass and Digest appear in an action." />
+  <Card title="Governance annotations" href="/docs/protocol/governance-annotations" description="RiskClass and ExecMode, the other shared governance enums." />
+  <Card title="Autonomy levels" href="/docs/concepts/autonomy-levels" description="What the AutonomyLevel ladder means in practice." />
+</Cards>

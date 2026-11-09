@@ -1,0 +1,58 @@
+---
+title: Concepts
+description: The mental model behind Numinance - what an autonomous engineer is, how authority is separated from intelligence, and what you can check afterwards.
+---
+
+<FeatureStatus kind="public-spec">The contracts described in these concepts are public. The engine that executes them is proprietary and not generally available.</FeatureStatus>
+
+<ShortProductTruth>
+Give it context. Let it engineer. Your policy decides, not the model, and the evidence lets you check the result.
+</ShortProductTruth>
+
+Numinance treats intelligence as one component of an engineering system. Context, authority, execution, verification and evidence are separate boundaries, each with a contract you can read. These ten pages build that model in order. Read them once, then use the architecture, configuration and protocol sections as reference.
+
+## The model in one pass
+
+```text
+objective -> context -> understand -> plan -> act -> verify -> evidence
+                              |                    |
+                  policy decides before every privileged action
+```
+
+| Idea | One-line claim | Page |
+| --- | --- | --- |
+| Autonomous engineer | Work is a bounded unit with an objective and an outcome, not a chat session. | [Autonomous engineer](/docs/concepts/autonomous-engineer) |
+| Context first | Context is retrieved under authorization and produced, not hand-authored. | [Context first](/docs/concepts/context-first) |
+| Change lifecycle | Every change moves through the same durable stages. | [Change lifecycle](/docs/concepts/change-lifecycle) |
+| Autonomy levels | Autonomy is a ladder you configure, capped by floors. | [Autonomy levels](/docs/concepts/autonomy-levels) |
+| Governed execution | Policy, grants and identities sit outside the model. | [Governed execution](/docs/concepts/governed-execution) |
+| Harnesses vs runtime | The harness owns intelligence. Numinance owns authority. | [Harnesses vs runtime](/docs/concepts/harnesses-vs-runtime) |
+| Reliability and recovery | Repair is bounded, checks are independent, rollback is planned. | [Reliability and recovery](/docs/concepts/reliability-and-recovery) |
+| Evidence and trust | Don't trust the agent. Check the evidence. | [Evidence and trust](/docs/concepts/evidence-and-trust) |
+| Open vs proprietary | The brain is private. The contract is open. | [Open vs proprietary](/docs/concepts/open-vs-proprietary) |
+
+## The invariants
+
+These hold across every page. If a page seems to weaken one, treat it as a documentation bug.
+
+1. Policy is evaluated outside the model before every privileged action.
+2. Authority is expressed as capability-based grants, bounded by scope, risk, environment and expiry.
+3. Four identities are distinct: author-agent, reviewer-agent, release-pipeline and human approver. No identity approves its own work, and only the release-pipeline deploys.
+4. Evidence is append-only, written by the runner identity, and denials are recorded too.
+5. Protected paths cannot be changed by an agent.
+6. Extensions are signed, digest-pinned and declare their permissions.
+7. A customer-local circuit breaker can stop or downgrade the system.
+8. Orchestration payloads carry references and digests, never content.
+9. Break-glass is human-only.
+
+<Callout type="warn" title="Designed versus available">
+Most of the runtime behavior in this section is designed and lives in the proprietary engine. What you can run today is the open `numi` CLI for schema validation and evidence verification. Check the [status page](/docs/status) before relying on any capability.
+</Callout>
+
+## Where to go next
+
+<Cards>
+  <Card title="Autonomous engineer" href="/docs/concepts/autonomous-engineer" description="Start here: what is being automated and what is not." />
+  <Card title="Quickstart" href="/docs/get-started/quickstart" description="Run the open CLI against real configuration." />
+  <Card title="Architecture" href="/docs/architecture" description="The same boundaries, described as components." />
+</Cards>

@@ -1,0 +1,174 @@
+---
+title: Conformance
+description: The conformance kits under conformance/, what each one covers, its modes and layout, how to run the runnable ones, and what a pass does and does not mean.
+---
+
+<FeatureStatus kind="public-spec">
+Five kits are runnable Go packages (knowledge, scm, ciexecutor, verifier, ticketing). The evidence kit is data run by the open verifier. Four kits (authorexecutor, evidencestore, sandboxprovider, transparencylog) are written case lists with no runnable package in the tree. Live modes need a real host and are not exercised in the open tree.
+</FeatureStatus>
+<SourceReference paths={["conformance/knowledge/v1/README.md", "conformance/scm/v1/README.md", "conformance/ciexecutor/v1/README.md", "conformance/verifier/v1/README.md", "conformance/ticketing/v1/README.md", "conformance/authorexecutor/v1/README.md", "conformance/evidencestore/v1/README.md", "conformance/sandboxprovider/v1/README.md", "conformance/transparencylog/v1/README.md", "conformance/evidence/v1/README.md"]} />
+
+<ShortProductTruth>A conformance pass states compatibility with the spec at a version. It is not a security certification, not an endorsement, and not a claim about any provider's behavior against a live system.</ShortProductTruth>
+
+## When to use this
+
+Use the kits while writing a provider to find contract mistakes early, and as the evidence a registry or a customer can ask for. A manifest names its kit in `conformance_suite` (`conformance/<port>/<major>/<suite>`); the host looks it up in its own index and runs it, and never trusts the claim.
+
+## How the kits are organised
+
+Each port has `conformance/<port>/v1/`. The version tracks the port minor. Most directories contain a README with the case table, and the runnable ones add a Go package `kit.go` plus `kit_test.go`.
+
+Every README has the same three parts:
+
+- **Core** cases (`CORE-nnn`) that test the provider through the port's verbs.
+- **Host checks** (`HOST-nnn`) that are enforced by the policy decision point, the plugin host and the release or verification context, not by a provider. The kits list them as the cases a host must hold. They are not run in the open tree.
+- **Extended** cases for negotiated capabilities, empty in 1.0.0 for most ports.
+
+### Modes
+
+The kit READMEs name three modes.
+
+| Mode | Meaning | Where it can run |
+| --- | --- | --- |
+| Replay | Recorded or in-memory fixtures; no network, no live system | Anywhere. This is what the open tree implements |
+| Live, publisher-run | The publisher runs the kit against the real system in an attested runner | Needs a real host, sandbox, egress proxy and broker |
+| Live, registry-run | A registry runs the kit against the real system | Same needs. Not applicable to ports bound to a deployment, such as the sandbox provider |
+
+The sandbox provider kit adds a rule that matters: a provider claims the `CONTAINER` or `GVISOR` isolation profile only after passing the live cases, and replay alone proves no isolation.
+
+## The kits
+
+| Kit | State in the tree | What it holds |
+| --- | --- | --- |
+| `knowledge/v1` | Runnable `knowledgekit`; runs CORE-001 to 005, 007, 008, 012 to 015 against any `Target`; tested on the sample provider | Seeded scopes `kit` and `other`; scope escape attempts; bounds |
+| `scm/v1` | Runnable `scmkit`; CORE-001 to 010 against a `Target` and a publisher's `Subject`; also exports `ValidateRepository`, `ValidatePullRequest`, `ValidateStatus` for a host to apply to any provider | Pull request opened once, merge at the verified head, idempotent comment |
+| `ciexecutor/v1` | Runnable `cikit`; CORE-001 to 008; exports `ValidateOperation` | A run started once under one key; dry run; cancel twice |
+| `verifier/v1` | Runnable `verifierkit`; CORE-001, 002, 003, 005, 006, 008, 009, 010, 014; exports `ValidateResponse` | Clean, seeded and crashing candidates; suppression directives; fingerprints |
+| `ticketing/v1` | Runnable `ticketingkit`; TICKETING-001 to 024 as a replay kit, proven against an in-memory fake | Identical not-found for hidden or foreign issues; body truncation; text stripping |
+| `evidence/v1` | Data, not code: 285 vector directories and 228 golden exports with generated test keys | Any `evidence/v1` verifier must match each vector's exit code, level and finding codes |
+| `authorexecutor/v1`, `evidencestore/v1`, `sandboxprovider/v1`, `transparencylog/v1` | README with the case table; no runnable Go kit in the tree | The list of cases a future kit must hold |
+
+Some kit notes worth knowing:
+
+- The **knowledge** kit puts a trap in every scope-related case: a document in scope `other` that matches the query must never be returned for scope `kit`, and encoded dot segments must be refused by the provider's own grammar.
+- The **scm** kit's `Subject` is how a publisher supplies fixtures (an existing repository, a protected and an unprotected branch, a candidate branch, a moved branch, a pull request with checks and reviews). Its test runs against the replaying build of `scm-github`.
+- The **ticketing** kit has no provider in the tree. Its test checks the kit itself: a conforming in-memory fake passes every case, and each of 37 fakes broken in a single way fails exactly the cases that guard that fault. A provider's own test builds a `Target` over its replay build and calls `ticketingkit.Run`.
+- **TICKETING-024** (markup in comments) needs an `Observer`; without one the case is reported as skipped with the reason, not passed.
+
+## Run the runnable kits
+
+From the root of a `numinance-spec` checkout:
+
+```bash title="Run every runnable kit and the official provider tests"
+go test -count=1 ./conformance/... ./plugins/... ./sdk/go/plugin/...
+```
+
+<VerifiedSnippet what="conformance packages, run against the pinned spec checkout (Go 1.27.2 local toolchain, no network)" exit="0">
+
+```text
+ok  	github.com/numinance/numinance-spec/conformance/ciexecutor/v1	0.885s
+ok  	github.com/numinance/numinance-spec/conformance/knowledge/v1	0.863s
+ok  	github.com/numinance/numinance-spec/conformance/scm/v1	0.552s
+ok  	github.com/numinance/numinance-spec/conformance/ticketing/v1	0.331s
+ok  	github.com/numinance/numinance-spec/conformance/verifier/v1	0.298s
+```
+
+</VerifiedSnippet>
+
+That run executed outside the command sandbox because the `sdk/go/plugin` tests bind a Unix socket. Each kit ran against its replay target: the sample provider, the replay builds of `scm-github`, `ci-github-actions` and `verifier-python`, and the ticketing fake. The knowledge kit output, case by case, is shown on [Write a plugin in Go](/docs/integrations/custom-plugin-go).
+
+The `evidence` kit is exercised by the open verifier's tests:
+
+<VerifiedSnippet what="go test ./sdk/go/evidenceverify" exit="0">
+
+```text
+ok  	github.com/numinance/numinance-spec/sdk/go/evidenceverify	1.812s
+```
+
+</VerifiedSnippet>
+
+You can also run a single vector by hand with the open CLI. This is the `closed-author` export from `conformance/evidence/v1`, run from that directory:
+
+```bash title="Verify one golden export under pinned keys"
+numi evidence verify --runner-key keys/runner.pub --log-key keys/log.pub \
+  --log-origin numinance.test/log --complete exports/closed-author
+```
+
+<VerifiedSnippet what="the command above (output abridged: the not-applicable lines are omitted)" exit="0">
+
+```text
+change: chg_01010101010101010101010101010101
+records: 12, head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48
+state: ended Closed
+level: verified
+chain: records link, hash and end as stated
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+attestation: signed, re-derived from the chain
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+result: verified
+```
+
+</VerifiedSnippet>
+
+Pinning the wrong runner key (`keys/other-runner.pub`) on the same export exits 3 with `FAIL signer_untrusted`, and pinning only the keys the export states exits 5 with level `self-consistent`. See [Conformance vectors](/docs/evidence/conformance-vectors) for the vector format.
+
+## Using a kit with your provider
+
+The pattern is the same for every runnable kit:
+
+<Steps>
+<Step>
+
+### Adapt your provider to the kit's `Target`
+
+Each kit defines a small interface of the port's verbs. A direct adapter calls your provider's server type with no host process. The kit judges only what comes back, so a real host dispatching `Invoke` can sit behind the same interface.
+
+</Step>
+<Step>
+
+### Supply fixtures
+
+A kit with a `Subject` (scm, ciexecutor, verifier) needs data you provide: an existing repository and a missing one, a protected branch, a clean and a seeded candidate. The README for each kit says what must be seeded.
+
+</Step>
+<Step>
+
+### Call the kit's `Run` from a test
+
+For example `knowledgekit.Run(t, target)`. Each case becomes a subtest named by its id.
+
+</Step>
+<Step>
+
+### Keep the negative controls
+
+The knowledge and ticketing tests include deliberately broken targets that must fail. Do the same for the rules you add; a kit that cannot fail is not a test.
+
+</Step>
+</Steps>
+
+## What a pass does not mean
+
+- It does not cover the cases the skeleton does not run. The READMEs list them, for example the knowledge kit's principals, 1 MiB document and unreachable-source cases, and the verifier kit's 1025-violation candidate and nested-sandbox cases.
+- It does not run the host checks. Scope refusal before `Invoke`, digest and bound checks on responses, unknown-field rejection and egress against metadata and private addresses are enforced by the host. A host kit must hold them; the open tree does not run them.
+- It does not mean a live system behaves. Replay fixtures are redacted recordings or hand-written data, and several are explicitly not recordings.
+- It is not a security certification, an audit or an endorsement. It states compatibility with the spec at a version.
+
+## Failure modes
+
+| Symptom | Likely cause |
+| --- | --- |
+| A case fails with an error that names a reason | Your provider returned a different `Reason` than the table expects, for example `NOT_FOUND` where `INVALID_ARGUMENT` is required |
+| A broken-target test passes | The kit lost a guard; investigate before trusting any pass |
+| The `sdk/go/plugin` tests hang | The environment forbids Unix sockets |
+| An evidence vector expected `exit 5` and you got `0` | You pinned keys that make the export `verified` rather than `self-consistent`; check the vector's `flags` |
+
+## Next steps
+
+<Cards>
+  <Card title="Write a plugin in Go" href="/docs/integrations/custom-plugin-go" description="Run the knowledge kit against the sample and write your own target." />
+  <Card title="Conformance vectors" href="/docs/evidence/conformance-vectors" description="How evidence verifiers are tested against golden exports." />
+  <Card title="Official providers" href="/docs/integrations/official-providers" description="Which kits each official provider runs and what remains undone." />
+</Cards>

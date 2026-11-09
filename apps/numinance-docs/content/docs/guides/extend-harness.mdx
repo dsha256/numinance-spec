@@ -1,0 +1,171 @@
+---
+title: Extend a coding harness
+description: How an adapter maps a native coding CLI onto the authorexecutor port, what it must report, what it must never do, and why residency is derived from live configuration rather than a cloud's name.
+---
+
+<FeatureStatus kind="designed">
+The `authorexecutor` port, the `ExecutorManifest` kind and the stream rules are in the public spec. No harness adapter ships in the open tree: the `fake`, `claude-cli` and `codex-cli` adapters are designed, and the adapter conformance kit is a written case list plus offline plan-stream checks, not a runnable harness.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/ports/authorexecutor/v1/authorexecutor.proto",
+    "proto/numinance/kinds/v1/executor_manifest.proto",
+    "proto/numinance/kinds/v1/residency_policy.proto",
+    "schemas/examples/ExecutorManifest/",
+    "conformance/authorexecutor/v1/README.md",
+    "sdk/go/ports/authorexecutor/",
+  ]}
+/>
+
+<ShortProductTruth>The harness owns intelligence. Numinance owns authority. An adapter translates between the two: it drives one native coding CLI and reports what happened as a canonical stream, while the host decides what the run may do.</ShortProductTruth>
+
+## When to use this
+
+Read this if you want to put another coding agent, such as a vendor CLI or an open-weight loop, behind Numinance, or if you want to know precisely what an adapter is allowed to claim. The adapter is the least trusted piece in the architecture: it runs a model-driven process and reports on it. Everything it says is a claim. See [Harnesses vs runtime](/docs/concepts/harnesses-vs-runtime) for the product-level split.
+
+## Prerequisites
+
+- The [plugin lifecycle](/docs/integrations/plugin-lifecycle) and the [custom plugin walk-through](/docs/guides/build-custom-plugin). An adapter is a plugin whose port is `authorexecutor`.
+- Familiarity with [Agent harnesses](/docs/architecture/agent-harnesses).
+- You cannot run an adapter end to end without the proprietary engine, which supplies the sandbox, the egress proxy and the broker. What you can do in the open tree is read the contract, validate the shapes, and run the offline stream rules.
+
+## The mechanism
+
+<HarnessAdapterExplorer />
+
+The execution context is the only caller. It dispatches one `Execute` per run of one work unit, inside a disposable work-unit sandbox, as an `author-agent` run. A `reviewer-agent` run goes through the same port but is read-only, and the host refuses every other actor kind.
+
+## The port, exactly
+
+The service has three RPCs.
+
+```proto title="proto/numinance/ports/authorexecutor/v1/authorexecutor.proto (excerpt)"
+service AuthorExecutorService {
+  rpc Capabilities(CapabilitiesRequest) returns (CapabilitiesResponse) { /* RISK_CLASS_READ */ }
+  rpc Execute(ExecuteRequest) returns (stream ExecuteResponse)       { /* RISK_CLASS_MEDIUM, EXEC_MODE_OPERATION */ }
+  rpc Plan(PlanRequest) returns (stream PlanResponse)                { /* RISK_CLASS_READ, EXEC_MODE_OPERATION */ }
+}
+```
+
+- `Capabilities` returns the `ExecutorCapability` values the adapter claims. The host calls it just before `Execute` and keeps the answer for that run only. The router reads the `ExecutorManifest` pinned in the lockfile, never this answer, and an answer that names a capability the pinned manifest does not declare is a provider fault.
+- `Execute` runs the harness for one run of one work unit and streams `ExecutionEvent` messages. It is `MEDIUM` because the harness writes only inside the sandbox; the decision for a dispatch takes the higher of `MEDIUM` and the risk of every granted credential intent and egress destination.
+- `Plan` runs the harness read-only, in state `Classified`, before any plan exists. It streams the same events in `PlanResponse`. An adapter that serves it claims `STRUCTURED_PLAN`.
+
+## The request: what the host gives the adapter
+
+`ChangeExecutionRequest` is everything a run is given. Nothing in it is advisory.
+
+| Field group | Fields | Notes |
+| --- | --- | --- |
+| Identity | `change_id`, `work_unit_id`, `run_id`, `grant_id` | Prefix plus 32 lowercase hex. One `Execute` per `run_id` |
+| References | `task_ref`, `plan_ref`, `context_bundle_ref`, `test_requirements_ref` | The provider may resolve only these four through `HostService.ResolveReference` |
+| Host-only references | `worktree_ref`, `network_policy_ref` | Marked `host_only`; never resolvable by the provider |
+| Routing | `executor_id`, `model_id` | The `ExecutorManifest` name and one of its models, as the router decided |
+| Authority | `allowed_paths`, `denied_paths`, `allowed_capabilities`, `credential_capabilities`, `protected_resources` | Only the paths the run may write; the protected set is the harness's copy and the sandbox masks it whatever the request says |
+| Bounds | `budget` (`tokens`, `tool_calls`, `files_changed`, `lines_changed`, `network_destinations`), `deadline` | The deadline is the hard bound |
+| Digests | `repository_digest`, `environment_digest`, `policy_digest`, `profile_digest` | Must agree with the `ActionContext` or the host refuses to dispatch |
+
+Payloads carry references and digests, never file contents, prompt text or credential material. The adapter fetches the task or the plan by reference, and the host checks `plan_ref.sha256` against `ActionContext.plan_digest`.
+
+## The response: the canonical event stream
+
+An adapter maps whatever its CLI emits onto these events. A stream holds 1 to 1023 events; the first is `EXECUTION_STARTED` at sequence 1; sequences are consecutive; the last, and only the last, is `EXECUTION_COMPLETED` or `EXECUTION_FAILED`; each message is at most 32 KiB.
+
+| Event | What the adapter reports |
+| --- | --- |
+| `EXECUTION_STARTED` | First event of every stream |
+| `PLAN_ACCEPTED` | The harness took the plan of `plan_ref` as its own |
+| `TOOL_INTENT` | A tool call the harness is about to make |
+| `TOOL_ALLOWED`, `TOOL_DENIED` | An echo of the broker's decision; it authorises nothing |
+| `TOOL_RESULT` | The result of a tool call |
+| `FILE_CHANGED` | A worktree file created, changed or removed |
+| `COMMAND_EXECUTED`, `NETWORK_REQUEST` | A command, or a request made through the egress proxy |
+| `CREDENTIAL_REQUEST` | A handle the harness asked the broker for |
+| `TEST_RESULT`, `CHECKPOINT`, `BUDGET_EVENT` | Test outcome, resumable point, budget use |
+| `EXECUTION_COMPLETED`, `EXECUTION_FAILED` | Terminal |
+
+Events carry a `subject` only for specific types (a tool name, a path, a credential intent) and `references` that point at content such as a diff or a test report, never the content itself. The `subject` is untrusted: the host rejects a `FILE_CHANGED` path outside `allowed_paths` or absent from its own diff of the worktree.
+
+On the plugin protocol each event rides one `RUNNING` Invoke message, and the terminal Invoke message is `SUCCEEDED` after `EXECUTION_COMPLETED` and `FAILED` after `EXECUTION_FAILED`. `sdk/go/ports/authorexecutor` provides `NewExecuteRule` and `NewPlanRule`, which check exactly those stream rules offline, and `ValidatePlanRequest` for the planning request bounds.
+
+## The mapping, in prose
+
+An adapter for a native CLI typically does five things, in order:
+
+1. **Translate the grant.** Turn `allowed_capabilities`, `allowed_paths` and the tool inventory into the CLI's own allowlist, configuration and instruction files. This is telemetry and convenience. The deny that counts is enforced by the broker, the egress proxy and the read-only filesystem, not by the CLI's settings.
+2. **Start the CLI inside the sandbox** with the pinned model, using the CLI's streaming protocol.
+3. **Map its events.** Each tool call becomes `TOOL_INTENT`, then the broker's answer arrives as `TOOL_ALLOWED` or `TOOL_DENIED`, then `TOOL_RESULT`. Commands, file changes and test runs map to their own types. Anything the adapter cannot place is dropped, not guessed.
+4. **Route permission prompts to the broker.** The CLI asks to run a tool; the adapter forwards that to the host's permission path and returns the decision.
+5. **Emit one terminal event** and stop. Never emit events after it.
+
+The designed adapters follow this shape: `fake` is an in-process deterministic executor that applies scripted diffs for lifecycle tests, `claude-cli` supervises the Claude Code CLI, and `codex-cli` supervises the Codex CLI. All three are designed. Their ids appear in specification examples (the `ExecutorManifest` example binds `dev.numinance.official/claude-cli`), but there is no adapter source in the open tree and nothing resolves those ids.
+
+<Callout type="warn" title="What an adapter must not do">
+- Treat anything in its own settings as the enforcement point. The sandbox, proxy and broker are configured from the host's resolved grant, never from the request, which is only the harness's copy.
+- Derive the candidate from its own events. The candidate is the host's own diff of the worktree. `FILE_CHANGED` is a claim to cross-check.
+- Hold or request credential material. `credential_capabilities` are intent names; the broker returns handles, never secrets. A canary secret is planted on the host in the live kit, and it must never appear in the sandbox, any event, `HostService.Log` or a diagnostic.
+- Reach the model endpoint on its own authority. Inference egress for the pinned model is configured by the host outside `allowed_capabilities`, `credential_capabilities` and `network_policy_ref`.
+- Resolve `worktree_ref` or `network_policy_ref`, widen `allowed_paths`, or retry past `max_repair_attempts`. Repair is a host-level, bounded loop.
+- Emit anything for a path under `protected_resources`.
+- Approve, merge or promote anything. An author-agent never approves its own change.
+</Callout>
+
+## The manifest the router reads
+
+The adapter is selected through an `ExecutorManifest` pinned in the lockfile. The shipped example:
+
+```yaml title="schemas/examples/ExecutorManifest/ (example)"
+apiVersion: numinance.dev/v1
+kind: ExecutorManifest
+metadata: {name: claude-cli-bedrock, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/claude-cli
+  capabilities: [EXECUTOR_CAPABILITY_FILESYSTEM_READ, EXECUTOR_CAPABILITY_FILESYSTEM_WRITE, EXECUTOR_CAPABILITY_SHELL, EXECUTOR_CAPABILITY_SUBAGENTS,
+    EXECUTOR_CAPABILITY_MCP, EXECUTOR_CAPABILITY_STRUCTURED_PLAN, EXECUTOR_CAPABILITY_APPROVAL_CALLBACKS]
+  models:
+    - {id: eu.anthropic.claude-sonnet-v1:0, max_context: 200000}
+  cost_class: EXECUTOR_COST_CLASS_MEDIUM
+```
+
+This validates with `numi validate --files` as an example document. It declares capabilities and models; it declares no residency, because the `residency` field is deliberately held back for a later minor. The provider id here is an example shape, not an installable adapter.
+
+## Residency is derived, not declared
+
+Where data goes has more than one dimension, and a cloud's name settles none of them:
+
+| Dimension | Question |
+| --- | --- |
+| Compute | Where does the harness process run? |
+| Inference | Where does the model run, and in which regions may it run? |
+| Egress | What prompt and response data leaves the account, and to whom? |
+| Retention | How long may the vendor keep prompts and responses, and may it train on them? |
+
+A `ResidencyPolicy` sets floors (`IN_ACCOUNT`, `PRIVATE_ENDPOINT`, `VENDOR_ZDR`, ...) plus regions, `cross_region`, `retention_max` and `training_use`. The class that is compared with the floor is derived from the live runtime configuration at Change start, not copied from a static manifest. Until the manifest carries residency fields, a manifest that cannot be checked against a floor fails it.
+
+"On AWS" and "through Bedrock" are therefore not `IN_ACCOUNT`. A model reached through a cloud provider can still run in another region, retain prompts, or be reached over a public path. The class is whatever the dimensions add up to, and a mismatch with the floor refuses the Change before work starts. An adapter must never write a residency claim into its own events as if it settled the question; `ActionContext.residency` is informational, host-derived, and never a grant.
+
+## Conformance
+
+The authorexecutor kit is a written list of cases, not a runnable harness. `CORE-001` to `CORE-018` cover `Capabilities`, `Execute` and bounds; the `live` cases (egress to link-local and metadata addresses, credential intents outside the grant, deadline enforcement, a planted canary secret, inference endpoint overrides) need a real sandbox, proxy and broker. `HOST-001` to `HOST-014` describe what every host does with a request and with a provider's answer: a stream whose first event is not `EXECUTION_STARTED` is rejected, a `TOOL_ALLOWED` for a denied intent grants nothing, a second `Execute` with a used `run_id` is not dispatched, and a reviewer-agent run with write capability is refused.
+
+What runs today, offline, is the stream half of `PLAN-001`/`PLAN-002` and `PLAN-003` through `NewPlanRule` and `ValidatePlanRequest`. Until the plugin host work lands, treat full adapter conformance as designed.
+
+## Failure modes and safeguards
+
+| Failure | Result |
+| --- | --- |
+| Stream has a gap, a repeated sequence, or an event after the terminal one | Host rejects the stream and records the run failed |
+| Event `subject` outside the grammar or the grant | Rejected; a canary or handle in a `subject` is an abnormal action and starts the incident workflow |
+| `Capabilities` names a capability the manifest does not declare | `Execute` is not dispatched; the host records `FAILED_PRECONDITION` |
+| Run exceeds `files_changed`, `lines_changed` or destination counts | Host stops the run at its own count |
+| Reviewer-agent worktree differs from its start | No candidate is built; the worktree is discarded |
+| Residency class below the floor | The Change is refused at start |
+
+## Next steps
+
+<Cards>
+  <Card title="Agent harnesses" href="/docs/architecture/agent-harnesses" description="Where adapters sit in the architecture." />
+  <Card title="Adapters and environments" href="/docs/configuration/adapters-and-environments" description="Executor manifests, selectors and residency policy fields." />
+  <Card title="Capability ports" href="/docs/protocol/capability-ports" description="All nine ports and their risk annotations." />
+</Cards>

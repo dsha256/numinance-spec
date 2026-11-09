@@ -1,0 +1,98 @@
+---
+title: Circuit breaker
+description: The customer-local switch with four positions that caps or halts all autonomous work, and the human-only break-glass path.
+---
+
+<FeatureStatus kind="designed">The <code>BreakerPosition</code> enum is public-spec. The breaker itself, its triggers and the <code>numi breaker</code> surface are designed and not in the open build.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto"]} note="BreakerPosition, ordered from least to most restrictive." />
+
+<ShortProductTruth>
+The breaker lives in your runtime and depends on nothing outside it. If the vendor, the control plane or the network disappears, you can still stop the agent.
+</ShortProductTruth>
+
+## Four positions
+
+Positions are ordered from least to most restrictive. Consumers compare by that order, never by number alone.
+
+| Position | Effect |
+| --- | --- |
+| `FULL_AUTO` | Caps nothing beyond the autonomy policy |
+| `PR_ONLY` | Caps effective autonomy at opening pull requests |
+| `READ_ONLY` | Allows no write |
+| `STOPPED` | Pauses every run |
+
+`FULL_AUTO` does not mean unrestricted. It means the breaker adds no cap, and floors, policy, grants and budgets all still apply.
+
+## Relation to the autonomy ladder
+
+The ladder is policy: Observe, Suggest, Implement, PR, Merge, Stage, Release, Operate. The breaker is a separate override above it. `PR_ONLY` is a **breaker state**, not a ladder level. When the breaker is at `PR_ONLY`, the effective level for any work is the lower of the policy level and PR. When it is at `READ_ONLY`, no writing action is allowed whatever policy says.
+
+```text
+effective autonomy = min(policy level, breaker cap)
+```
+
+This means you can incident-respond without editing policy, and you can restore normal operation by resetting the breaker rather than rewriting configuration.
+
+## What trips it
+
+Designed triggers include:
+
+- A human, through the dashboard, CLI or API.
+- The incident detector on an abnormal action.
+- Budget or policy anomalies.
+- A failure to write evidence.
+- Provider drift, such as an extension whose declared permissions no longer match.
+- A sandbox canary violation at runtime.
+
+## What happens when it trips
+
+1. Credential handles are revoked.
+2. Runs pause at the next checkpoint. A change shows as paused rather than failed.
+3. Effective autonomy is capped at the new position.
+4. The trip, its source and its reason are recorded as evidence.
+
+Reset needs a human and a reason, and the reset is recorded too. An agent identity cannot reset the breaker.
+
+## Customer-local by construction
+
+Breaker state is held in the customer data plane and is evaluated by the runtime on every privileged action. It does not call the control plane, so:
+
+- A control plane outage cannot leave the breaker unreachable or stale.
+- A control plane compromise cannot reset it.
+- Sovereign and later air-gapped modes behave the same way.
+
+The dashboard may show and change the breaker for convenience, but it is a client of the local state, not its owner.
+
+## Break-glass
+
+Break-glass is the exception path for a human who must act outside normal gates, for example to unblock an urgent fix while approvers are unavailable.
+
+- **Human only.** Named human principal with strong authentication. No agent identity can invoke it.
+- **Named.** The actor is individual and attributable, not a shared account.
+- **Time-boxed.** It expires. The design sets a short default expiry.
+- **Scoped.** It covers a stated scope, not general override.
+- **Logged separately.** Events go to a distinct log and into evidence.
+- **Reviewed.** A post-event review task is created automatically.
+
+Dual control can be required for specific policy packs.
+
+## Example operation
+
+<IllustrativeNote>
+Descriptive flow, not a command transcript. The breaker commands are not in the open <code>numi</code> build.
+</IllustrativeNote>
+
+A verifier starts reporting false accepts. The on-call operator moves the breaker to `PR_ONLY`. In-flight work that would merge now stops at pull request, and nothing is lost. After investigating, the operator moves it to `FULL_AUTO` with a recorded reason, and work that stopped at PR resumes through normal approval.
+
+## Failure modes
+
+- **Breaker set but never reviewed.** A long-lived `PR_ONLY` hides a policy that needs fixing. Review trips as incidents.
+- **Cap on the wrong scope.** Confirm the breaker is global to the runtime and not mistaken for a per-playbook setting. Per-playbook limits belong in policy.
+- **Evidence-write failure.** This both trips the breaker and means recent records may be missing, so verify the chain after recovery.
+
+<Cards>
+  <Card title="Rollback and recovery" href="/docs/operations/rollback-and-recovery" description="What to do after a trip." />
+  <Card title="Autonomy levels" href="/docs/concepts/autonomy-levels" description="The ladder the breaker caps." />
+  <Card title="Governed execution" href="/docs/concepts/governed-execution" description="Where the breaker sits in the runtime." />
+</Cards>

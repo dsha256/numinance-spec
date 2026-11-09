@@ -1,0 +1,129 @@
+---
+title: AutonomyPolicy
+description: Set the autonomy level per playbook, risk class and environment, under org floors that no rule, default or narrower scope can exceed.
+---
+
+<FeatureStatus kind="public-spec">
+The kind, schema and loader checks are public. Evaluating levels against floors at runtime is a proprietary engine feature.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/autonomy_policy.proto", "proto/numinance/types/v1/types.proto", "schemas/examples/AutonomyPolicy/org-ladder.yaml"]} />
+
+<ShortProductTruth>Rules choose a level. Floors cap it. The highest level never bypasses a floor.</ShortProductTruth>
+
+## Purpose and scopes
+
+`AutonomyPolicy` sets how far an autonomous change may go. It can be written at any scope. Only an org-scoped kind (or a control pack) may set `floors`. The loader refuses `floors` anywhere else.
+
+The levels are the ladder in the types proto:
+
+| Level | Meaning |
+| --- | --- |
+| `AUTONOMY_LEVEL_OBSERVE` | reads only |
+| `AUTONOMY_LEVEL_SUGGEST` | proposes and writes nothing |
+| `AUTONOMY_LEVEL_IMPLEMENT` | writes in a sandbox |
+| `AUTONOMY_LEVEL_PR` | opens pull requests |
+| `AUTONOMY_LEVEL_MERGE` | merges when policy allows |
+| `AUTONOMY_LEVEL_STAGE` | deploys to pre-production |
+| `AUTONOMY_LEVEL_RELEASE` | deploys to production |
+| `AUTONOMY_LEVEL_OPERATE` | runs operations against production |
+
+See [Autonomy levels](/docs/concepts/autonomy-levels) for the concept and [Choose autonomy](/docs/guides/choose-autonomy) for a decision procedure.
+
+## Field reference
+
+<TypeTable type={{
+  "spec.defaults": { type: "AutonomyDefaults", description: "The level when no rule matches. Absent everywhere means PR for READ, LOW and MEDIUM risk and Suggest for HIGH and PRIVILEGED." },
+  "spec.defaults.level": { type: "AutonomyLevel", description: "Required.", required: true },
+  "spec.rules": { type: "AutonomyRule[]", description: "Set levels for the changes they match. A narrower scope's list replaces the wider one." },
+  "spec.rules[].match": { type: "AutonomyMatch", description: "Required. An absent key matches every value; an empty match matches every change.", required: true },
+  "spec.rules[].level": { type: "AutonomyLevel", description: "Required.", required: true },
+  "spec.floors": { type: "AutonomyFloors", description: "Cap the level. Org-scoped kind or control pack only (FORBID). Absent in the org means the shipped floor: Suggest for HIGH and PRIVILEGED, PR for the rest." },
+  "spec.floors.rules": { type: "AutonomyFloor[]", description: "Required and non-empty when floors is present.", required: true },
+  "spec.floors.rules[].match": { type: "AutonomyMatch", description: "Required.", required: true },
+  "spec.floors.rules[].max_level": { type: "AutonomyLevel", description: "Required. No rule, default or narrower scope resolves a matching change above it.", required: true },
+}} />
+
+### Matching dimensions
+
+`AutonomyMatch` has exactly three optional keys.
+
+<TypeTable type={{
+  playbook: { type: "string", description: "The name of the change's playbook." },
+  risk: { type: "RiskClass", description: "The change's risk class, fixed at Classified: RISK_CLASS_READ, LOW, MEDIUM, HIGH or PRIVILEGED." },
+  environment: { type: "string", description: "The name of the environment the change acts in." },
+}} />
+
+The two uses differ. In a **rule**, `risk` matches exactly, and a key the change has no value for does not match. In a **floor**, `risk` matches that class and every higher one, and a key the change has no value for counts as a match, so a floor errs toward capping.
+
+## Example: organization ladder
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {environment: production}, max_level: AUTONOMY_LEVEL_MERGE}
+```
+
+Read it top to bottom. The default is PR. A low-risk dependency upgrade may reach MERGE. Any HIGH or PRIVILEGED change is capped at SUGGEST. Anything acting in an environment named `production`, or with no environment value, is capped at MERGE: the agent can never deploy there on its own authority.
+
+<VerifiedSnippet what="The org-ladder example against the strict schema and loader" exit="exit 0">
+```text
+$ numi validate --files schemas/examples/AutonomyPolicy
+revision: "files"
+ok       file "org-ladder.yaml" AutonomyPolicy "org-ladder"
+```
+</VerifiedSnippet>
+
+## Explore it
+
+<AutonomyPolicyExplorer />
+
+## Resolution semantics
+
+1. Take the lowest level among the matching rules, else the default.
+2. Cap it at the lowest `max_level` among the matching floors (org floors and every control pack's floors).
+
+"Highest level never bypasses a floor" is therefore structural: a rule that says `AUTONOMY_LEVEL_OPERATE` for a HIGH change resolves to SUGGEST under the example above. Floors from the org and from control packs combine by taking the lowest; pack floors only add caps and never displace the org's. Only org floors displace the shipped floor.
+
+Across scopes: `defaults` merges field by field; a narrower scope's `rules` list replaces the wider list; `floors` are FORBID and cannot be set below the org. `SDLCProfile.spec.autonomy` is one more layer at the profile's scope, applied after that scope's AutonomyPolicy.
+
+## Security implications
+
+- An agent cannot widen its own level. A narrower scope cannot lift a floor, and a rule cannot exceed one.
+- A repository can always choose a lower level than the org allows.
+- The generated repo tree writes no floors block: `numi init` explains that a floor set below the org scope is refused, and that without an org document the engine applies its shipped floor, which caps every change at PR (HIGH at SUGGEST). Run `numi init --org-dir DIR` to write explicit org floors.
+
+## Common misconfigurations
+
+<VerifiedSnippet what="org-ladder with an invented level name" exit="exit 3">
+```text
+$ numi validate --files bad-enum.yaml
+revision: "files"
+invalid  file "bad-enum.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/defaults/level\": enum
+```
+</VerifiedSnippet>
+
+The same shape appears for a misspelt key (`default:` for `defaults:` gives `"/spec/default": additionalProperties`) and for a short enum such as `PR`. A floor in a repo-scoped document gives `floors is set only at the org scope`, shown on [Layout and scopes](/docs/configuration/layout-and-scopes#failure-modes).
+
+## What validation checks, and what it does not
+
+Checked: keys, enum names, that `rules` entries have `match` and `level`, that `floors.rules` is non-empty, org-only floors. Not checked by the open build: whether a rule is shadowed by a floor, whether the named playbook or environment exists, or the resulting level for a given change. `numi validate --files` runs no resolver.
+
+<DesignNote title="Planned runtime meaning">
+The design evaluates policy outside the model before every privileged action. The resolved level and the floors that capped it feed the grant the runner issues; the agent never decides its own level. Promotion to a higher level is a human-accepted decision backed by a playbook's qualification record, not something an agent can request of itself.
+</DesignNote>
+
+## Next steps
+
+<Cards>
+  <Card title="Playbooks" href="/docs/configuration/playbooks" description="The qualification record that gates promotion." />
+  <Card title="Choose autonomy" href="/docs/guides/choose-autonomy" description="Pick a starting level and floors." />
+  <Card title="Authority and policy" href="/docs/architecture/authority-and-policy" description="Where levels become grants." />
+</Cards>

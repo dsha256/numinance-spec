@@ -1,0 +1,11 @@
+{
+  "title": "Project",
+  "pages": [
+    "index",
+    "governance",
+    "versioning",
+    "rfcs",
+    "contributing",
+    "license"
+  ]
+}

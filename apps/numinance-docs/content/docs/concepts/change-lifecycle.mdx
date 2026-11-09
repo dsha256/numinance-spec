@@ -1,0 +1,70 @@
+---
+title: Change lifecycle
+description: The durable stages every change passes through - Understand, Plan, Act, Verify, Evidence - and the release, observe and recover stages that exist only when authorized.
+---
+
+<FeatureStatus kind="designed">The lifecycle is run by the proprietary runtime. The state names are public-spec in the shared types.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto"]} note="The ChangeState enum." />
+
+<ShortProductTruth>
+A change is a durable state machine with fresh authority at each gate, not one long agent session.
+</ShortProductTruth>
+
+## The core loop
+
+```text
+Understand -> Plan -> Act -> Verify -> Evidence
+```
+
+| Stage | What happens | Typical states |
+| --- | --- | --- |
+| Understand | Resolve context, classify the change. | `CHANGE_STATE_UNDERSTOOD`, `CHANGE_STATE_CLASSIFIED` |
+| Plan | Produce a plan and pass the plan gate. | `CHANGE_STATE_PLANNED`, `CHANGE_STATE_PLAN_GATE` |
+| Act | Agents implement work units under bounded grants. | `CHANGE_STATE_IMPLEMENTING`, `CHANGE_STATE_INTEGRATED` |
+| Verify | Independent checks, bounded repair. | `CHANGE_STATE_VERIFYING`, `CHANGE_STATE_REPAIRING` |
+| Evidence | Seal the record of what happened. | `CHANGE_STATE_CLOSED` |
+
+<ChangeLifecycleTimeline />
+
+## Beyond the pull request
+
+When, and only when, the [autonomy level](/docs/concepts/autonomy-levels) and policy authorize it, the lifecycle continues:
+
+- **Release.** `CHANGE_STATE_REHEARSING`, `CHANGE_STATE_RELEASE_GATE`, `CHANGE_STATE_MERGING` and `CHANGE_STATE_RELEASING`. The release gate and everything after it run under the release-pipeline identity, never the author agent.
+- **Observe.** `CHANGE_STATE_OBSERVING` watches the released change for a window defined by the playbook.
+- **Recover.** `CHANGE_STATE_RECOVERING` and `CHANGE_STATE_ROLLED_BACK` when observation or release fails.
+
+A change at PR level closes after the pull request is opened and never enters release states. The evidence export records that explicitly: the deployment and observation parts are marked not applicable at PR level, and the verifier checks that the chain bears this out.
+
+## Terminal and side states
+
+| State | Meaning |
+| --- | --- |
+| `CHANGE_STATE_ESCALATED` | A human signal is needed. Reached from failed verification, exhausted repair or a denied gate. |
+| `CHANGE_STATE_PAUSED` | The circuit breaker tripped. Work resumes only on breaker reset. |
+| `CHANGE_STATE_ABANDONED` | The change was denied, rejected or cancelled. |
+| `CHANGE_STATE_CLOSED` | Completed at the authorized level. |
+| `CHANGE_STATE_ROLLED_BACK` | Recovery restored the previous state. |
+
+## Fresh authority per stage
+
+Authority does not carry over. Planning runs under an initial read-oriented grant. The plan gate decides again before implementation. The release gate decides again before merge. A human can be required at either gate by policy or by risk class, and the approver cannot be the author. Because each stage re-evaluates, a decision that was right at planning time cannot be reused after the situation changed.
+
+## Reference-only payloads
+
+The orchestration layer moves change identifiers, digests, decision references and status codes. Source, diffs, prompts and logs stay in the artifact store and travel as references. This is why a workflow history can be inspected without leaking the change itself.
+
+## Failure modes
+
+- Verification fails and repair is exhausted: the change escalates, it does not loop.
+- The breaker trips mid-implementation: the change pauses.
+- A gate denies: the change is abandoned with the denial recorded.
+
+## Next steps
+
+<Cards>
+  <Card title="Reliability and recovery" href="/docs/concepts/reliability-and-recovery" description="Verification, bounded repair and rollback." />
+  <Card title="Temporal orchestration" href="/docs/architecture/temporal-orchestration" description="How the state machine is run." />
+  <Card title="Playbooks" href="/docs/configuration/playbooks" description="Configure steps, verifiers and repair limits." />
+</Cards>

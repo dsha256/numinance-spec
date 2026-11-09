@@ -1,0 +1,72 @@
+---
+title: Context resolver
+description: How Numinance builds a small, cited, access-checked context bundle for each stage from the systems that already hold your knowledge.
+---
+
+<FeatureStatus kind="designed">
+  The resolver is part of the proprietary runtime. The knowledge port it calls is a public contract.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/ports/knowledge/v1/knowledge.proto"]} note="Search, Fetch and Resolve." />
+
+<ShortProductTruth>
+  Give it context. Let it engineer. Context is retrieved per change from the customer's own systems, never copied into a vendor index.
+</ShortProductTruth>
+
+## Flow
+
+<ContextResolverFlow />
+
+## Mechanism
+
+For each stage, a child workflow resolves context from the change, the task and acceptance criteria, the affected components, the resolved profile and the actor's authorisation. It reads repository documentation first, derives queries, and calls the knowledge port, which exposes three verbs: `Search`, `Fetch` and `Resolve`. Results are deduplicated by digest, redacted for secrets and personal data, ranked, and selected with a written reason. The resolver then flags stale or conflicting sources and lists unresolved questions. It stops at the stage budget.
+
+Resolution is read-only. A planning model may help derive queries, but it runs under a read-only grant with no ability to write tools.
+
+## Identity and access
+
+- By default a run uses the delegated access of the human who triggered the change, so the bundle can only hold what that person can see.
+- Unattended runs use a service account whose effective scope is the intersection of its grant and a policy listing allowed spaces and projects.
+- Each source records its access basis. Restricted sources are marked and their text is kept out of pull request descriptions.
+- If a principal loses access, existing bundles remain immutable evidence but are not reused; the resolver fetches again under current authorisation or marks the source inaccessible.
+
+## Trust classes
+
+| Input | Trust | May create enforceable authority |
+| --- | --- | --- |
+| Retrieved knowledge, tickets, tool output | Untrusted | No; cited as guidance only |
+| Files in the worktree | Repository authored | No |
+| Signed skill | Advisory | No |
+| Signed policy and kernel | Authoritative | Yes |
+
+The bundle separates `authored_constraints`, which come from signed policy and are enforced, from `cited_guidance`, which comes from documents and is advisory.
+
+## Tool pinning and the bundle
+
+Knowledge servers reached over MCP are approved read-only subsets. Their tool inventories are pinned by name and hash. Drift quarantines the connection until re-approved. Read-only is enforced by the server where possible, the pinned allow-list, and the broker's refusal of any non-read capability on a knowledge connection. The executor never gets enterprise MCP servers; it sees only the bundle, delivered as a read-only directory and a bundle tool.
+
+## Receipts and reproducibility
+
+Each search and fetch produces a retrieval receipt that binds the principal, authorisation context, source version and content digests. Two searches can return different results across a crash, so each resolution has a generation: the first persisted result for an operation is the result for that generation, and a refresh opens a new generation instead of mutating a bundle.
+
+## Boundary table
+
+| Party | Holds | Cannot do |
+| --- | --- | --- |
+| Resolver | A read-only knowledge grant | Write to any source |
+| Knowledge provider | Source credentials by handle | Widen the connection's scope |
+| Executor | The finished bundle | Query enterprise systems directly |
+| Cache | Authorisation-bound fetched documents | Serve a body to a different authorisation context |
+
+## Failure cases
+
+- Unresolved question that blocks a change: reported back to the ticket instead of guessed.
+- Source conflict: both claims are returned; the resolver does not pick silently unless a pack declares precedence.
+- Tool inventory drift: connection quarantined, resolution fails closed.
+- Stage budget reached: the bundle is returned incomplete with the gaps listed.
+
+<Cards>
+  <Card title="Context first" href="/docs/concepts/context-first" description="Why context comes before autonomy." />
+  <Card title="Knowledge connection" href="/docs/configuration/knowledge-connection" description="How connections are configured." />
+  <Card title="Knowledge MCP" href="/docs/integrations/knowledge-mcp" description="The provider side." />
+</Cards>

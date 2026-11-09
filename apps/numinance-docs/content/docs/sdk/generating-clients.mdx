@@ -1,0 +1,138 @@
+---
+title: Generating clients
+description: Build a Protobuf client in any language from the public .proto files, which commands were actually run, and what remains untested.
+---
+
+<FeatureStatus kind="public-spec">
+  The .proto files are the public contract. Clients generated from them are interoperability, not an official SDK.
+</FeatureStatus>
+
+<SourceReference paths={["buf.yaml", "buf.gen.yaml", "proto/numinance/", "VERSIONING.md"]} />
+
+<ShortProductTruth>
+  The brain is private. The contract is open. Any language with a Protobuf toolchain can speak the contract without waiting for an SDK.
+</ShortProductTruth>
+
+## When to use this
+
+- You work in Rust, Java, C#, Ruby or another language with no official SDK. [Rust](/docs/sdk/rust) and [Java](/docs/sdk/java) are coming soon.
+- You want Python or TypeScript messages without checking in the repository's generated stubs.
+- You are building a provider or a tool that reads Numinance messages, and you want your own build to own the generated code.
+
+## Prerequisites
+
+- A clone of `https://github.com/dsha256/numinance-spec.git`.
+- The `buf` CLI (this page ran 1.46.0), or `protoc` for your target language.
+- A generator plugin for your target language.
+
+## What the repository gives you
+
+`buf.yaml` declares one module rooted at `proto`:
+
+```yaml title="buf.yaml (excerpt)"
+version: v2
+modules:
+  - path: proto
+lint:
+  use:
+    - STANDARD
+    - COMMENTS
+breaking:
+  use:
+    - FILE
+  ignore_unstable_packages: true
+```
+
+The packages under `proto/numinance/` are `annotations`, `events`, `evidence`, `kinds`, `plugin`, `ports` and `types`. Every port is a separate package (authorexecutor, ciexecutor, evidencestore, knowledge, sandboxprovider, scm, ticketing, transparencylog, verifier), so you generate only the ones you implement.
+
+The checked-in `buf.gen.yaml` is the maintainers' generation recipe for the Go, Python, TypeScript and JSON Schema outputs. Its own comments say it runs through a `just gen` task, with Go generators pinned in a `tools` module and a Python generator taken from `grpcio-tools`. Those inputs are not in the public checkout, so copy the idea, not the file. It does state two useful facts: no generator is remote, and the JSON Schemas for the configuration kinds are produced from `numinance.kinds.v1` only.
+
+## Run it
+
+All commands are run from the root of the checkout.
+
+<Steps>
+<Step>
+
+Confirm the module builds:
+
+```bash
+buf build -o /dev/null
+```
+
+</Step>
+<Step>
+
+Lint it with the repository's rules:
+
+```bash
+buf lint
+```
+
+</Step>
+<Step>
+
+Write a template for your language. Python messages need only a built-in generator:
+
+```yaml title="buf.gen.demo.yaml"
+version: v2
+plugins:
+  - protoc_builtin: python
+    out: gen-py
+```
+
+</Step>
+<Step>
+
+Generate:
+
+```bash
+buf generate --template buf.gen.demo.yaml
+```
+
+</Step>
+</Steps>
+
+<VerifiedSnippet what="buf build -o /dev/null, buf lint, and buf generate with the template above, buf 1.46.0, checkout at revision 3c74d59" exit="0">
+```text
+buf build: exit 0
+buf lint: exit 0, no findings
+buf generate: exit 0, 44 files written under gen-py
+```
+</VerifiedSnippet>
+
+A plain `protoc -I proto --python_out=OUT proto/numinance/types/v1/types.proto proto/numinance/annotations/v1/annotations.proto` with protoc 29.3 also wrote `types_pb2.py` and `annotations_pb2.py`.
+
+## What is and is not tested
+
+| Claim | Status |
+| --- | --- |
+| The `proto/` module builds and passes `buf lint` | Run for this page |
+| A built-in Python generator produces message modules | Run for this page |
+| Generated Go stubs compile | Yes, they are built and tested as part of `go test` in the module |
+| Generated Python stubs import | Covered by the repository smoke test (not run for this page) |
+| Generated TypeScript stubs type-check | No test is documented |
+| A generated client in any other language compiles | Not tested by Numinance |
+| A generated client interoperates with a real host | Not tested by Numinance |
+| Conformance kits exist for ports | Yes, written in Go: authorexecutor, ciexecutor, evidence, evidencestore, knowledge, sandboxprovider, scm, ticketing, transparencylog and verifier |
+
+You can use the conformance kits' vectors as a behavioral reference, and the [evidence conformance vectors](/docs/evidence/conformance-vectors) are language neutral because they are directories of files. A client in another language is correct only to the extent you test it against them.
+
+## Failure modes and safeguards
+
+- **A schema is stricter than the type.** Protobuf types do not carry the bounds, ordering and uniqueness rules written in comments and annotations. The host rejects over-limit input rather than truncating it, so a generated client that builds an oversized message gets a refusal, not a silent fix.
+- **Descriptor mismatch.** A plugin ships a descriptor set, and the host's compiled copy of each port file is authoritative. A differing shared port file fails install.
+- **Generator drift.** Different generator versions produce different code. Pin yours.
+- **Untagged contract.** The packages are `v1`, but the repository is not tagged yet; read [versioning](/docs/project/versioning) before you build on a field.
+
+<Callout type="warn" title="No extra authority">
+  A generated client can send any well-formed message. Whether the host acts on it is decided by policy, grants and the manifest the plugin declared. Agents cannot widen grants or approve themselves by constructing messages.
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Protocol overview" href="/docs/protocol" description="Services and messages you are generating against." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="Kits that define correct provider behavior." />
+  <Card title="Go SDK" href="/docs/sdk/go" description="The handwritten helpers Go gets that generated clients do not." />
+</Cards>

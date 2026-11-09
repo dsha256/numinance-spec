@@ -1,0 +1,158 @@
+---
+title: KnowledgeConnection
+description: Declare an approved, read-only knowledge source with pinned tools, bounded calls and no secrets, so the context resolver can search it without inheriting its authority.
+---
+
+<FeatureStatus kind="public-spec">
+  The KnowledgeConnection schema and its loader checks are public and validate with the open `numi validate --files`. The context resolver and the MCP bridge that read through a connection are part of the proprietary runtime, which is not generally available.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/kinds/v1/knowledge_connection.proto",
+    "schemas/examples/KnowledgeConnection/confluence-eng.yaml",
+    "schemas/examples/KnowledgeConnection/confluence-oauth.yaml",
+    "sdk/go/kindyaml/README.md",
+  ]}
+/>
+
+<ShortProductTruth>
+  A KnowledgeConnection is an org-approved, read-only door to a wiki, ticket system or document store. It names the provider, the endpoint, whose authority a read runs under, the exact tools allowed and their hashes, and the budget. It holds no credential.
+</ShortProductTruth>
+
+## When to use it
+
+Use a KnowledgeConnection when engineers keep the information a change needs outside the repository: design pages, runbooks, ticket history. The context resolver searches these sources and assembles a bundle for each stage. The connection is the only way it can do so, and the org is the only scope that can create one. For the end-to-end flow, see [connect knowledge](/docs/guides/connect-knowledge), [the context resolver](/docs/architecture/context-resolver) and [knowledge and MCP](/docs/integrations/knowledge-mcp).
+
+## Scope and merge rules
+
+KnowledgeConnection is org-scoped only. The loader refuses any `metadata.scope` other than `SCOPE_ORG`, and the profile context refuses one loaded below the org. A repository can only name a connection in its adapter selector (`ports.knowledge`) when the org has granted it; it cannot define its own.
+
+Three fields carry the `FORBID` merge directive: `endpoint`, `auth` and `oauth`. Only the org sets them, since they decide where reads go and under which authority.
+
+## Field reference
+
+<TypeTable type={{
+  "spec.provider": { type: "string", description: "Required. The extension id of a knowledge-port provider. It must resolve to a lockfile entry.", required: true },
+  "spec.endpoint": { type: "string (https URL)", description: "The source's URL. Absent for a provider that reads the worktree. Must be https with a lower-case DNS host of two or more labels. Its host must also be in the provider manifest's egress allow-list." },
+  "spec.auth": { type: "KNOWLEDGE_AUTH_USER_DELEGATED | KNOWLEDGE_AUTH_SERVICE_ACCOUNT", description: "Required. Whose authority a read runs under. Unspecified is rejected, so there is no silent default.", required: true },
+  "spec.pinned_tools": { type: "PinnedTool[]", description: "The requested read-only tool subset, unique by name. An empty list allows no tool." },
+  "spec.pinned_tools[].name": { type: "string", description: "Required. The tool name as the server lists it.", required: true },
+  "spec.pinned_tools[].hash.value": { type: "string", description: "Required. sha256: followed by 64 lowercase hex characters. The hash of the tool's canonicalised description, schemas and annotations.", required: true },
+  "spec.read_only": { type: "bool", description: "Required and must be true. The loader refuses false.", required: true },
+  "spec.scope": { type: "string[]", description: "Required, non-empty and unique (ignoring case). The spaces, projects or relative paths the connection may read. Wildcards, dot segments, a leading slash and query or glob characters are refused.", required: true },
+  "spec.budgets.calls_per_stage": { type: "uint32", description: "Most searches and fetches in one stage. An explicit 0 is refused. A connection budget only lowers the stage budgets, never raises them." },
+  "spec.budgets.bytes_per_call": { type: "uint32", description: "Most bytes one fetch returns. An explicit 0 is refused." },
+  "spec.cache_ttl": { type: "duration", description: "How long a fetched document is cached. Absent means 30 days. 0s disables the cache.", default: "30 days (when absent)" },
+  "spec.oauth.client_id": { type: "string", description: "The OAuth client the bridge presents. 1 to 2048 printable ASCII bytes; a value that looks like a URL must pass the https endpoint rule. There is no secret field and none may be added." },
+}} />
+
+### The two auth modes
+
+`KNOWLEDGE_AUTH_USER_DELEGATED` runs a search or fetch under the grant of the human who triggered the change. `KNOWLEDGE_AUTH_SERVICE_ACCOUNT` is for unattended runs. The schema notes that the broker issues a service-account handle only with an approval record, that its effective scope is the intersection of the account's grant and the policy's allowed spaces and projects, and that whether the first release allows it at all is an open design question. Prefer user-delegated until your policy says otherwise.
+
+## Working example
+
+```yaml title="schemas/examples/KnowledgeConnection/confluence-eng.yaml"
+apiVersion: numinance.dev/v1
+kind: KnowledgeConnection
+metadata: {name: confluence-eng, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/bridge-mcp
+  endpoint: https://mcp.example.com/v1/mcp
+  auth: KNOWLEDGE_AUTH_USER_DELEGATED
+  pinned_tools:
+    - {name: searchConfluenceUsingCql, hash: {value: "sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f"}}
+    - {name: getConfluencePage, hash: {value: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"}}
+  read_only: true
+  scope: [ENG, PAY]
+  budgets: {calls_per_stage: 8, bytes_per_call: 65536}
+  cache_ttl: 2592000s
+```
+
+<IllustrativeNote>
+  `mcp.example.com` is a placeholder host and the two hashes are sample values from the schema examples. They are not a real server, and the tool names are only a plausible shape. Compute real hashes from the tool inventory your administrator approves.
+</IllustrativeNote>
+
+A second example in the same directory shows the OAuth variant, which replaces nothing about the read-only rule:
+
+```yaml title="schemas/examples/KnowledgeConnection/confluence-oauth.yaml"
+apiVersion: numinance.dev/v1
+kind: KnowledgeConnection
+metadata: {name: confluence-oauth, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/bridge-mcp
+  endpoint: https://mcp.example.com/v1/mcp
+  auth: KNOWLEDGE_AUTH_USER_DELEGATED
+  oauth: {client_id: "https://numinance.example.com/oauth/client.json"}
+  pinned_tools:
+    - {name: getConfluencePage, hash: {value: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"}}
+  read_only: true
+  scope: [ENG]
+```
+
+## How it behaves in the designed runtime
+
+<DesignNote title="Pinning, quarantine and delivery">
+  Tool pinning exists because a tool server's description can change after approval. The requested `pinned_tools` are only a request: the runtime trusts the administrator-approved pins recorded in the lockfile, not this file alone. On each tool listing the bridge compares the server's inventory with the pins, and any drift quarantines the connection until it is re-approved. Read-only is enforced in layers, not only by `read_only: true`.
+
+  Retrieved text is untrusted. It is redacted before it is stored, delivered to the executor as a read-only copy, and labelled untrusted in prompts. It can inform a change; it cannot alter policy, tool lists or approvals. The enterprise server itself is never attached to the executor. See [context bundle](/docs/configuration/evals-and-context-bundle) for the record a read produces.
+</DesignNote>
+
+## Security implications
+
+- No secrets in the file. There is no field for a token, and the schema is strict, so adding one is an error (shown below). The broker holds secrets and issues a handle. `extensions` must not hold credentials, endpoints, tool mappings or caps either.
+- Pins are the trust boundary, not the endpoint. An https URL tells you the transport, not that the server is the one you approved.
+- The endpoint rule excludes IP literals, single-label hosts and `.local`, `.internal` or `.localhost` suffixes, which narrows server-side request forgery, but the egress allow-list is the real control.
+- `scope` is passed as a parameter, never as query text. Do not rely on it to hide documents the delegated user can already read.
+- A passing `numi validate --files` does not check that a pin matches a real tool, that the host is allow-listed or that the provider is installed.
+
+## Common misconfigurations
+
+<VerifiedSnippet what="Edited copies of confluence-eng.yaml, run with the open numi build">
+
+```text
+$ numi validate --files bad/doc.yaml      # read_only: false
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.KnowledgeConnectionSpec.read_only fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # endpoint: http://mcp.example.com/...
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.KnowledgeConnectionSpec.endpoint fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # endpoint: https://10.0.0.5
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.KnowledgeConnectionSpec.endpoint fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # metadata.scope: SCOPE_REPO
+invalid  file "doc.yaml": kind: invalid: KnowledgeConnection is org-scoped only
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # scope: ["*"]
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.KnowledgeConnectionSpec.scope fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # auth line removed
+invalid  file "doc.yaml": kind: invalid: numinance.kinds.v1.KnowledgeConnectionSpec.auth is empty
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # a hash of "sha256:abc"
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.Digest.value fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # an added "token: abc"
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/token\": additionalProperties
+(exit 3)
+```
+
+</VerifiedSnippet>
+
+Error messages name a field and never echo the value, by design, so a rejected document cannot leak what it contained into logs.
+
+## Next steps
+
+<Cards>
+  <Card title="Connect knowledge" href="/docs/guides/connect-knowledge" description="Walk through approving a source end to end." />
+  <Card title="Context resolver" href="/docs/architecture/context-resolver" description="How stage-scoped context is searched, redacted and delivered." />
+  <Card title="Evals and context bundle" href="/docs/configuration/evals-and-context-bundle" description="The produced record a connection read leaves behind." />
+</Cards>
