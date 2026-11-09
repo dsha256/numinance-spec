@@ -91,3 +91,39 @@ func TestExecRunner_ADeadlineKillsTheWholeProcessGroup(t *testing.T) {
 	}
 	t.Errorf("the tool's child %d is still running after the call ended", pid)
 }
+
+// A plugin host starts the provider with no PATH. A tool installed for the operator alone (uv tool install) is then found only
+// through the directories the operator named at launch, and it runs with those directories as its PATH.
+func TestExecRunner_FindsAToolInANamedDirectoryWhenNoPathHasIt(t *testing.T) {
+	t.Setenv("PATH", "")
+	dir, report := t.TempDir(), filepath.Join(t.TempDir(), "path.txt")
+	script := "#!/bin/sh\necho \"PATH=$PATH\" > " + report + "\necho '[]'\n"
+	if err := os.WriteFile(filepath.Join(dir, "ruff"), []byte(script), 0o700); err != nil { //nolint:gosec // a test script, executable by design
+		t.Fatal(err)
+	}
+	r := provider.ExecRunner{Dirs: []string{"relative/dir", dir}}
+	if _, err := r.Run(t.Context(), callOf(t, 0)); err != nil {
+		t.Fatalf("Run with the tool in a named directory = %v, want output", err)
+	}
+	b, err := os.ReadFile(report) //nolint:gosec // the test's own report file
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(b)); got != "PATH="+dir {
+		t.Errorf("the tool's PATH = %q, want only the named absolute directory %q", got, "PATH="+dir)
+	}
+}
+
+func TestExecRunner_NoToolInAnyNamedDirectoryIsUnavailable(t *testing.T) {
+	t.Setenv("PATH", "")
+	notExec := t.TempDir()
+	if err := os.WriteFile(filepath.Join(notExec, "ruff"), []byte("#!/bin/sh\necho '[]'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for name, dirs := range map[string][]string{"none": nil, "a relative directory": {"relative"}, "a file without an execute bit": {notExec}} {
+		r := provider.ExecRunner{Dirs: dirs}
+		if _, err := r.Run(t.Context(), callOf(t, 0)); !errors.Is(err, provider.ErrUnavailable) {
+			t.Errorf("Run with %s = %v, want ErrUnavailable", name, err)
+		}
+	}
+}

@@ -130,8 +130,12 @@ type Runner interface {
 // candidate, with the tree passed by path, no PYTHONPATH and PYTHONSAFEPATH set, so no file of the candidate is on the tool's
 // import path; each runs in its own process group that is killed whole at the deadline.
 type ExecRunner struct {
-	// Lookup finds a tool binary; it is exec.LookPath when nil.
+	// Lookup finds a tool binary; when nil it is the PATH of this process, then Dirs.
 	Lookup func(string) (string, error)
+	// Dirs are the absolute directories the operator named at launch (-tool-dir) for the tools that are not in a PATH: a plugin host
+	// starts a provider with no PATH, so a tool installed for the operator alone (uv tool install puts ruff and mypy in
+	// ~/.local/bin) is found only here. A tool is looked for in them in order, and runs with them as its PATH.
+	Dirs []string
 }
 
 // Run implements Runner.
@@ -177,7 +181,7 @@ func (r ExecRunner) Run(ctx context.Context, c Call) (Output, error) {
 	cmd := exec.CommandContext(ctx, argv[0], append(argv[1:], args...)...) //nolint:gosec // the binary is one of five fixed tool names found on PATH
 	// The working directory is the private config directory: nothing of the candidate is the tool's current directory.
 	cmd.Dir = cfgDir
-	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + home, "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", "PYTHONNOUSERSITE=1", "PYTHONSAFEPATH=1"}
+	cmd.Env = []string{"PATH=" + r.toolPath(), "HOME=" + home, "LANG=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1", "PYTHONNOUSERSITE=1", "PYTHONSAFEPATH=1"}
 	if c.Config.Check == checkMypy {
 		cmd.Env = append(cmd.Env, "MYPYPATH="+tree)
 	}
@@ -212,7 +216,7 @@ func (r ExecRunner) Run(ctx context.Context, c Call) (Output, error) {
 func (r ExecRunner) command(check string) ([]string, error) {
 	look := r.Lookup
 	if look == nil {
-		look = exec.LookPath
+		look = r.lookPath
 	}
 	var name string
 	var lead []string
@@ -292,4 +296,36 @@ func (w *limitWriter) Write(p []byte) (int, error) {
 		return 0, errors.New("output over the limit")
 	}
 	return w.buf.Write(p)
+}
+
+// lookPath finds name on the PATH of this process, then in Dirs in order. A directory that is not absolute is never searched, and
+// only a regular file with an execute bit is a tool.
+func (r ExecRunner) lookPath(name string) (string, error) {
+	if p, err := exec.LookPath(name); err == nil {
+		return p, nil
+	}
+	for _, d := range r.Dirs {
+		if !filepath.IsAbs(d) {
+			continue
+		}
+		p := filepath.Join(d, name)
+		if fi, err := os.Stat(p); err == nil && fi.Mode().IsRegular() && fi.Mode().Perm()&0o111 != 0 {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("%s is not on PATH or in the tool directories", name)
+}
+
+// toolPath is the PATH a tool runs with: the absolute tool directories, then the PATH of this process (empty when a host started it).
+func (r ExecRunner) toolPath() string {
+	var dirs []string
+	for _, d := range r.Dirs {
+		if filepath.IsAbs(d) {
+			dirs = append(dirs, d)
+		}
+	}
+	if p := os.Getenv("PATH"); p != "" {
+		dirs = append(dirs, p)
+	}
+	return strings.Join(dirs, string(os.PathListSeparator))
 }

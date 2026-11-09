@@ -721,3 +721,30 @@ func TestInit_Run_PlaybookHasOneStepPerIdentityKind(t *testing.T) {
 		}
 	}
 }
+
+// A run reads the budget of the resolved profile and refuses a change when max_risk_escalation is unset, because a ceiling is
+// never defaulted (design section 8, BudgetPolicy). So the tree a run is pointed at must hold an explicit ceiling: it
+// is the organization tree (the only scope the profile lets set one).
+func TestInit_Run_WritesAnExplicitBudgetCeiling(t *testing.T) {
+	repo, org := t.TempDir(), t.TempDir()
+	if code, _, errOut := runInit("--ci", "github-actions", "--org-dir", org, repo); code != cli.ExitOK {
+		t.Fatalf("init with an org directory = %d, stderr %q, want 0", code, errOut)
+	}
+	budget := readFiles(t, org)[".numinance/policy/budget.yaml"]
+	for _, want := range []string{"kind: BudgetPolicy", "scope: SCOPE_ORG", "max_risk_escalation: RISK_CLASS_MEDIUM"} {
+		if !strings.Contains(budget, want) {
+			t.Errorf("org budget.yaml lacks %q:\n%s", want, budget)
+		}
+	}
+	// A budget at any scope below the org is refused by the profile ("only the org sets budgets"), so the repository tree never holds one.
+	for _, dir := range []string{repo, t.TempDir()} {
+		if dir != repo {
+			if code, _, errOut := runInit("--ci", "github-actions", dir); code != cli.ExitOK {
+				t.Fatalf("init alone = %d, stderr %q, want 0", code, errOut)
+			}
+		}
+		if _, ok := readFiles(t, dir)[".numinance/policy/budget.yaml"]; ok {
+			t.Errorf("a repository tree holds a budget.yaml, which the profile refuses below the org scope")
+		}
+	}
+}

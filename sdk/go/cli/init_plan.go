@@ -200,6 +200,7 @@ func planOrgTree(d initData) ([]outFile, error) {
 		{path: protectedDir + "sdlc-profile.yaml", tmpl: "sdlc-profile-org.yaml.tmpl"},
 		{path: protectedDir + "autonomy.yaml", tmpl: "autonomy.yaml.tmpl"},
 		{path: protectedDir + "stage-registry.yaml", tmpl: "stage-registry.yaml.tmpl"},
+		{path: protectedDir + "budget.yaml", tmpl: "budget.yaml.tmpl"},
 		{path: protectedDir + "playbook-bugfix-bounded.yaml", tmpl: "playbook.yaml.tmpl"},
 		{path: protectedDir + "toolchain-python.yaml", tmpl: "toolchain.yaml.tmpl"},
 		{path: ".numinance/README.md", tmpl: "readme-org.md.tmpl"},

@@ -5,9 +5,11 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 
 	"google.golang.org/grpc"
 
@@ -22,7 +24,26 @@ func main() {
 	}
 }
 
+// dirsFlag collects the repeated -tool-dir values: absolute directories that hold tools outside any PATH.
+type dirsFlag []string
+
+func (d *dirsFlag) String() string { return fmt.Sprint([]string(*d)) }
+
+func (d *dirsFlag) Set(v string) error {
+	if !filepath.IsAbs(v) || filepath.Clean(v) != v {
+		return fmt.Errorf("-tool-dir %q is not a clean absolute directory", v)
+	}
+	*d = append(*d, v)
+	return nil
+}
+
 func run() error {
+	var dirs dirsFlag
+	fs := flag.NewFlagSet("verifier-python", flag.ContinueOnError)
+	fs.Var(&dirs, "tool-dir", "an absolute directory that holds ruff, mypy or another tool when no PATH does (repeatable); a plugin host starts this provider with no PATH")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		return err
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	digest, err := provider.ExecutableDigest()
@@ -36,6 +57,6 @@ func run() error {
 			rt.Stop()
 			return
 		}
-		provider.New(provider.PluginID, digest, provider.ExecRunner{}, host, rt.Stop).Register(s)
+		provider.New(provider.PluginID, digest, provider.ExecRunner{Dirs: dirs}, host, rt.Stop).Register(s)
 	})
 }

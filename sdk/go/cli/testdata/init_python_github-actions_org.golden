@@ -87,6 +87,23 @@ spec:
     rules:
       - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
       - {match: {risk: RISK_CLASS_READ}, max_level: AUTONOMY_LEVEL_PR}
+=== .numinance/policy/budget.yaml ===
+# BudgetPolicy "pr-only-budget", written by "numi init --org-dir" (only the org scope sets a budget). Every run of a change stays
+# inside these limits: a count a document leaves out is unbounded, but max_risk_escalation is never defaulted (a ceiling is a
+# decision), and a profile without it refuses the change. The ceiling is MEDIUM because opening a pull request is the
+# medium-risk action of the PR-only ladder level; HIGH risk and above stay out of reach. Tighten these to your own limits.
+apiVersion: numinance.dev/v1
+kind: BudgetPolicy
+metadata: {name: pr-only-budget, scope: SCOPE_ORG}
+spec:
+  tokens: 400000
+  wall_clock: 3600s
+  tool_calls: 300
+  files_changed: 10
+  lines_changed: 500
+  repositories: 1
+  retries: 2
+  max_risk_escalation: RISK_CLASS_MEDIUM
 === .numinance/policy/playbook-bugfix-bounded.yaml ===
 # Playbook "bugfix-bounded", written by "numi init": a bounded bug fix that ends in a pull request. The verifier names are
 # the ones of the LanguageToolchain python-3.12.
