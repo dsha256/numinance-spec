@@ -1,0 +1,31 @@
+{
+  "vector": "fallback-without-route-record-gap",
+  "description": "Two author runs on two manifests and no fallback route record: the attestation is ambiguous, a gap is recorded and the level is incomplete.",
+  "status": "shipped",
+  "export": "closed-fallback-no-route-record",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "incomplete",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "incomplete",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:incomplete",
+    "exit:5",
+    "rule:fallback-attestation"
+  ]
+}

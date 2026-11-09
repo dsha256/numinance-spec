@@ -1,0 +1,13 @@
+{
+  "export_version": 1,
+  "manifests": [
+    {
+      "kind": "ExecutorManifest",
+      "name": "codex-cli"
+    },
+    {
+      "kind": "ExecutorManifest",
+      "name": "claude-cli"
+    }
+  ]
+}

@@ -12,32 +12,33 @@ import (
 )
 
 const (
-	maxEntries           = 64
-	pathRecords          = "records.ndjson"
-	pathSummary          = "summary.json"
-	pathIndex            = "export-index.json"
-	pathManifest         = "bundle-manifest.json"
-	pathAttest           = "attestation.json"
-	pathAttestCP         = "attestation-checkpoint.json"
-	pathGap              = "attestation-gap.json"
-	pathHeadCP           = "head-checkpoint.json"
-	pathHeadProof        = "head-inclusion-proof.json"
-	pathDiff             = "diff.digest"
-	pathToolEvents       = "tool-events.ndjson"
-	pathChange           = "change.json"
-	pathSigners          = "provenance/signers.json"
-	pathProvenance       = "provenance/provenance.json"
-	pathExecutorManifest = "provenance/executor-manifest.json"
-	pathRoutePerformance = "provenance/route-performance.json"
-	pathVerdicts         = "verification/verdicts.json"
-	pathReview           = "review/review.json"
+	maxEntries            = 64
+	pathRecords           = "records.ndjson"
+	pathSummary           = "summary.json"
+	pathIndex             = "export-index.json"
+	pathManifest          = "bundle-manifest.json"
+	pathAttest            = "attestation.json"
+	pathAttestCP          = "attestation-checkpoint.json"
+	pathGap               = "attestation-gap.json"
+	pathHeadCP            = "head-checkpoint.json"
+	pathHeadProof         = "head-inclusion-proof.json"
+	pathDiff              = "diff.digest"
+	pathToolEvents        = "tool-events.ndjson"
+	pathChange            = "change.json"
+	pathSigners           = "provenance/signers.json"
+	pathProvenance        = "provenance/provenance.json"
+	pathExecutorManifest  = "provenance/executor-manifest.json"
+	pathRoutePerformance  = "provenance/route-performance.json"
+	pathExecutorManifests = "provenance/executor-manifests.json"
+	pathVerdicts          = "verification/verdicts.json"
+	pathReview            = "review/review.json"
 )
 
-// The eighteen file names of evidence/v1 (bundle-layout.md section 1).
+// The nineteen file names of evidence/v1 (bundle-layout.md section 1).
 func knownPaths() []string {
 	return []string{
 		pathRecords, pathSummary, pathIndex, pathSigners, pathProvenance, pathVerdicts, pathReview, pathDiff,
-		pathToolEvents, pathChange, pathAttest, pathAttestCP, pathGap, pathManifest, pathHeadCP, pathHeadProof, pathExecutorManifest, pathRoutePerformance,
+		pathToolEvents, pathChange, pathAttest, pathAttestCP, pathGap, pathManifest, pathHeadCP, pathHeadProof, pathExecutorManifest, pathRoutePerformance, pathExecutorManifests,
 	}
 }
 

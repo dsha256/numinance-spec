@@ -1,6 +1,6 @@
 # evidence verification conformance vectors, v1
 
-Data, not code. The acceptance vectors for any verifier of an `evidence/v1` export directory: the private `numi evidence verify` of the Numinance build and the open verifier. The spec they test is `../../../docs/evidence/` (start with `verification.md`); the shapes are `../../../schemas/evidence/v1/`. The kit version tracks the evidence spec: this is 1.1.0 (unreleased; the vectors named `route-performance-*` are the ones 1.1.0 adds).
+Data, not code. The acceptance vectors for any verifier of an `evidence/v1` export directory: the private `numi evidence verify` of the Numinance build and the open verifier. The spec they test is `../../../docs/evidence/` (start with `verification.md`); the shapes are `../../../schemas/evidence/v1/`. The kit version tracks the evidence spec: this is 1.1.0 (unreleased; the vectors named `route-performance-*`, `executor-manifests-*`, `fallback-*` and `shadow-compared-*` are the ones 1.1.0 adds).
 
 The open verifier (`../../../sdk/go/evidenceverify`) runs every vector, `target` ones included, in `conformance_test.go`. The reference implementation's own verifier runs them too, and a differential test runs both over every vector and over a deterministic mutation corpus; the engine build's `numi evidence verify` takes its verdict from the open verifier.
 

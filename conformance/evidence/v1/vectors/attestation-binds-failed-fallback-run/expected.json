@@ -1,0 +1,31 @@
+{
+  "vector": "attestation-binds-failed-fallback-run",
+  "description": "After a fallback the attestation states the executor and model of the failed first run instead of the run whose diff the passed verdict names. Signed again by a holder of the runner key, with the manifest re-signed: only the re-derivation fails it.",
+  "status": "shipped",
+  "export": "attestation-binds-failed-fallback-run",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ]
+  },
+  "keys": [
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "attestation_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:attestation_mismatch",
+    "rule:fallback-attestation"
+  ]
+}

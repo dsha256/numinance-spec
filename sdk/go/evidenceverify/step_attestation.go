@@ -175,7 +175,12 @@ func (v *verifier) rederiveAttestation(a *attDoc) string {
 		sandbox = runSandbox
 	}
 	if executor == "\x00" || model == "\x00" || sandbox == "\x00" {
-		return "the author records disagree on the executor, model or sandbox image"
+		// A fallback run on another executor or model is the one case that resolves the disagreement (fallback-and-shadow.md
+		// section 3); anything else leaves it ambiguous.
+		var ok bool
+		if executor, model, sandbox, ok = fallbackBinding(span); !ok {
+			return "the author records disagree on the executor, model or sandbox image"
+		}
 	}
 	actors := make([]actorPair, 0, len(pairs))
 	for p := range pairs {

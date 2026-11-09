@@ -15,6 +15,7 @@ Status: `evidence/v1`, spec version 1.0.0. Change class of the specification: `c
 | [log-and-checkpoints.md](log-and-checkpoints.md) | leaves, Merkle hashing, inclusion proofs, checkpoints, which hash a head leaf holds |
 | [bundle-layout.md](bundle-layout.md) | the files of an export, the index, the design list, absent parts, how a directory is read |
 | [route-performance.md](route-performance.md) | the performance snapshot a router records with a route, the `execution/performance` input and `provenance/route-performance.json` (1.1.0) |
+| [fallback-and-shadow.md](fallback-and-shadow.md) | the fallback route record, the attestation after a fallback, the `ShadowCompared.v1` record and `provenance/executor-manifests.json` (1.1.0) |
 | [attestation-and-manifest.md](attestation-and-manifest.md) | the attestation (with the shipped encodings of `ticket`, `credential_scopes` and `network_policy`) and the signed bundle manifest |
 | [derivations.md](derivations.md) | everything a verifier re-derives: summary, diff digest, closed at PR level, `change.json`, the three views, tool events, signer sets |
 | [verification.md](verification.md) | finding codes, result levels and their precedence, key modes, exit codes, reports, trust limits, the release ordering rule |

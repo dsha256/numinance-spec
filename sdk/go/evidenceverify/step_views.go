@@ -3,7 +3,6 @@ package evidenceverify
 import (
 	"bytes"
 	"encoding/json"
-	"slices"
 	"strings"
 )
 
@@ -280,28 +279,45 @@ func executorIDParts(executorID string) (name, digest string, ok bool) {
 	return executorID[:i], executorID[i+1:], true
 }
 
-// stepExecutorManifest checks provenance/executor-manifest.json against the executor_ids of the chain: when they name a manifest by
-// digest the file must be there and hash to it, and a file that no executor_id names is a mismatch (bundle-layout.md section 6).
+// executorManifestDigests returns the distinct manifest digests the executor_ids of the chain name, in first-seen order.
+func (v *verifier) executorManifestDigests() []string {
+	var want []string
+	seen := map[string]bool{}
+	for _, r := range v.ch.records {
+		if _, d, ok := executorIDParts(r.executor); ok && !seen[d] {
+			seen[d] = true
+			want = append(want, d)
+		}
+	}
+	return want
+}
+
+// stepExecutorManifest checks the manifest files against the executor_ids of the chain (bundle-layout.md section 6): one digest is
+// carried by provenance/executor-manifest.json, two or more by provenance/executor-manifests.json, never both, and a file that no
+// executor_id names is a mismatch.
 func (v *verifier) stepExecutorManifest() {
 	if v.ch == nil {
 		return
 	}
-	var want []string
-	for _, r := range v.ch.records {
-		if _, d, ok := executorIDParts(r.executor); ok && !slices.Contains(want, d) {
-			want = append(want, d)
-		}
-	}
-	have := v.b.has(pathExecutorManifest)
+	want := v.executorManifestDigests()
+	one, many := v.b.has(pathExecutorManifest), v.b.has(pathExecutorManifests)
 	switch {
-	case len(want) == 0 && have:
-		v.fail(CodeDigestMismatch, "provenance/executor-manifest.json is present and no executor_id names a manifest")
-	case len(want) > 0 && !have:
+	case one && many:
+		v.fail(CodeDigestMismatch, "provenance/executor-manifest.json and provenance/executor-manifests.json are both present")
+	case len(want) == 0 && (one || many):
+		v.fail(CodeDigestMismatch, "an executor manifest file is present and no executor_id names a manifest")
+	case len(want) == 1 && many:
+		v.fail(CodeDigestMismatch, "provenance/executor-manifests.json is present and the executor_ids name one manifest")
+	case len(want) > 1 && one:
+		v.fail(CodeDigestMismatch, "provenance/executor-manifest.json is present and the executor_ids name more than one manifest")
+	case len(want) == 1 && !one:
 		v.fail(CodePartMissing, "provenance/executor-manifest.json is required: an executor_id names a manifest by digest")
-	case len(want) > 1:
-		v.fail(CodeDigestMismatch, "the executor_ids name more than one manifest")
-	case have:
+	case len(want) > 1 && !many:
+		v.fail(CodePartMissing, "provenance/executor-manifests.json is required: the executor_ids name more than one manifest")
+	case one:
 		v.checkManifestFile(want[0])
+	case many:
+		v.checkManifestsFile(want)
 	}
 }
 

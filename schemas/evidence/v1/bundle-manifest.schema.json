@@ -103,6 +103,7 @@
             "provenance/provenance.json",
             "provenance/executor-manifest.json",
             "provenance/route-performance.json",
+            "provenance/executor-manifests.json",
             "attestation-checkpoint.json",
             "attestation-gap.json"
           ],

@@ -1,0 +1,31 @@
+{
+  "vector": "fallback-superseded-candidate-gap",
+  "description": "A succeeded execution.diff record for another candidate follows the receipt of the candidate the verdict passes (ADR 0049 decision 5): the passed candidate is superseded, so the attestation is ambiguous and a gap is recorded.",
+  "status": "shipped",
+  "export": "closed-fallback-superseded",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "incomplete",
+    "exit_code": 5,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "incomplete",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:incomplete",
+    "exit:5",
+    "rule:fallback-attestation"
+  ]
+}

@@ -163,6 +163,16 @@
         "level:failed",
         "exit:3",
         "finding:attestation_mismatch",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "attestation-binds-failed-fallback-run"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:attestation_mismatch",
         "rule:attestation-rederivation"
       ],
       "status": "shipped",
@@ -1355,6 +1365,140 @@
       ],
       "status": "shipped",
       "vector": "executor-manifest-not-canonical"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-both-files"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-edited-element"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-element-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-file-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-for-one-digest"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-not-canonical"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:executor-manifests"
+      ],
+      "status": "shipped",
+      "vector": "executor-manifests-unnamed-element"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-cause-outside-the-set-gap"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-forked-verdict-gap"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-reopens-a-known-run-gap"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-superseded-candidate-gap"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-two-failed-runs-one-fallback-gap"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:executor-manifests",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-two-manifests-verified"
+    },
+    {
+      "covers": [
+        "level:incomplete",
+        "exit:5",
+        "rule:fallback-attestation"
+      ],
+      "status": "shipped",
+      "vector": "fallback-without-route-record-gap"
     },
     {
       "covers": [
@@ -2581,6 +2725,16 @@
       ],
       "status": "shipped",
       "vector": "runner-key-file-missing-is-usage-error"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:executor-manifests",
+        "rule:shadow-compared"
+      ],
+      "status": "shipped",
+      "vector": "shadow-compared-ignored-by-attestation-verified"
     },
     {
       "covers": [

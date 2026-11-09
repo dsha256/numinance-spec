@@ -472,3 +472,32 @@ func TestVerify_EmptyPathIsAUsageError(t *testing.T) {
 		t.Errorf("ExitCode(Verify(%q)) = %d, want 2", "", got)
 	}
 }
+
+func TestFallbacks_ValidRecordNeedsDecisionGrantAndAFreshRun(t *testing.T) {
+	failed := &record{sequence: 1, action: actionStream, hash: "h1", runID: "run-1", inputs: []artifact{{ref: refConsidered}}}
+	route := func(edit func(r *record)) *record {
+		r := &record{
+			sequence: 2, action: actionRoute, hash: "h2", runID: "run-2", kind: "runner", outcome: "succeeded", decisionID: "dec-1", grantID: "grant-1",
+			inputs: []artifact{{ref: refConsidered}, {ref: refFallbackOf, sha256: "h1"}, {ref: refFallbackCause, sha256: sha256Digest([]byte(causeExecutorFail))}},
+		}
+		edit(r)
+		return r
+	}
+	tests := []struct {
+		name string
+		span []*record
+		want int
+	}{
+		{"a complete fallback record", []*record{failed, route(func(*record) {})}, 1},
+		{"no policy decision", []*record{failed, route(func(r *record) { r.decisionID = "" })}, 0},
+		{"no grant", []*record{failed, route(func(r *record) { r.grantID = "" })}, 0},
+		{"a run a record of lower sequence already has", []*record{{sequence: 0, action: "scm.read", runID: "run-2"}, failed, route(func(*record) {})}, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := len(fallbacks(tt.span)); got != tt.want {
+				t.Errorf("len(fallbacks()) = %d, want %d", got, tt.want)
+			}
+		})
+	}
+}

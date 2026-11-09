@@ -1,0 +1,32 @@
+{
+  "vector": "fallback-two-manifests-verified",
+  "description": "The first author run ended failed on the claude-cli manifest, a fallback route record opens the second run on the codex-cli manifest, and its diff is the candidate the last verdict passes. The two manifests are in provenance/executor-manifests.json, and the attestation binds the second run's executor, model and image.",
+  "status": "shipped",
+  "export": "closed-fallback",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:executor-manifests",
+    "rule:fallback-attestation"
+  ]
+}

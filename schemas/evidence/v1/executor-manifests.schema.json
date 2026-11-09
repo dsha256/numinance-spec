@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/executor-manifests.schema.json",
+  "title": "Evidence executor manifests",
+  "description": "provenance/executor-manifests.json in an evidence/v1 export (spec 1.1.0): the ExecutorManifest documents when the executor_ids of the chain name two or more manifests. With exactly one digest named the export carries provenance/executor-manifest.json instead, and the two files are never both present. Not expressible here and checked by the verifier: the file is the canonical JSON form; the sha256 of the canonical form of each element is a digest that some executor_id names after the at sign, each digest appears once, and every digest named appears; the name of each element is the name before the at sign in every executor_id that names it; at least 1 and at most 16 elements; the file is at most 1 MiB. The order of the elements (an exporter writes them by digest) is not checked.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "manifests"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "manifests": {
+      "type": "array",
+      "items": { "type": "object", "description": "One ExecutorManifest document in canonical form, as provenance/executor-manifest.json holds it." }
+    }
+  }
+}

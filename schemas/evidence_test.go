@@ -29,7 +29,7 @@ var evidencePositive = []string{
 	"closed-complete", "closed-attested-fields", "closed-sealed", "abandoned", "rolled-back",
 	"open-prefix", "closed-gap", "closed-canon-unicode", "closed-canon-timestamps", "closed-basic",
 	"closed-ticket-none", "closed-author", "closed-streams", "closed-canon-control-escapes",
-	"closed-route-performance", "closed-route-performance-two",
+	"closed-route-performance", "closed-route-performance-two", "closed-fallback", "closed-shadow",
 }
 
 // evidenceFiles maps a file of an export to its schema; records.ndjson is
@@ -51,7 +51,8 @@ var evidenceFiles = map[string]string{
 	"review/review.json":          "review",
 	"provenance/provenance.json":  "provenance",
 
-	"provenance/route-performance.json": "route-performance",
+	"provenance/route-performance.json":  "route-performance",
+	"provenance/executor-manifests.json": "executor-manifests",
 }
 
 // evidenceSchemas compiles every schema under evidence/v1, keyed by the file
@@ -387,6 +388,7 @@ func TestEvidenceSchemas_RejectBadDocuments(t *testing.T) {
 		{"route performance with a candidate that has no rank", "route-performance", `{"export_version":1,"snapshots":[{"as_of":1,"candidates":[{"executor":"a","model":"m"}],"language":"go","n":100,"task_class":"bugfix"}]}`},
 		{"route performance with a figure of no outcomes", "route-performance", `{"export_version":1,"snapshots":[{"as_of":1,"candidates":[{"executor":"a","figure":{"accepted":0,"n":0},"model":"m","rank":1}],"language":"go","n":100,"task_class":"bugfix"}]}`},
 		{"route performance with an unknown key", "route-performance", `{"export_version":1,"snapshots":[{"as_of":1,"candidates":[],"extra":1,"language":"go","n":100,"task_class":"bugfix"}]}`},
+		{"executor manifests with an unknown key", "executor-manifests", `{"export_version":1,"manifests":[{"name":"a"}],"extra":1}`},
 		{"index with the manifest listed", "export-index", `{"change_id":"chg_` + strings.Repeat("0", 32) + `","entries":[{"path":"bundle-manifest.json","sha256":"sha256:` + strings.Repeat("0", 64) + `","size":1}],"export_version":1}`},
 		{"vector with an unknown status", "vector-expected", `{"vector":"a","description":"d","status":"draft","flags":{},"keys":[],"expect":{"level":null,"exit_code":0,"finding_codes":[],"target":{"level_enum":null,"weakened_by_flags":[]}},"covers":[]}`},
 	}

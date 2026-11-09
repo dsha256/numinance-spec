@@ -1,6 +1,6 @@
 # Export bundle layout
 
-Status: normative for `evidence/v1` (spec 1.0.0; spec 1.1.0 adds `provenance/route-performance.json`, section 7). Read [canonical form](canonical-form.md) first.
+Status: normative for `evidence/v1` (spec 1.0.0; spec 1.1.0 adds `provenance/route-performance.json`, section 7, and `provenance/executor-manifests.json`, section 6). Read [canonical form](canonical-form.md) first.
 
 `numi evidence export CHG_ID --out DIR` writes a directory. `numi evidence verify DIR` reads it offline. The directory is untrusted input: every rule here is one a verifier enforces before it believes anything in it.
 
@@ -15,6 +15,7 @@ Status: normative for `evidence/v1` (spec 1.0.0; spec 1.1.0 adds `provenance/rou
 | `provenance/provenance.json` | design part `provenance/` | derived view ([derivations](derivations.md) section 5) | 1 MiB |
 | `provenance/executor-manifest.json` | when an `executor_id` of the chain names a manifest (section 6) | the ExecutorManifest document, canonical JSON, whose sha256 the `executor_id` names after `@` | 1 MiB |
 | `provenance/route-performance.json` | when a record of the chain names a performance snapshot ([route performance](route-performance.md)) | the performance snapshots the router read, one canonical document for every `execution/performance` input of the chain | 1 MiB |
+| `provenance/executor-manifests.json` | when the `executor_id`s of the chain name two or more manifests (section 6) | the ExecutorManifest documents, canonical JSON, whose sha256 the `executor_id`s name after `@`, in one canonical object; never beside `provenance/executor-manifest.json` | 1 MiB |
 | `verification/verdicts.json` | design part `verification/`, only when the chain holds a verdict or a verifier report | derived view | 1 MiB |
 | `review/review.json` | design part `review/`, only when the chain holds a gate decision or a reviewer record | derived view | 1 MiB |
 | `diff.digest` | design part, only when the chain holds an `execution.diff` record | `sha256:<hex>` and a line feed | 1 MiB |
@@ -58,7 +59,7 @@ A verifier MUST read the directory as follows.
 - `export_version` is 1. `change_id` is the change. `entries` has 1 to 64 items.
 - Every entry `path` is a valid bundle path (a plain file name, or a plain file name inside `verification`, `review` or `provenance`), a known file name, and neither `export-index.json` nor `bundle-manifest.json`. A path is listed at most once. Every `sha256` is a digest. `size` is an integer.
 - Every `absent` entry names a part of the design list (section 3), with a non-empty `reason` and `owner` of at most 512 bytes each.
-- `absent` has at most 12 entries, `entries` at most 64 on the wire; every path is a known file name other than the index and the manifest and is listed once, so no valid index has more than 16 (the 18 known file names less the index and the manifest).
+- `absent` has at most 12 entries, `entries` at most 64 on the wire; every path is a known file name other than the index and the manifest and is listed once, so no valid index has more than 17 (the 19 known file names less the index and the manifest).
 
 The index must agree with the directory. A verifier reports, each as its own finding: a listed file that is not in the directory (`file_missing`), a known file in the directory that the index does not list (`file_unlisted`; the manifest is exempt), a listed file whose size or sha256 differs (`digest_mismatch`), a missing or undecodable index (`index_invalid`), and an index and a summary that name different changes (`change_mismatch`).
 
@@ -93,13 +94,24 @@ An exporter writes all files or none. The directory MUST NOT exist before the ex
 An `executor_id` of the form `<name>@sha256:<64 lowercase hex>` names the ExecutorManifest the host routed the author run under, by the sha256 of the document's canonical JSON. The document is the whole ExecutorManifest (design section 8: capabilities, residency, `image_digest`, `model_ids`), not a projection, and it is in the canonical form of `record_hash` (object keys sorted, no insignificant white space). Any other form of `executor_id` makes no manifest claim and is not read. A verifier applies these rules to the distinct digests that the `executor_id` values of `records.ndjson` name:
 
 - no digest named and `provenance/executor-manifest.json` present: `digest_mismatch`;
-- one or more digests named and the file absent: `part_missing`;
-- more than one digest named: `digest_mismatch` (an export holds one manifest);
+- exactly one digest named and the file absent: `part_missing`;
+- more than one digest named and `provenance/executor-manifest.json` present: `digest_mismatch` (the single file holds one manifest; see the list file below);
 - the file present and its sha256 not equal to the named digest: `digest_mismatch`;
 - the file present, with the right digest, but not a JSON object already in canonical form: `digest_mismatch`;
 - the file present, with the right digest, and its `name` not equal to the name before `@` in an `executor_id` that names it: `digest_mismatch`.
 
-The file is a JSON object with these keys, all always present: `kind` (`ExecutorManifest`), `name`, `version`, `capabilities` (names), `image_digest`, `model_ids` (in the order of `models`) and `models`, a list of objects `{id, residency}`. `residency` has the keys of design section 8 (`execution`, `inference`, `prompt_egress`, `regions`, `training_use`, `retention`) and the other dimensions of design section 11 the host declares (`model_provider`, `model_endpoint`, `source_region`, `retention_max_seconds`, `customer_keying`, `network_path`, `private_endpoint`). The enumerated values are strings, never numbers: `execution` is `customer_account` or `vendor`; `inference` and `prompt_egress` are `none`, `customer_account` or `vendor`; `training_use` is `none` or `permitted`; `retention` is `none`, `customer_controlled` or `provider`; `network_path` is `none`, `in_account`, `private_endpoint` or `public`; `regions` is sorted and unique. The file is a reduced copy of the ExecutorManifest kind: `provider`, `cost_class`, `max_context`, `extensions` and `api_version` are omitted. A verifier checks only the rules above, not this schema.
+Two or more digests (spec 1.1.0, [fallback and shadow](fallback-and-shadow.md)): the manifests are carried by `provenance/executor-manifests.json`, one canonical object `{"export_version": 1, "manifests": [...]}` of 1 to 16 manifest documents, each a JSON object in the canonical form above, written sorted by their digest (a verifier does not check the order). The two files are mutually exclusive, and the list file is used exactly when two or more digests are named:
+
+- both files present: `digest_mismatch`;
+- no digest named and the list file present: `digest_mismatch`;
+- exactly one digest named and the list file present: `digest_mismatch`;
+- two or more digests named and the list file absent: `part_missing`;
+- the list file not a canonical object of exactly that shape, with an element that is not an object, an empty list, more than 16 elements, or two elements with the same digest: `digest_mismatch`;
+- an element whose sha256 (of its canonical form) no `executor_id` names (an unnamed element): `digest_mismatch`;
+- a digest named for which no element has that sha256: `part_missing`;
+- an element whose `name` is not the name before `@` in an `executor_id` that names it: `digest_mismatch`.
+
+The manifest document, in either file, is a JSON object with these keys, all always present: `kind` (`ExecutorManifest`), `name`, `version`, `capabilities` (names), `image_digest`, `model_ids` (in the order of `models`) and `models`, a list of objects `{id, residency}`. `residency` has the keys of design section 8 (`execution`, `inference`, `prompt_egress`, `regions`, `training_use`, `retention`) and the other dimensions of design section 11 the host declares (`model_provider`, `model_endpoint`, `source_region`, `retention_max_seconds`, `customer_keying`, `network_path`, `private_endpoint`). The enumerated values are strings, never numbers: `execution` is `customer_account` or `vendor`; `inference` and `prompt_egress` are `none`, `customer_account` or `vendor`; `training_use` is `none` or `permitted`; `retention` is `none`, `customer_controlled` or `provider`; `network_path` is `none`, `in_account`, `private_endpoint` or `public`; `regions` is sorted and unique. The file is a reduced copy of the ExecutorManifest kind: `provider`, `cost_class`, `max_context`, `extensions` and `api_version` are omitted. A verifier checks only the rules above, not this schema.
 
 The file is not derived from the records. The digest in the signed records is what binds it, and an edited file or an edited `executor_id` fails here, an edited record fails the chain. The check proves which manifest the host routed under. It does not prove the executor obeyed it, and the `model_id` beside it is the executor's own claim, checked only against its grammar (ADR 0052).
 
