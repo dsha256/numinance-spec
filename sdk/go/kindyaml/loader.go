@@ -163,6 +163,16 @@ func requiredFields() []protoreflect.FullName {
 		"numinance.kinds.v1.EvalLayerCount.count",
 		"numinance.kinds.v1.EvalSeeded.defect",
 		"numinance.kinds.v1.EvalSeeded.caught_by",
+		"numinance.kinds.v1.LockedExtension.id",
+		"numinance.kinds.v1.LockedExtension.version",
+		"numinance.kinds.v1.LockedExtension.digest",
+		"numinance.kinds.v1.LockedExtension.h1",
+		"numinance.kinds.v1.LockedExtension.zh",
+		"numinance.kinds.v1.LockedExtension.signer",
+		"numinance.kinds.v1.LockedExtension.permissions_digest",
+		"numinance.kinds.v1.LockedKnowledgeTool.connection",
+		"numinance.kinds.v1.LockedKnowledgeTool.name",
+		"numinance.kinds.v1.LockedKnowledgeTool.hash",
 	}
 }
 
@@ -217,6 +227,8 @@ func uniqueKeys() map[protoreflect.FullName]func(protoreflect.Value) string {
 		// Folded, since a source may compare scope names without case.
 		"numinance.kinds.v1.KnowledgeConnectionSpec.scope":        func(v protoreflect.Value) string { return strings.ToLower(v.String()) },
 		"numinance.kinds.v1.KnowledgeConnectionSpec.pinned_tools": field("name"),
+		"numinance.kinds.v1.LockfileSpec.extensions":              field("id"),
+		"numinance.kinds.v1.LockfileSpec.knowledge_tools":         pairKey("connection", "name"),
 	}
 }
 
@@ -253,6 +265,11 @@ func valueChecks() map[protoreflect.FullName]func(protoreflect.Value) bool {
 		"numinance.kinds.v1.ControlPackSpec.applicability":  func(v protoreflect.Value) bool { return isText(v.String(), MaxApplicabilityBytes) },
 		"numinance.kinds.v1.ExecutorModel.id":               func(v protoreflect.Value) bool { return isModelID(v.String()) },
 		"numinance.kinds.v1.EvalSetSpec.version":            func(v protoreflect.Value) bool { return isSemver(v.String()) },
+		"numinance.kinds.v1.LockedExtension.id":             func(v protoreflect.Value) bool { return isExtensionID(v.String()) },
+		"numinance.kinds.v1.LockedExtension.version":        func(v protoreflect.Value) bool { return isSemver(v.String()) },
+		"numinance.kinds.v1.LockedExtension.h1":             func(v protoreflect.Value) bool { return isH1(v.String()) },
+		"numinance.kinds.v1.LockedExtension.zh":             func(v protoreflect.Value) bool { return isZH(v.String()) },
+		"numinance.kinds.v1.LockedExtension.signer":         func(v protoreflect.Value) bool { return isSigner(v.String()) },
 	}
 	for _, f := range []protoreflect.FullName{
 		"numinance.kinds.v1.EvalCase.name",
@@ -273,6 +290,8 @@ func valueChecks() map[protoreflect.FullName]func(protoreflect.Value) bool {
 		"numinance.kinds.v1.ResidencyMatch.environment",
 		"numinance.kinds.v1.KnowledgeConnectionSpec.provider",
 		"numinance.kinds.v1.PinnedTool.name",
+		"numinance.kinds.v1.LockedKnowledgeTool.connection",
+		"numinance.kinds.v1.LockedKnowledgeTool.name",
 	} {
 		m[f] = func(v protoreflect.Value) bool { return isName(v.String()) }
 	}

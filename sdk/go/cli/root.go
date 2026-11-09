@@ -20,6 +20,9 @@ type Root struct {
 	// Suggest runs "numi suggest ..." with the arguments after "suggest". Both builds set it to RunSuggest. When nil
 	// the command is unknown.
 	Suggest func(ctx context.Context, args []string, stdout, stderr io.Writer) int
+	// Extension runs "numi extension ..." with the arguments after "extension". The open build sets it to RunExtension
+	// (offline verification of the lockfile pins). When nil the command is unknown.
+	Extension func(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	// Version is printed by "numi version".
 	Version string
 	// Stdout and Stderr receive the output and the errors; nil discards.
@@ -46,6 +49,9 @@ func (r Root) Run(ctx context.Context, args []string) int {
 		if r.Evidence != nil {
 			names = append(names, "evidence")
 		}
+		if r.Extension != nil {
+			names = append(names, "extension")
+		}
 		names = append(names, "version")
 		_, _ = fmt.Fprintf(r.Stderr, "usage: numi <%s> [args]\n", strings.Join(names, "|"))
 		return ExitUsage
@@ -66,6 +72,10 @@ func (r Root) Run(ctx context.Context, args []string) int {
 	case "evidence":
 		if r.Evidence != nil {
 			return r.Evidence(ctx, args[1:], r.Stdout, r.Stderr)
+		}
+	case "extension":
+		if r.Extension != nil {
+			return r.Extension(ctx, args[1:], r.Stdout, r.Stderr)
 		}
 	case "version":
 		_, _ = fmt.Fprintln(r.Stdout, r.Version)

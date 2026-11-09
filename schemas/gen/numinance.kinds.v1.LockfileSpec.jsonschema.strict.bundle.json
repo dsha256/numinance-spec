@@ -1,0 +1,115 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.LockedExtension.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "LockedExtension pins one extension version by what was verified at install, never by what its manifest declares.",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "digest is the content digest the installer recomputed over the package content with manifest.yaml excluded."
+        },
+        "h1": {
+          "description": "h1 is the hash of the unpacked tree: \"h1:\" plus the standard base64 of a sha256 over the sorted per-file\n sha256 lines (the Go module tree hash), 47 characters.",
+          "type": "string"
+        },
+        "id": {
+          "description": "id is the plugin_id of the manifest: a reverse-DNS identifier of at least two labels.",
+          "type": "string"
+        },
+        "permissions_digest": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "permissions_digest is the digest of the accepted permission set (the canonical form of the manifest's kind, ports and\n capabilities with their intents); a change of it is recomputed from the manifest and shown as a permission diff."
+        },
+        "signer": {
+          "description": "signer is the signer identity verified at install, the OIDC issuer plus subject pair as the manifest declares it;\n a different signer for a locked id is a widening that needs approval.",
+          "type": "string"
+        },
+        "version": {
+          "description": "version is the strict x.y.z version installed.",
+          "type": "string"
+        },
+        "zh": {
+          "description": "zh is the hash of the archive as downloaded: \"zh:\" plus 64 lowercase hex characters of its sha256.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "h1",
+        "zh",
+        "signer"
+      ],
+      "title": "Locked Extension",
+      "type": "object"
+    },
+    "numinance.kinds.v1.LockedKnowledgeTool.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "LockedKnowledgeTool pins one tool of a knowledge connection by the hash of its canonicalised description, schemas and\n annotations (design section 14). Drift quarantines the connection.",
+      "properties": {
+        "connection": {
+          "description": "connection is the name of the KnowledgeConnection.",
+          "type": "string"
+        },
+        "hash": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "hash is the approved hash."
+        },
+        "name": {
+          "description": "name is the tool name as the server lists it.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection",
+        "name"
+      ],
+      "title": "Locked Knowledge Tool",
+      "type": "object"
+    },
+    "numinance.kinds.v1.LockfileSpec.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "LockfileSpec is the pinned set. Both lists may be empty (a repository that installed nothing); entries are unique by\n their key, and the install flow writes them sorted by it so a diff shows one change.",
+      "properties": {
+        "extensions": {
+          "description": "extensions are the installed extensions, unique by id: one version of one extension per lockfile.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.LockedExtension.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "knowledge_tools": {
+          "description": "knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.LockedKnowledgeTool.jsonschema.strict.json"
+          },
+          "type": "array"
+        }
+      },
+      "title": "Lockfile Spec",
+      "type": "object"
+    },
+    "numinance.types.v1.Digest.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Digest is a sha256 content digest as \"sha256:\" plus 64 lowercase hex characters.",
+      "properties": {
+        "value": {
+          "description": "value is exactly \"sha256:\" plus 64 lowercase hex characters. Any other\n length, case or prefix, and an empty value in a present message, is\n rejected. Absence is the unset message.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Digest",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.LockfileSpec.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.LockfileSpec.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

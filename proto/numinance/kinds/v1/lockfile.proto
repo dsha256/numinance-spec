@@ -1,0 +1,67 @@
+// Key spelling, json_name and the checks the loader adds to the schema: see meta.proto.
+syntax = "proto3";
+
+package numinance.kinds.v1;
+
+import "google/protobuf/struct.proto";
+import "numinance/annotations/v1/annotations.proto";
+import "numinance/kinds/v1/meta.proto";
+import "numinance/types/v1/types.proto";
+
+// Lockfile is the document .numinance.lock.yaml at the repository root: it pins every installed extension and every
+// approved knowledge tool inventory (design section 8 row Lockfile, section 17 "Governed install"). The install flow
+// writes it; a person reviews it in a pull request and never types a hash. It holds no credential and no extension
+// content. Install and load fail closed on any mismatch between a pin and what is installed.
+message Lockfile {
+  // api_version is required and is "numinance.dev/v1".
+  string api_version = 1 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // kind is required and is "Lockfile".
+  string kind = 2 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // metadata is required; the loader enforces it, the schema cannot.
+  Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // spec is required; the loader enforces it, the schema cannot.
+  LockfileSpec spec = 4 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
+  map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.1.0"];
+}
+
+// LockfileSpec is the pinned set. Both lists may be empty (a repository that installed nothing); entries are unique by
+// their key, and the install flow writes them sorted by it so a diff shows one change.
+message LockfileSpec {
+  // extensions are the installed extensions, unique by id: one version of one extension per lockfile.
+  repeated LockedExtension extensions = 1 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.
+  repeated LockedKnowledgeTool knowledge_tools = 2 [json_name = "knowledge_tools", (numinance.annotations.v1.field).since = "1.1.0"];
+}
+
+// LockedExtension pins one extension version by what was verified at install, never by what its manifest declares.
+message LockedExtension {
+  // id is the plugin_id of the manifest: a reverse-DNS identifier of at least two labels.
+  string id = 1 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // version is the strict x.y.z version installed.
+  string version = 2 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // digest is the content digest the installer recomputed over the package content with manifest.yaml excluded.
+  numinance.types.v1.Digest digest = 3 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // h1 is the hash of the unpacked tree: "h1:" plus the standard base64 of a sha256 over the sorted per-file
+  // sha256 lines (the Go module tree hash), 47 characters.
+  string h1 = 4 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // zh is the hash of the archive as downloaded: "zh:" plus 64 lowercase hex characters of its sha256.
+  string zh = 5 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // signer is the signer identity verified at install, the OIDC issuer plus subject pair as the manifest declares it;
+  // a different signer for a locked id is a widening that needs approval.
+  string signer = 6 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // permissions_digest is the digest of the accepted permission set (the canonical form of the manifest's kind, ports and
+  // capabilities with their intents); a change of it is recomputed from the manifest and shown as a permission diff.
+  numinance.types.v1.Digest permissions_digest = 7 [json_name = "permissions_digest", (numinance.annotations.v1.field).since = "1.1.0"];
+}
+
+// LockedKnowledgeTool pins one tool of a knowledge connection by the hash of its canonicalised description, schemas and
+// annotations (design section 14). Drift quarantines the connection.
+message LockedKnowledgeTool {
+  // connection is the name of the KnowledgeConnection.
+  string connection = 1 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // name is the tool name as the server lists it.
+  string name = 2 [(numinance.annotations.v1.field).since = "1.1.0"];
+  // hash is the approved hash.
+  numinance.types.v1.Digest hash = 3 [(numinance.annotations.v1.field).since = "1.1.0"];
+}

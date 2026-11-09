@@ -4,7 +4,7 @@
 // pass, while "numi validate --files" checks example documents only and exits 0
 // when they all pass. "numi evidence verify DIR" checks an evidence export
 // offline with the open verifier, and reaches "verified" only with keys the
-// caller pins. "numi init" writes a .numinance template for a Python repository; "numi suggest" proposes up to three bounded ticket files from a deterministic local scan.
+// caller pins. "numi init" writes a .numinance template for a Python repository; "numi suggest" proposes up to three bounded ticket files from a deterministic local scan. "numi extension verify" checks offline that the installed extensions match the pins of the lockfile.
 package main
 
 import (
@@ -28,12 +28,13 @@ func main() {
 
 func root(version string) cli.Root {
 	return cli.Root{
-		Validate: cli.Validate{Source: workingTree{}, Files: fileTree{}},
-		Evidence: cli.RunEvidence,
-		Init:     cli.RunInit,
-		Suggest:  cli.RunSuggest,
-		Version:  version,
-		Stdout:   os.Stdout,
-		Stderr:   os.Stderr,
+		Validate:  cli.Validate{Source: workingTree{}, Files: fileTree{}},
+		Evidence:  cli.RunEvidence,
+		Extension: cli.RunExtension,
+		Init:      cli.RunInit,
+		Suggest:   cli.RunSuggest,
+		Version:   version,
+		Stdout:    os.Stdout,
+		Stderr:    os.Stderr,
 	}
 }

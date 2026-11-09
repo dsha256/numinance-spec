@@ -16,12 +16,17 @@ numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
 numi validate --files [--json] path
 numi init --ci github-actions|jenkins|both [--org-dir DIR] [--package-manager uv|pip|poetry] [--python-version 3.N] [--verifiers LIST] [--force] [path]
 numi suggest --out DIR [path]
+numi extension verify [--lockfile FILE] [--store DIR] [--json]
 numi version
 ```
 
 `path` is the repository (default `.`). `--org` is the organization policy repository. `--component` is the repository-relative component root, for example `svc/api`. Flags may come before or after the path. `--json` prints one JSON object; the default output is for people.
 
 `--rev` defaults to empty, meaning the source's own default: the working tree in the open build, `HEAD` of a hardened mirror in the engine build. The open build refuses any non-empty `--rev` as a usage error, exit 2 (it cannot read a commit; `--rev ""` is the default), so `--rev` never silently means something else. It reads `.numinance/` of the directories given, so uncommitted edits are seen; the output says "working tree". It refuses a symbolic link as the config directory, anywhere on the `--component` path, or as a document, and any file that is not regular (checked on the open descriptor, without blocking on a FIFO). Files are read through `os.Root`. Bounds across all trees: 4096 entries, 256 documents, 16 MiB, and `kindyaml.MaxBytes` per document. Names, paths and messages from documents are cut and escaped before printing (control, bidi and zero-width characters become `\u` escapes, and `\` and `"` are written `\\` and `\"`, so a name cannot pass for another); schema errors name a path and keyword and never a value. A panic or an error of no kind exits 1, never 0.
+
+## Extension verify (`numi extension verify`)
+
+`numi extension verify` checks offline that every extension the lockfile (`.numinance.lock.yaml`, default in the current directory) pins is installed exactly as pinned: the archive at `<store>/<id>/<version>.zip` (`--store`, default `.numinance/extensions`) must hash as the entry's `zh`, its unpacked tree as `h1` and its content as `digest` (the arithmetic of `sdk/go/extpkg`). It exits 0 when all match, 5 (conflict) when any differs or is missing, naming the pins that differ and never their values; 3 for a lockfile that is not a valid `Lockfile`, 4 when it is absent, 2 for a usage error. The lockfile and archives are read as regular files only (links refused) within size bounds; the archive is unpacked in memory with the refusals of `extpkg.Unpack`. It does not check signatures, the permission set or revocation: those need the signed index and the Engine's governed install (`VerifyAndInstall`), which `numi extension add` will call. Only `verify` exists in the open build.
 
 ## Example validator (`--files`)
 
