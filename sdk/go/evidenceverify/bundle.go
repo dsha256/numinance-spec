@@ -28,15 +28,16 @@ const (
 	pathSigners          = "provenance/signers.json"
 	pathProvenance       = "provenance/provenance.json"
 	pathExecutorManifest = "provenance/executor-manifest.json"
+	pathRoutePerformance = "provenance/route-performance.json"
 	pathVerdicts         = "verification/verdicts.json"
 	pathReview           = "review/review.json"
 )
 
-// The seventeen file names of evidence/v1 (bundle-layout.md section 1).
+// The eighteen file names of evidence/v1 (bundle-layout.md section 1).
 func knownPaths() []string {
 	return []string{
 		pathRecords, pathSummary, pathIndex, pathSigners, pathProvenance, pathVerdicts, pathReview, pathDiff,
-		pathToolEvents, pathChange, pathAttest, pathAttestCP, pathGap, pathManifest, pathHeadCP, pathHeadProof, pathExecutorManifest,
+		pathToolEvents, pathChange, pathAttest, pathAttestCP, pathGap, pathManifest, pathHeadCP, pathHeadProof, pathExecutorManifest, pathRoutePerformance,
 	}
 }
 

@@ -39,6 +39,7 @@
             "review/review.json",
             "provenance/provenance.json",
             "provenance/executor-manifest.json",
+            "provenance/route-performance.json",
             "attestation-checkpoint.json",
             "attestation-gap.json"
           ],

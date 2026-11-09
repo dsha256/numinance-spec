@@ -2480,6 +2480,103 @@
     },
     {
       "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-absent-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-digest-mismatch"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-entry-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:part_missing",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-file-missing"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-not-canonical"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-two-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-unknown-key"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-unnamed-entry"
+    },
+    {
+      "covers": [
+        "level:verified",
+        "exit:0",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-verified"
+    },
+    {
+      "covers": [
+        "level:failed",
+        "exit:3",
+        "finding:digest_mismatch",
+        "rule:route-performance"
+      ],
+      "status": "shipped",
+      "vector": "route-performance-without-record"
+    },
+    {
+      "covers": [
         "exit:2"
       ],
       "status": "shipped",

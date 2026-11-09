@@ -110,6 +110,7 @@ func (v *verifier) run() {
 	v.stepViews()
 	v.stepToolEvents()
 	v.stepExecutorManifest()
+	v.stepRoutePerformance()
 	v.stepAttestation()
 	v.stepChange()
 	v.stepManifest()

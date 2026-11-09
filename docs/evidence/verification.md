@@ -44,7 +44,7 @@ The log pin (`--log-key` with `--log-origin`) is independent of the key mode. Wi
 4. Summary: decode.
 5. Chain: every record decodes, links, is signed by a trusted key and fits the bounds; then the summary and `diff.digest` are compared with what the records give.
 6. Anchor: `signers.json` decodes; the two anchor files come as a pair; with a pinned log, they decode and the head proof verifies under it (without one they are not decoded).
-7. Derived parts: the three views, `tool-events.ndjson`, `change.json`.
+7. Derived parts: the three views, `tool-events.ndjson`, the executor manifest, the route performance file, `change.json`.
 8. Attestation: decode, signature, re-derivation, per-change checkpoint and proof.
 9. Ticket cross-check between `change.json` and the attestation.
 10. Manifest: decode, signature, entries, binding, anchor files and proofs.
@@ -255,6 +255,7 @@ What a verifier can and cannot show, stated so that no reader believes more than
 7. **The leaf fields are the runner's statements.** `ticket`, `repository`, the commits, `toolchain_digest`, `ci_run_ids`, `deployment_ids`, `credential_scopes`, `network_policy` and `postgres_transport` (`verify-full` or `loopback-plaintext`) are bound by the runner's signature and by the attestation leaf; a verifier checks their form, not their truth. Reconciliation against the SCM, the CI executor, the cloud and IAM is a separate workflow.
 8. **Timestamps are statements.** No timestamp is checked against a clock.
 9. **Forks.** Two chains for one change, each signed by the pinned key, each verify. The head leaf in the log is what a log pin and `--expect-head` use to choose.
+10. **The route performance binding needs a verifier of 1.1.0 or newer.** A verifier of spec 1.0.0 does not check that `provenance/route-performance.json` holds the snapshots the records name; it refuses the file as `unknown_file`, so an export that carries it fails there (fail closed), and an export without it verifies unchanged. A verifier of 1.1.0 checks shape, digest binding and completeness ([route performance](route-performance.md) section 4). It does not check the order of the candidates, the truth of a figure, or that the router ranked by the figures; those are the router's statements, bound by the signed record digests only.
 
 ## 10. Release ordering rule
 

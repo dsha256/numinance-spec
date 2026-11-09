@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://numinance.dev/schemas/evidence/v1/route-performance.schema.json",
+  "title": "Evidence route performance",
+  "description": "provenance/route-performance.json in an evidence/v1 export (spec 1.1.0): the performance snapshots the router read, one canonical document for every execution/performance input the records of the chain name. Not expressible here and checked by the verifier: the file is the canonical JSON form; the sha256 of the canonical form of each snapshot is a digest that some record names as an execution/performance input, each digest appears once, and every digest a record names appears; a figure has no more accepted outcomes than outcomes; at most 4096 snapshots and 256 candidates in each; executor and model are 1 to 256 bytes, task_class and language are 0 to 256 bytes, all of printable UTF-8 without leading or trailing space; the file is at most 1 MiB. The order of the snapshots (an exporter writes them by digest) and of the candidates (the policy order) is not checked.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["export_version", "snapshots"],
+  "properties": {
+    "export_version": { "type": "integer", "minimum": 1, "maximum": 1, "description": "The export layout version; 1 in evidence/v1." },
+    "snapshots": { "type": "array", "items": { "$ref": "#/$defs/snapshot" } }
+  },
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["as_of", "candidates", "language", "n", "task_class"],
+      "description": "What the router read before it ranked one route: the figures of the strata of one task class and language, the position they were read at, the N they were counted against and the full list of candidates in policy order.",
+      "properties": {
+        "as_of": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "description": "The position of the observations the figures fold." },
+        "n": { "type": "integer", "minimum": 1, "maximum": 4294967295, "description": "The comparable outcomes a candidate needs before its figure may move it." },
+        "task_class": { "type": "string" },
+        "language": { "type": "string" },
+        "candidates": { "type": "array", "items": { "$ref": "#/$defs/candidate" }, "description": "The whole list before ranking, in policy order, with the normalized ranks." }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executor", "model", "rank"],
+      "properties": {
+        "executor": { "type": "string" },
+        "model": { "type": "string" },
+        "rank": { "type": "integer", "minimum": 1, "maximum": 4294967295, "description": "Equal ranks are interchangeable candidates; the ranks do not decrease along the list." },
+        "figure": { "$ref": "#/$defs/figure", "description": "Absent when the snapshot holds no valid figure for the candidate." }
+      }
+    },
+    "figure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "n"],
+      "properties": {
+        "accepted": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+        "n": { "type": "integer", "minimum": 1, "maximum": 4294967295 }
+      }
+    }
+  }
+}

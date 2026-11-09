@@ -1,0 +1,34 @@
+{
+  "vector": "route-performance-unknown-key",
+  "description": "A snapshot of the file has a key the format does not define.",
+  "status": "shipped",
+  "export": "route-performance-unknown-key",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "failed",
+    "exit_code": 3,
+    "finding_codes": [
+      "digest_mismatch"
+    ],
+    "target": {
+      "level_enum": "failed",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:failed",
+    "exit:3",
+    "finding:digest_mismatch",
+    "rule:route-performance"
+  ]
+}

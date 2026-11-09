@@ -1,0 +1,31 @@
+{
+  "vector": "route-performance-verified",
+  "description": "A route record names a performance snapshot by digest as the input execution/performance, and provenance/route-performance.json holds that one document in canonical form. The export verifies.",
+  "status": "shipped",
+  "export": "closed-route-performance",
+  "flags": {
+    "runner_keys": [
+      "keys/runner.pub"
+    ],
+    "log_key": "keys/log.pub",
+    "log_origin": "numinance.test/log"
+  },
+  "keys": [
+    "keys/log.pub",
+    "keys/runner.pub"
+  ],
+  "expect": {
+    "level": "verified",
+    "exit_code": 0,
+    "finding_codes": [],
+    "target": {
+      "level_enum": "verified",
+      "weakened_by_flags": []
+    }
+  },
+  "covers": [
+    "level:verified",
+    "exit:0",
+    "rule:route-performance"
+  ]
+}

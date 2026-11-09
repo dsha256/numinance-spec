@@ -1,0 +1,1 @@
+{"export_version":1,"snapshots":[{"as_of":7,"candidates":[{"executor":"claude-cli","figure":{"accepted":90,"n":100},"model":"model-a","rank":1},{"executor":"claude-cli","figure":{"accepted":60,"n":100},"model":"model-b","rank":1},{"executor":"fake","model":"scripted","rank":3}],"language":"go","n":100,"task_class":"bugfix"}]}

@@ -14,6 +14,7 @@ Status: `evidence/v1`, spec version 1.0.0. Change class of the specification: `c
 | [trajectory.md](trajectory.md) | the runner's statement of how the executor's reported tool use compares with the host and proxy records |
 | [log-and-checkpoints.md](log-and-checkpoints.md) | leaves, Merkle hashing, inclusion proofs, checkpoints, which hash a head leaf holds |
 | [bundle-layout.md](bundle-layout.md) | the files of an export, the index, the design list, absent parts, how a directory is read |
+| [route-performance.md](route-performance.md) | the performance snapshot a router records with a route, the `execution/performance` input and `provenance/route-performance.json` (1.1.0) |
 | [attestation-and-manifest.md](attestation-and-manifest.md) | the attestation (with the shipped encodings of `ticket`, `credential_scopes` and `network_policy`) and the signed bundle manifest |
 | [derivations.md](derivations.md) | everything a verifier re-derives: summary, diff digest, closed at PR level, `change.json`, the three views, tool events, signer sets |
 | [verification.md](verification.md) | finding codes, result levels and their precedence, key modes, exit codes, reports, trust limits, the release ordering rule |
@@ -32,7 +33,7 @@ Machine-readable parts:
 - the `--json` fields `level_enum`, `weakened_by_flags` and `anchored_head_record_hash` and the flags `--expect-change` and `--expect-head` ([verification.md](verification.md), sections 6 and 8): implemented by the open verifier and by the reference implementation's own verifier;
 - the vectors of status `target`, which cover them.
 
-Added in spec 1.1.0 (the unreleased minor that also carries `postgres_transport`): the optional eleventh field `injected` of a `NetworkRequests.v1` request line ([receipts.md](receipts.md), section 1a). An export whose lines carry `injected` needs a verifier of 1.1.0 or newer; an older verifier refuses it with `record_invalid` (fail closed). Exports without the marker verify unchanged. The kit file `../../conformance/evidence/v1/receipt-request-lines.json` holds the line cases.
+Added in spec 1.1.0 (the unreleased minor that also carries `postgres_transport`): the optional eleventh field `injected` of a `NetworkRequests.v1` request line ([receipts.md](receipts.md), section 1a). An export whose lines carry `injected` needs a verifier of 1.1.0 or newer; an older verifier refuses it with `record_invalid` (fail closed). Exports without the marker verify unchanged. Also added in 1.1.0: the optional input `execution/performance` and the file `provenance/route-performance.json` ([route-performance.md](route-performance.md)); a verifier of 1.0.0 refuses an export that carries the file with `unknown_file` (fail closed). The kit file `../../conformance/evidence/v1/receipt-request-lines.json` holds the line cases.
 
 ## The open verifier
 

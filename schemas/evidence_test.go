@@ -29,6 +29,7 @@ var evidencePositive = []string{
 	"closed-complete", "closed-attested-fields", "closed-sealed", "abandoned", "rolled-back",
 	"open-prefix", "closed-gap", "closed-canon-unicode", "closed-canon-timestamps", "closed-basic",
 	"closed-ticket-none", "closed-author", "closed-streams", "closed-canon-control-escapes",
+	"closed-route-performance", "closed-route-performance-two",
 }
 
 // evidenceFiles maps a file of an export to its schema; records.ndjson is
@@ -49,6 +50,8 @@ var evidenceFiles = map[string]string{
 	"verification/verdicts.json":  "verification",
 	"review/review.json":          "review",
 	"provenance/provenance.json":  "provenance",
+
+	"provenance/route-performance.json": "route-performance",
 }
 
 // evidenceSchemas compiles every schema under evidence/v1, keyed by the file
@@ -381,6 +384,9 @@ func TestEvidenceSchemas_RejectBadDocuments(t *testing.T) {
 		{"checkpoint with an unknown key", "checkpoint", `{"canon_version":1,"origin":"o","root_hash":"sha256:` + strings.Repeat("0", 64) + `","tree_size":1,"extra":1}`},
 		{"inclusion proof with a negative leaf index", "inclusion-proof", `{"leaf_index":-1,"tree_size":1}`},
 		{"signers with a short key", "signers", `{"export_version":1,"signers":[{"key_id":"sha256:` + strings.Repeat("0", 64) + `","public_key":"AAAA"}]}`},
+		{"route performance with a candidate that has no rank", "route-performance", `{"export_version":1,"snapshots":[{"as_of":1,"candidates":[{"executor":"a","model":"m"}],"language":"go","n":100,"task_class":"bugfix"}]}`},
+		{"route performance with a figure of no outcomes", "route-performance", `{"export_version":1,"snapshots":[{"as_of":1,"candidates":[{"executor":"a","figure":{"accepted":0,"n":0},"model":"m","rank":1}],"language":"go","n":100,"task_class":"bugfix"}]}`},
+		{"route performance with an unknown key", "route-performance", `{"export_version":1,"snapshots":[{"as_of":1,"candidates":[],"extra":1,"language":"go","n":100,"task_class":"bugfix"}]}`},
 		{"index with the manifest listed", "export-index", `{"change_id":"chg_` + strings.Repeat("0", 32) + `","entries":[{"path":"bundle-manifest.json","sha256":"sha256:` + strings.Repeat("0", 64) + `","size":1}],"export_version":1}`},
 		{"vector with an unknown status", "vector-expected", `{"vector":"a","description":"d","status":"draft","flags":{},"keys":[],"expect":{"level":null,"exit_code":0,"finding_codes":[],"target":{"level_enum":null,"weakened_by_flags":[]}},"covers":[]}`},
 	}

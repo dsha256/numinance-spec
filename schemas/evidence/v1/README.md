@@ -17,6 +17,7 @@ Hand-authored JSON Schema (draft 2020-12) for the files of an evidence export, v
 | `verification.schema.json` | `verification/verdicts.json` |
 | `review.schema.json` | `review/review.json` |
 | `provenance.schema.json` | `provenance/provenance.json` |
+| `route-performance.schema.json` | `provenance/route-performance.json` (spec 1.1.0) |
 | `vector-expected.schema.json` | `conformance/evidence/v1/vectors/<name>/expected.json` |
 | `vectors-index.schema.json` | `conformance/evidence/v1/vectors/index.json` |
 
