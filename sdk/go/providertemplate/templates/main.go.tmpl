@@ -1,0 +1,31 @@
+// Command {{.Name}} is a capability provider of numinance.ports.{{.Port}}.v{{.PortMajor}} generated from the Numinance SDK
+// provider template for the capability {{.Capability}}. A plugin host launches it as a subprocess.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+
+	"google.golang.org/grpc"
+
+	"github.com/numinance/numinance-spec/sdk/go/plugin"
+)
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "{{.Name}}:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	return plugin.Serve(ctx, os.Getenv, os.Stdout, func(s *grpc.Server, rt plugin.Runtime) {
+		// TODO: register the PluginService (manifest, handshake) and the {{.Port}} service of this provider on s; rt.Stop
+		// ends the process after Shutdown. The template ships no behaviour, so a provider built from it serves nothing.
+		_, _ = s, rt
+	})
+}

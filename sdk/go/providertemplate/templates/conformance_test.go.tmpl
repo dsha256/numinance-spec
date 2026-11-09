@@ -1,0 +1,11 @@
+package provider_test
+
+import "testing"
+
+// TestConformance_{{.Verb}} stands for the conformance suite conformance/{{.Port}}/v{{.PortMajor}}/basic. The host replays
+// the recorded cassette of that suite against the built provider; this test is the local entry to the same checks.
+//
+// It fails until it is written: a skeleton that passes would claim a conformance nobody checked.
+func TestConformance_{{.Verb}}(t *testing.T) {
+	t.Fatal("not implemented: run the {{.Port}} conformance kit against the provider")
+}

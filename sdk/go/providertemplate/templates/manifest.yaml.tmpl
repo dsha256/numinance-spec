@@ -1,0 +1,23 @@
+# Generated from the Numinance SDK provider template. The authority below is the most the gap asked for; narrowing it is a
+# change a human reviews. risk_floor, side_effect and idempotency are declared at their worst case because the template
+# cannot know the verb; sbom_ref and provenance_ref are added by the build, never by hand.
+plugin_id: {{.PluginID}}
+version: {{.Version}}
+digest: {value: "{{.Digest}}"}
+signer_identity: "{{.Signer}}"
+kind: EXTENSION_CLASS_CAPABILITY_PROVIDER
+ports: [numinance.ports.{{.Port}}.v{{.PortMajor}}]
+capabilities:
+  - name: {{.Capability}}
+    risk_floor: RISK_CLASS_PRIVILEGED
+    side_effect: SIDE_EFFECT_DEPLOY
+    idempotency: IDEMPOTENCY_NONE
+    dry_run: false
+    credential_intents: [{{join .Credentials}}]
+    network_intents: [{{range $i, $n := .Network}}{{if $i}}, {{end}}{host: {{$n.Host}}, port: {{$n.Port}}}{{end}}]
+    filesystem_intents: [{{range $i, $f := .Filesystem}}{{if $i}}, {{end}}{path: {{$f.Path}}, mode: {{if $f.ReadWrite}}FILESYSTEM_MODE_READ_WRITE{{else}}FILESYSTEM_MODE_READ_ONLY{{end}}}{{end}}]
+    environment_scope: [{{join .Environment}}]
+    evidence_declared: [{{.Port}}-{{.Verb}}]
+    timeout: 30s
+    resource_budget: {cpu_millicores: 500, memory_bytes: 268435456, disk_bytes: 268435456}
+    conformance_suite: conformance/{{.Port}}/v{{.PortMajor}}/basic

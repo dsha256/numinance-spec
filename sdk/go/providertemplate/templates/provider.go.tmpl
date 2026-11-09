@@ -1,0 +1,18 @@
+// Package provider implements the capability {{.Capability}} of numinance.ports.{{.Port}}.v{{.PortMajor}}.
+package provider
+
+import "errors"
+
+// ErrNotImplemented is what every verb returns until the provider is written.
+var ErrNotImplemented = errors.New("provider: {{.Capability}} is not implemented")
+
+// Capability is the capability this provider offers and the only one its manifest declares.
+const Capability = "{{.Capability}}"
+
+// Invoke performs {{.Capability}}.
+//
+// TODO: implement the verb against the port's request and result messages. Use only the credential handles, hosts and
+// paths the manifest declares; anything else is refused by the host and must not be attempted.
+func Invoke() error {
+	return ErrNotImplemented
+}

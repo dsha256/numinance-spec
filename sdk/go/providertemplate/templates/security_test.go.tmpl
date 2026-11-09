@@ -1,0 +1,13 @@
+package provider_test
+
+import "testing"
+
+// TestSecurity_NoCanaryLeaks plants canary secrets (an environment variable, a file outside the declared paths, a
+// credential no intent names) and checks that {{.Capability}} never reads, logs or returns them. It also checks that the
+// provider contacts no host outside the manifest's network intents.
+//
+// It fails until it is written: the host runs the behaviour tests in a sandbox with canaries before a human sees the
+// authority, and a skeleton that passes would claim a check nobody made.
+func TestSecurity_NoCanaryLeaks(t *testing.T) {
+	t.Fatal("not implemented: plant canaries and check {{.Capability}} does not touch them")
+}
