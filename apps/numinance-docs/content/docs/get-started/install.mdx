@@ -1,0 +1,132 @@
+---
+title: Install
+description: Build the open numi CLI from source today, and see what planned install channels will and will not be.
+---
+
+<FeatureStatus kind="public-spec">A source build from a clone is the only install path that exists.</FeatureStatus>
+<SourceReference paths={["go.mod", "cli/numi/main.go", "cli/README.md"]} />
+
+<ShortProductTruth>Installing numi gives you a CLI that scaffolds and validates configuration and verifies evidence. It does not install an autonomous engineer.</ShortProductTruth>
+
+## Three different things
+
+| Object | Installed by this page | Notes |
+| --- | --- | --- |
+| The open `numi` CLI | Yes, built from source | `version`, `init`, `validate`, `validate --files`, `evidence verify`. |
+| The `numinance-spec` repository | Yes, as the clone | Protocol, schemas, SDKs, plugins, conformance. Apache-2.0. |
+| The proprietary runtime | No | Private. Not generally available. No installer exists. |
+
+## Install options
+
+<Tabs items={["GitHub (source build)", "GitHub Releases", "Homebrew", "Customer runtime"]}>
+<Tab value="GitHub (source build)">
+
+<StatusBadge kind="public-spec" />
+
+Prerequisites: Git, and a Go toolchain that satisfies `go.mod`. The module declares `go 1.27` and `toolchain go1.27.3`. With Go 1.21 or newer, a `go` command that is older than the declared toolchain downloads the right one automatically unless `GOTOOLCHAIN=local` is set.
+
+```bash title="Clone"
+git clone https://github.com/dsha256/numinance-spec.git
+cd numinance-spec
+```
+
+Run without building:
+
+```bash title="Run from source"
+go run ./cli/numi version
+```
+
+Or build a binary:
+
+```bash title="Build"
+go build -o ./bin/numi ./cli/numi
+./bin/numi version
+```
+
+<VerifiedSnippet what="numi version, built from revision 3c74d59" exit="0">
+
+```text
+0.0.0-dev
+```
+
+</VerifiedSnippet>
+
+`0.0.0-dev` is the correct output. The CLI has no tagged release, so it reports a development version.
+
+</Tab>
+<Tab value="GitHub Releases">
+
+<StatusBadge kind="planned" />
+
+Prebuilt binaries on GitHub Releases are an intended channel. None is published, so there is nothing to download and these docs give no command or filename. Use the source build.
+
+</Tab>
+<Tab value="Homebrew">
+
+<StatusBadge kind="planned" />
+
+Distribution through Homebrew is an intended channel. No tap or formula is published, so these docs give no command. Use the source build.
+
+</Tab>
+<Tab value="Customer runtime">
+
+<StatusBadge kind="designed" />
+
+The Numinance runtime is designed to run in your infrastructure. It is proprietary, private and gated; there is no public installer. See [Deployment modes](/docs/architecture/deployment-modes) and [Installation modes](/docs/operations/installation-modes) for the design.
+
+</Tab>
+</Tabs>
+
+## Verify the build
+
+Build verification today is simple, because there is no release to compare against:
+
+1. `numi version` prints `0.0.0-dev` and exits 0.
+2. Run the shipped examples through the validator from the repository root:
+
+```bash title="Smoke test"
+./bin/numi validate --files schemas/examples/SDLCProfile
+```
+
+<VerifiedSnippet what="validate the SDLCProfile examples" exit="0">
+
+```text
+revision: "files"
+ok       file "org-baseline.yaml" SDLCProfile "org-baseline"
+ok       file "payments-api.yaml" SDLCProfile "payments-api"
+```
+
+</VerifiedSnippet>
+
+3. Check that you cloned the expected repository: `git remote -v` should show `github.com/dsha256/numinance-spec`.
+
+## What release verification is designed to look like
+
+<DesignNote title="Planned, not published">
+  When release binaries exist, the design is that a download can be checked three ways: a checksum list to detect corruption, a signature over that list to detect substitution, and build provenance to tie a binary to a source revision and a build. You would verify before first run, against keys or identities published separately from the download. None of that exists yet, so this page names no files, tools or commands for it. Until then, building from a clone you inspected is the verification.
+</DesignNote>
+
+## Troubleshooting
+
+<Accordions>
+<Accordion title="go: go.mod requires go >= 1.27">
+Your local Go is older than the module's `go 1.27` line. Install Go 1.27 or newer, or let the toolchain switch download `go1.27.3` by leaving `GOTOOLCHAIN` at its default. In an offline or locked-down environment, `GOTOOLCHAIN=local` forces your installed version and will refuse a too-old one.
+</Accordion>
+<Accordion title="Module path confusion: github.com/dsha256 versus github.com/numinance">
+The clone URL is `https://github.com/dsha256/numinance-spec.git`, but the Go module path in `go.mod` is `github.com/numinance/numinance-spec`. Both are correct. Build from inside the clone using relative paths such as `./cli/numi`; do not `go install` or `go get` by the clone URL.
+</Accordion>
+<Accordion title="Dependency downloads fail">
+The build needs the modules listed in `go.sum`. Behind a proxy or without network, populate a module cache first or point `GOPROXY` at a mirror you trust.
+</Accordion>
+<Accordion title="unknown subcommand, exit 2">
+You ran a command that is designed but not in the open build, such as the designed run commands or `numi evidence export`. See [Status](/docs/status).
+</Accordion>
+</Accordions>
+
+## Next steps
+
+<Cards>
+  <Card title="Quickstart" href="/docs/get-started/quickstart" description="Validate examples and scaffold a repository with numi init." />
+  <Card title="CLI install reference" href="/docs/cli/install" description="The CLI section's view of the same build." />
+  <Card title="Status" href="/docs/status" description="Which channels exist and which are planned." />
+</Cards>

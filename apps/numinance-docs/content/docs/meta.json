@@ -1,0 +1,27 @@
+{
+  "title": "Numinance Docs",
+  "pages": [
+    "index",
+    "---Start---",
+    "get-started",
+    "status",
+    "---How it works---",
+    "concepts",
+    "architecture",
+    "---Build---",
+    "guides",
+    "configuration",
+    "integrations",
+    "---Reference---",
+    "protocol",
+    "evidence",
+    "sdk",
+    "cli",
+    "---Operate---",
+    "operations",
+    "roadmap",
+    "---Project---",
+    "numinance-and-spec",
+    "project"
+  ]
+}

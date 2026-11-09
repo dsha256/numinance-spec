@@ -1,0 +1,232 @@
+---
+title: numi evidence verify
+description: Verify an evidence export directory offline under keys you pin. Every flag, the three key modes, exit codes, JSON fields and real runs.
+---
+
+<FeatureStatus kind="public-spec">
+  The verifier and its conformance vectors are public. The open command is a wrapper over the public package `sdk/go/evidenceverify`.
+</FeatureStatus>
+
+<SourceReference paths={["cli/README.md", "sdk/go/evidenceverify/README.md", "docs/evidence/verification.md", "conformance/evidence/v1/"]} />
+
+<ShortProductTruth>
+  Don't trust the agent. Check the evidence. `verified` means the chain is intact and signed by keys you pinned. It does not mean the code is correct.
+</ShortProductTruth>
+
+## What it does
+
+`numi evidence verify [flags] DIR` checks an `evidence/v1` export directory offline, read-only and with bounded reads. It needs no Numinance software and no network. It was written from the public specification, the JSON Schemas and the conformance vectors, and it passes every vector under `conformance/evidence/v1/`.
+
+There is no built-in trust root. A result reaches `verified` only through runner keys, a log key and a log origin that you supply. A key that the export states about itself never gets there.
+
+## Synopsis
+
+```text
+numi evidence verify --runner-key FILE [--runner-key FILE ...] --log-key FILE --log-origin ORIGIN DIR
+```
+
+## Flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--runner-key FILE` | A pinned runner public key (64 hex characters, at most 1024 bytes). Repeatable. Any pinned key may sign any record, the attestation or the manifest. |
+| `--trust-bundle-keys` | Trust the keys the export states (`provenance/signers.json`). The best level is `self-consistent`. |
+| `--skip-signatures` | Check no signature. The best level is `unauthenticated`. |
+| `--log-key FILE`, `--log-origin ORIGIN` | The pinned transparency log. Both or neither. |
+| `--allow-unanchored` | Accept a head not proved under a pinned log. |
+| `--allow-incomplete` | Accept a chain with no terminal record. |
+| `--allow-unsigned` | Accept the export of an Abandoned or RolledBack change. |
+| `--complete` | Fail when a part of the design list is absent. |
+| `--expect-change CHG_ID` | Fail unless the chain is that change. |
+| `--expect-head DIGEST` | Fail unless the last record hash, or the anchored head hash, is that digest. |
+| `--json` | Print one JSON object. |
+
+An allowance flag suffixes the level only when the weakness it covers is present. A fully pinned, anchored, `Closed` export is a bare `verified` whatever the flags.
+
+## Key modes: choose exactly one
+
+| Mode | Flags | Best level | Use when |
+| --- | --- | --- | --- |
+| Runner keys | `--runner-key` (and `--log-key` with `--log-origin`) | `verified` | You hold the runner public key and the log key from a source outside the export |
+| Trust the bundle | `--trust-bundle-keys` | `self-consistent` | You only want to know the export is internally consistent |
+| Skip signatures | `--skip-signatures` | `unauthenticated` | You only want hash-chain structure |
+
+Zero modes or two modes is a usage error.
+
+<VerifiedSnippet what="numi evidence verify with no key mode, run against a conformance export" exit="2">
+```text
+numi evidence verify: choose exactly one key mode: --runner-key, --trust-bundle-keys or --skip-signatures
+usage: numi evidence verify [flags] DIR
+...
+Exactly one key mode is required. A key the export states never reaches "verified".
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="numi evidence verify --runner-key keys/runner.pub --log-key keys/log.pub exports/closed-author (no origin)" exit="2">
+```text
+numi evidence verify: --log-key and --log-origin go together
+usage: numi evidence verify [flags] DIR
+...
+```
+</VerifiedSnippet>
+
+## A full pass
+
+These runs use the conformance export `exports/closed-author` and keys from `conformance/evidence/v1/`, run from that directory.
+
+<VerifiedSnippet what="numi evidence verify --runner-key keys/runner.pub --log-key keys/log.pub --log-origin numinance.test/log --complete exports/closed-author" exit="0">
+```text
+change: chg_01010101010101010101010101010101
+records: 12, head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48
+state: ended Closed
+level: verified
+chain: records link, hash and end as stated
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+attestation: signed, re-derived from the chain
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+not applicable: deployment.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+not applicable: observation.json (not applicable at PR level: ... same reason)
+result: verified
+```
+</VerifiedSnippet>
+
+Read the `unsourced` lines. They say the export carries no credential-broker statement and no egress-proxy statement, so the verifier did not and could not check credential scopes or network policy. `verified` is silent about them, and the report is not.
+
+## Weaker results and failures
+
+Pin the wrong runner key and the result is a failure, exit 3:
+
+<VerifiedSnippet what="the same export with --runner-key keys/other-runner.pub" exit="3">
+```text
+FAIL signer_untrusted: a record names a key that is not trusted
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+result: failed
+```
+</VerifiedSnippet>
+
+(Only the finding lines are shown; the rest matches the pass above. `part_contradiction` appeared twice.)
+
+Pin the runner key but omit the log, and you get a consistent export that is weaker than `verified`, exit 5:
+
+<VerifiedSnippet what="--runner-key keys/runner.pub exports/closed-author" exit="5">
+```text
+level: unanchored
+signatures: verified under the pinned runner keys
+anchor: not checked (no log pinned)
+WEAK the head was not proved under a pinned log
+result: unanchored
+```
+</VerifiedSnippet>
+
+(Excerpt of the report.) Add `--allow-unanchored` and the same run exits 0, but the level says so:
+
+<VerifiedSnippet what="--runner-key keys/runner.pub --allow-unanchored exports/closed-author" exit="0">
+```text
+level: verified, unanchored
+anchor: not checked (no log pinned)
+result: verified, unanchored (a pass with an allowance: unanchored)
+```
+</VerifiedSnippet>
+
+Trusting only the keys the export states:
+
+<VerifiedSnippet what="--trust-bundle-keys exports/closed-author" exit="5">
+```text
+level: self-consistent
+signatures: verified under keys the export states only
+anchor: not checked (no log pinned)
+WEAK signatures verified only under keys the export states
+WEAK the head was not proved under a pinned log
+result: self-consistent
+```
+</VerifiedSnippet>
+
+An expectation mismatch is a failure even when everything else verifies:
+
+<VerifiedSnippet what="full pinning plus --expect-change chg_02020202020202020202020202020202" exit="3">
+```text
+level: failed
+FAIL expectation_mismatch: the change is not the one expected
+result: failed
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="--skip-signatures on a directory that does not exist" exit="4">
+```text
+numi evidence verify: the directory does not exist
+```
+</VerifiedSnippet>
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| 0 | A pass, with or without an allowance |
+| 1 | Internal error or cancel |
+| 2 | Usage |
+| 3 | A report with a finding, or a refused directory path |
+| 4 | The directory does not exist |
+| 5 | A consistent export weaker than `verified` |
+| 7 | An I/O error |
+| 8 | Timeout |
+
+Exit 6 is never produced by `verify`. An allowance-bearing pass such as `verified, unanchored` exits 0, so automation that needs a full pass must check the JSON, not the exit code alone.
+
+## JSON output
+
+<VerifiedSnippet what="the full-pass run with --json" exit="0">
+```text
+{"ok":true,"change_id":"chg_01010101010101010101010101010101","records":12,"head_record_hash":"sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48","anchored_head_record_hash":"sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48","ended":true,"terminal_state":"Closed","sealed":false,"level":"verified","level_enum":"verified","weakened_by_flags":[],"chain":"records link, hash and end as stated","signatures":"verified under the pinned runner keys","anchor":"head proved under the pinned log","attestation":"signed, re-derived from the chain","not_applicable":[{"part":"deployment.json","reason":"...","owner":"...","not_applicable":true},{"part":"observation.json","reason":"...","owner":"...","not_applicable":true}],"credential_scopes":"unsourced: no credential broker statement is in the attestation","network_policy":"unsourced: no egress proxy statement is in the attestation"}
+```
+</VerifiedSnippet>
+
+(The `reason` and `owner` strings of the two `not_applicable` entries are shortened here.)
+
+| Field | Meaning |
+| --- | --- |
+| `ok` | True for a pass, including a pass with an allowance. Not a full-pass signal. |
+| `change_id`, `records` | The change and the number of records in the chain |
+| `head_record_hash`, `anchored_head_record_hash` | The last record hash, and the head hash the log proved |
+| `ended`, `terminal_state`, `sealed` | Whether the chain ended, how, and whether it is sealed |
+| `level` | Human-readable level; may carry a suffix such as `, unanchored` |
+| `level_enum` | The machine-readable level. Test this, never a prefix of `level` |
+| `weakened_by_flags` | The allowances that covered a weakness that is present. Empty for a full pass |
+| `weaknesses` | Present when the level is weaker than `verified`; for `--skip-signatures` it read `no signature was checked` and `the head was not proved under a pinned log` |
+| `chain`, `signatures`, `anchor`, `attestation` | One line per check |
+| `not_applicable` | Parts declared not applicable, with reason and owner |
+| `credential_scopes`, `network_policy` | Whether the attestation carries a statement; `unsourced` means it does not |
+
+<VerifiedSnippet what="--skip-signatures with --json, excerpt of fields" exit="5">
+```text
+"ok":false, "level":"unauthenticated", "level_enum":"unauthenticated", "weakened_by_flags":[],
+"weaknesses":["no signature was checked","the head was not proved under a pinned log"],
+"signatures":"not checked (--skip-signatures)", "anchor":"not checked (no log pinned)"
+```
+</VerifiedSnippet>
+
+A `verified` result may still carry parts the index declares absent. Automation must read the `absent` list in the JSON report when there is one, or pass `--complete`. A script that needs a full pass should require `level_enum == "verified"` and an empty `weakened_by_flags`.
+
+## What a pass proves
+
+- It proves the chain links, hashes and ends as stated, that signatures verify under the keys you pinned, and that the head was proved under the log you pinned.
+- It does not prove the code is correct, the tests are thorough or the model reasoned well. It does not prove every event was logged if the host that wrote the evidence was compromised. This is a provenance check.
+- The open `numi` can verify an export but cannot create one: `numi evidence export` is not in the open build (see [commands](/docs/cli/commands-and-exit-codes)).
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+| --- | --- |
+| Exit 2, `choose exactly one key mode` | None or several of the three modes |
+| Exit 3, `signer_untrusted` | The pinned key did not sign a record |
+| Exit 5, `level: unanchored` | No log pinned; pin the log or accept `--allow-unanchored` |
+| Exit 4 | The directory does not exist |
+
+## Next steps
+
+<Cards>
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="The algorithm and findings behind the report." />
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="What each level does and does not establish." />
+  <Card title="Evidence quickstart" href="/docs/get-started/evidence-quickstart" description="Verify a golden export end to end." />
+</Cards>

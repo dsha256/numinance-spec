@@ -1,0 +1,78 @@
+---
+title: Deployment modes
+description: Managed, sovereign and air-gapped deployment, data residency, credential handling and the security model summary.
+---
+
+<FeatureStatus kind="designed">
+  Deployment modes describe the intended topology. None is generally available.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto"]} note="ResidencyClass." />
+
+<ShortProductTruth>
+  Your infrastructure. Not our playground.
+</ShortProductTruth>
+
+## Boundary
+
+<DeploymentBoundary />
+
+## Modes
+
+| Mode | Control plane | Inference | Status |
+| --- | --- | --- | --- |
+| Managed | Vendor control plane for fleet, licence and dashboard; data plane in the customer account | Per residency floor | `designed` |
+| Sovereign | None required; the runtime applies policy, finishes work and exports evidence on its own | Per residency floor | `designed` |
+| Air-gapped | None; no external network path | In place only | Coming soon: later design milestone |
+
+<ComingSoon title="Air-gapped">
+  Air-gapped operation needs open-weight executors and offline registries. It is a later design milestone and not available.
+</ComingSoon>
+
+## Data residency
+
+Each executor and model pair declares its compute and inference location, prompt egress, training use and retention. A residency class is derived from live configuration, not copied from a static manifest, and compared with the policy floor for the component and environment when a change starts. Regulated components default to in-account inference in-region; cross-region use is an explicit opt-in. Being on a cloud provider or a hosted model service is never assumed to mean in-account. Resolver and reviewer inference obey the same floor as author inference.
+
+## Credential handling without secrets in the sandbox
+
+The sandbox starts with no ambient credentials, keys or tokens. A step receives a handle; the egress proxy applies the credential outside the sandbox and re-originates the request. Handles expire with the step. Providers that require materialised secrets are flagged for security review and policy approval.
+
+## Security model summary
+
+| Threat | Control |
+| --- | --- |
+| Prompt injection through retrieved content | Content treated as data; broker, proxy and filesystem enforce regardless |
+| Credential theft | No ambient credentials; scoped, expiring handles |
+| Metadata service access | Link-local addresses denied |
+| Malicious extension | Signing, digest pinning, permission diff, conformance |
+| Policy tampering | Protected paths, kernel outside every grant |
+| Evidence forgery | Runner-only writes, append-only store |
+| Direct deploy | Release identity only |
+| Cost runaway | Multi-dimensional budgets, pause and escalate |
+
+Numinance is designed to produce evidence that supports a customer's compliance program. It does not make anyone compliant.
+
+## Observability and evaluations
+
+Telemetry follows OpenTelemetry conventions and is exported to the customer's own backend. It carries identifiers, decision and run references and metrics, and never secrets, handles, prompts, retrieved knowledge or customer code. Evaluations use the event stream and outcomes as a private customer corpus to compute qualification for promotion. That corpus stays in the customer account and is not a shared training set.
+
+## Boundary table
+
+| Item | Managed | Sovereign |
+| --- | --- | --- |
+| Source and credentials | Customer account | Customer account |
+| Evidence | Customer account | Customer account |
+| Fleet metadata | Vendor control plane | Not required |
+| Breaker | Local | Local |
+
+## Failure cases
+
+- Residency below floor at start: change refused.
+- Control plane outage in managed mode: authorised work continues.
+- Telemetry sink down: events buffer locally; evidence writing is independent.
+
+<Cards>
+  <Card title="Installation modes" href="/docs/operations/installation-modes" description="Operational detail." />
+  <Card title="Evaluations" href="/docs/operations/evaluations" description="Qualification and the private corpus." />
+  <Card title="Data and control planes" href="/docs/architecture/data-and-control-planes" description="The split." />
+</Cards>

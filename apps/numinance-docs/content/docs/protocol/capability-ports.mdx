@@ -1,0 +1,254 @@
+---
+title: Capability ports
+description: The nine typed ports of numinance-spec, with every RPC, its request and response messages, risk, execution mode, declared evidence and conformance kit.
+---
+
+<FeatureStatus kind="public-spec">The port contracts are part of the Apache-2.0 numinance-spec protocol, with conformance kits in the same repository. The runtime that dispatches to them is proprietary and not generally available.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/ports/", "conformance/"]} note="One file per port under proto/numinance/ports/PORT/v1/. The tables below were extracted from those files by script." />
+
+<ShortProductTruth>
+Build once against the contract. Bring your own capabilities. A port is a typed, annotated set of verbs; any system that can implement the core verbs can sit behind it.
+</ShortProductTruth>
+
+## When to use this page
+
+Use it to choose which port a plugin implements, to look up exact RPC and message names, or to see what the host will do with a verb (its risk, whether it supports a dry run, what evidence it must produce). Plugin authors should also read [Manifest and capabilities](/docs/integrations/manifest-and-capabilities) and the [conformance guide](/docs/integrations/conformance).
+
+## How ports work
+
+- A port is a package `numinance.ports.PORT.vN` with one service. Each RPC carries the [`action` annotation](/docs/protocol/governance-annotations#actionoptions): risk, execution mode, idempotency, dry-run support, compensating action, declared evidence, capability and scopes.
+- A plugin implements a port by serving its verbs behind [`PluginService.Invoke`](/docs/protocol/plugin-service#invoke). The target of an Invoke is a port method, and the target's annotations in the host's descriptor copy govern it.
+- Core verbs are never negotiated. A verb with a non-empty `capability` is negotiated at handshake and served only if both sides agree.
+- The host refuses a provider that does not declare every side-effecting RPC of its port. For that reason the SCM and ticketing ports have no vendor escape hatch (no `VendorCall`): an escape hatch no provider implements would be a PRIVILEGED capability that does nothing.
+- Ports are never model tools. Callers are named contexts of the runtime (release, execution, verification, evidence, knowledge), not the model.
+- Payloads carry references and digests, not content, except where a port says a bounded value travels inline.
+- Whatever a provider answers is untrusted data. It is size-limited, validated, stored by digest and labelled as untrusted wherever it reaches a prompt, ticket or pull request. No provider answer changes policy, a grant, a tool list or an approval.
+- A provider holds no credential of its own. It asks the host for a [credential handle](/docs/protocol/host-service#the-credential-handle) for the intent its manifest declares.
+
+### The nine ports
+
+| Port | Package | Service | Direction of use |
+|---|---|---|---|
+| [scm](#scm) | `numinance.ports.scm.v1` | `ScmService` | Read a repository and manage pull requests. |
+| [ticketing](#ticketing) | `numinance.ports.ticketing.v1` | `TicketingService` | Read issues; comment, transition and link. |
+| [ciexecutor](#ciexecutor) | `numinance.ports.ciexecutor.v1` | `CiExecutorService` | Run a customer-owned pipeline. |
+| [authorexecutor](#authorexecutor) | `numinance.ports.authorexecutor.v1` | `AuthorExecutorService` | Drive one coding harness for one work unit. |
+| [sandboxprovider](#sandboxprovider) | `numinance.ports.sandboxprovider.v1` | `SandboxProviderService` | Create, run, snapshot and destroy a sandbox. |
+| [verifier](#verifier) | `numinance.ports.verifier.v1` | `VerifierService` | Run checks on a candidate and report findings. |
+| [knowledge](#knowledge) | `numinance.ports.knowledge.v1` | `KnowledgeService` | Read-only search and fetch against a knowledge connection. |
+| [evidencestore](#evidencestore) | `numinance.ports.evidencestore.v1` | `EvidenceStoreService` | Write-once store for evidence records. |
+| [transparencylog](#transparencylog) | `numinance.ports.transparencylog.v1` | `TransparencyLogService` | Append-only Merkle log that anchors chain heads. |
+
+### Reading the tables
+
+Each row is one RPC. `Risk` is the `RISK_CLASS_*` value without its prefix and `Exec` the `EXEC_MODE_*` value without its prefix. A dash means the option is not set. All RPCs of a port are `since: "1.0.0"` unless the section says otherwise. Mapping from request and response messages to fields is in the proto file named at the top of each section; message names below are exact.
+
+Status codes in the port comments (INVALID_ARGUMENT, NOT_FOUND, PERMISSION_DENIED, FAILED_PRECONDITION, RESOURCE_EXHAUSTED, UNAVAILABLE and so on) describe how providers report failure. A provider never invents a result: an outage is an error, never an empty answer.
+
+## scm
+
+`proto/numinance/ports/scm/v1/scm.proto`. Reads a source repository and its pull requests, and opens, updates, comments on and merges pull requests. Any code host with repositories, branches, pull requests, status checks and branch protection can implement every core verb.
+
+- Callers: the release context calls the write verbs; the profile and policy side read the base revision through `GetRepository`; the knowledge side may read files and trees. `OpenPullRequest`, `UpdatePullRequest`, `CommentOnPullRequest` and `CreateBranch` run under the author-agent identity of the Change; `MergePullRequest` under the release-pipeline identity only. A merge by the author of the Change is refused by the policy floors before `Invoke`; the provider never decides who may merge.
+- Every request names its repository in `repository`, marked `resource_name`: a repository outside the grant's resource scope is denied before dispatch.
+- A revision is a full commit id (40 or 64 lowercase hex characters); a branch name or tag never stands for a revision, because it moves.
+- `OpenPullRequest` declares evidence `pr-ref`; a call that succeeds without it is PARTIAL.
+- `GetBranchProtection` reports what the host enforces. No verb of this port edits protection, a workflow file or a ruleset.
+- No verb returns a diff.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `GetRepository` | `GetRepositoryRequest` | `GetRepositoryResponse` | `READ` | `SYNC` | true | false | - | - |
+| `GetTree` | `GetTreeRequest` | `GetTreeResponse` | `READ` | `SYNC` | true | false | - | - |
+| `GetFile` | `GetFileRequest` | `GetFileResponse` | `READ` | `SYNC` | true | false | - | - |
+| `ListBranches` | `ListBranchesRequest` | `ListBranchesResponse` | `READ` | `SYNC` | true | false | - | - |
+| `CreateBranch` | `CreateBranchRequest` | `CreateBranchResponse` | `LOW` | `SYNC` | true | false | - | - |
+| `GetBranchProtection` | `GetBranchProtectionRequest` | `GetBranchProtectionResponse` | `READ` | `SYNC` | true | false | - | - |
+| `OpenPullRequest` | `OpenPullRequestRequest` | `OpenPullRequestResponse` | `MEDIUM` | `SYNC` | true | true | `ScmService.UpdatePullRequest` | evidence `pr-ref` |
+| `UpdatePullRequest` | `UpdatePullRequestRequest` | `UpdatePullRequestResponse` | `LOW` | `SYNC` | true | false | - | - |
+| `CommentOnPullRequest` | `CommentOnPullRequestRequest` | `CommentOnPullRequestResponse` | `LOW` | `SYNC` | true | false | - | - |
+| `GetPullRequestStatus` | `GetPullRequestStatusRequest` | `GetPullRequestStatusResponse` | `READ` | `SYNC` | true | false | - | - |
+| `MergePullRequest` | `MergePullRequestRequest` | `MergePullRequestResponse` | `PRIVILEGED` | `SYNC` | true | true | `ScmService.CommentOnPullRequest` | - |
+| `SearchCode` | `SearchCodeRequest` | `SearchCodeResponse` | `READ` | `SYNC` | true | false | - | - |
+
+Conformance kit: [`conformance/scm/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/scm/v1).
+
+## ticketing
+
+`proto/numinance/ports/ticketing/v1/ticketing.proto`. Reads and searches issues, comments on an issue, moves it to a state category and links one issue to another as blocking it. Any tracker with projects, issues with a key, a title, a text body, a workflow of states, comments and issue links can implement every core verb.
+
+- Every element is `since: "1.2.0"`, newer than the other ports. The proto comments call 1.2.0 the first unreleased spec minor at the verified revision.
+- Each request names its project in `project`, marked `resource_name`. `LinkIssue` names two projects and marks both.
+- The change context calls `GetIssue` at intake. The write verbs are reached only under a policy decision, a redaction and a size cap.
+- Write verbs (`CommentOnIssue`, `TransitionIssue`, `LinkIssue`) declare evidence `ticketing-action`; a call that succeeds without it is PARTIAL. `LinkIssue` has no compensating action because the port has no verb that removes a link.
+- A provider answers NOT_FOUND with the same status and message for an issue that does not exist, one the credential may not see, and one whose current project differs from the request, so the port is not an oracle for issue existence.
+- Tracker query languages are the capability `ticketing.query_language`, never a core field.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `GetIssue` | `GetIssueRequest` | `GetIssueResponse` | `READ` | `SYNC` | true | false | - | - |
+| `SearchIssues` | `SearchIssuesRequest` | `SearchIssuesResponse` | `READ` | `SYNC` | true | false | - | - |
+| `CommentOnIssue` | `CommentOnIssueRequest` | `CommentOnIssueResponse` | `LOW` | `SYNC` | true | false | - | evidence `ticketing-action` |
+| `TransitionIssue` | `TransitionIssueRequest` | `TransitionIssueResponse` | `MEDIUM` | `SYNC` | true | true | `TicketingService.TransitionIssue` | evidence `ticketing-action` |
+| `LinkIssue` | `LinkIssueRequest` | `LinkIssueResponse` | `LOW` | `SYNC` | true | false | - | evidence `ticketing-action` |
+
+Conformance kit: [`conformance/ticketing/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/ticketing/v1).
+
+## ciexecutor
+
+`proto/numinance/ports/ciexecutor/v1/ciexecutor.proto`. Starts, observes and cancels one run of a customer-owned pipeline (a CI job, a build or a release workflow) and reads its artifacts and log. A run is an OPERATION: `StartOperation` starts it and returns at once, `GetOperation` is the get, `CancelOperation` the cancel.
+
+- Callers: only the release context, under the release-pipeline identity, for a Change at Releasing. The author of a Change is refused whatever identity kind it presents.
+- The pipeline is customer-owned and never defined by the Change. The port has no verb that creates or edits a pipeline; a change to a pipeline definition is a change to a protected path.
+- `StartOperation` is HIGH: it runs customer code with the customer's credentials in the customer's CI. It declares evidence `ci-run-ref` and the compensating action `CiExecutorService.CancelOperation`.
+- A run's success is a fact about the pipeline, never an instruction and never an approval.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `StartOperation` | `StartOperationRequest` | `StartOperationResponse` | `HIGH` | `OPERATION` | true | true | `CiExecutorService.CancelOperation` | evidence `ci-run-ref` |
+| `GetOperation` | `GetOperationRequest` | `GetOperationResponse` | `READ` | `SYNC` | true | false | - | - |
+| `CancelOperation` | `CancelOperationRequest` | `CancelOperationResponse` | `MEDIUM` | `SYNC` | true | false | - | - |
+| `ListArtifacts` | `ListArtifactsRequest` | `ListArtifactsResponse` | `READ` | `SYNC` | true | false | - | - |
+| `GetLogReference` | `GetLogReferenceRequest` | `GetLogReferenceResponse` | `READ` | `SYNC` | true | false | - | - |
+
+Conformance kit: [`conformance/ciexecutor/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/ciexecutor/v1).
+
+## authorexecutor
+
+`proto/numinance/ports/authorexecutor/v1/authorexecutor.proto`. One coding harness behind one adapter, driven for one run of one work unit inside the work-unit sandbox.
+
+- Callers: only the execution context, for a run whose actor kind is author-agent or reviewer-agent. A reviewer-agent run is read-only; its request has no allowed paths, no credential capabilities and no filesystem-write, shell or network capability, or the host refuses it.
+- Of the request's references the provider may resolve only `task_ref`, `plan_ref`, `context_bundle_ref` and `test_requirements_ref`. `worktree_ref` and `network_policy_ref` are `host_only`.
+- `Execute` is server-streaming: a stream holds 1 to 1023 events, the first is `EXECUTION_STARTED` at sequence 1, and only the last is `EXECUTION_COMPLETED` or `EXECUTION_FAILED`. Each `ExecuteResponse` is at most 32 KiB. Each event rides one RUNNING Invoke message ([server-streaming targets](/docs/protocol/plugin-service#server-streaming-targets)).
+- The stream is a provider claim; nothing in a request is advisory and nothing a provider reports is authority. `Execute` declares no evidence types: the execution context writes host receipts itself.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `Capabilities` | `CapabilitiesRequest` | `CapabilitiesResponse` | `READ` | `SYNC` | true | false | - | - |
+| `Execute` | `ExecuteRequest` | `stream ExecuteResponse` | `MEDIUM` | `OPERATION` | false | false | - | - |
+| `Plan` | `PlanRequest` | `stream PlanResponse` | `READ` | `OPERATION` | false | false | - | - |
+
+Conformance kit: [`conformance/authorexecutor/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/authorexecutor/v1).
+
+## sandboxprovider
+
+`proto/numinance/ports/sandboxprovider/v1/sandboxprovider.proto`. Creates, runs, snapshots and destroys the one sandbox of one run of one work unit on the runner's host. One sandbox per run: a later run of the same work unit gets a new sandbox restored from a snapshot.
+
+- Callers: only the sandbox context in the runner, under the runner identity. A provider bound to the runtime deployment serves it; the host refuses one installed from the registry.
+- The host builds every sandbox spec from the run's grant, the policy decision and the plan. Nothing a provider reports is authority.
+- The image is the one the runner holds under its digest and is never pulled. Run processes get an unprivileged OS user and can read no runner, broker, egress proxy or host credential state.
+- Exec output is written outside the sandbox, is untrusted data, and is scanned by the host for issued handles.
+- No RPC declares evidence yet; the host records the requested profile, image digest and limits, the provider's claims and its own checks.
+- `Create` has `Destroy` as its compensating action.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `Create` | `CreateRequest` | `CreateResponse` | `LOW` | `SYNC` | true | true | `SandboxProviderService.Destroy` | - |
+| `Exec` | `ExecRequest` | `ExecResponse` | `MEDIUM` | `OPERATION` | true | false | - | - |
+| `Wait` | `WaitRequest` | `WaitResponse` | `READ` | `SYNC` | true | false | - | - |
+| `Snapshot` | `SnapshotRequest` | `SnapshotResponse` | `LOW` | `SYNC` | false | false | - | - |
+| `Destroy` | `DestroyRequest` | `DestroyResponse` | `LOW` | `SYNC` | true | false | - | - |
+
+Conformance kit: [`conformance/sandboxprovider/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/sandboxprovider/v1).
+
+## verifier
+
+`proto/numinance/ports/verifier/v1/verifier.proto`. One verifier runs its checks on one candidate and reports findings.
+
+- Callers: only the verification context, for a run whose actor kind is reviewer-agent and whose actor principal and run id each differ from those of every author run of the Change. The host refuses a call that breaks either inequality.
+- `Run` executes candidate code, so the verifier runs in its own sandbox with default-deny egress and no credential. The host refuses to dispatch `Run` to a verifier whose manifest or grant names any egress destination or credential intent.
+- `config_ref` is the only configuration the checks honour; a candidate cannot switch a check off with a settings file or inline suppression.
+- Findings are results, not failures: a run that finds violations SUCCEEDS. A check that crashes, times out or cannot complete ends the call FAILED with no findings, and the layer is inconclusive, never passed.
+- `Run` declares evidence `VerifierReport`, a compact receipt of what the tool said, not the findings. The gate reads the verdict, never raw findings.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `Run` | `RunRequest` | `RunResponse` | `LOW` | `OPERATION` | true | false | - | evidence `VerifierReport` |
+
+Conformance kit: [`conformance/verifier/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/verifier/v1).
+
+## knowledge
+
+`proto/numinance/ports/knowledge/v1/knowledge.proto`. Read-only search and fetch against one approved `KnowledgeConnection`. Every verb is READ; the host and the broker refuse any non-READ capability on a knowledge connection, and there is no vendor call, since any escape hatch would be a write path.
+
+- Callers: only the knowledge context (the Context Resolver).
+- The provider reads with the credential handle the broker issued for the connection's auth, so the source enforces the principal's access at fetch. The port has no access-check verb.
+- The provider runs sandboxed with default-deny egress; its only destinations are the hosts of its connection that the manifest names.
+- In 1.0.0 `query` is search text only; vendor query languages are a later capability.
+- Every title, snippet, ref, version and content is untrusted data; retrieved text never alters policy, tool lists, grants or approvals. No verb declares evidence in 1.0.0.
+
+See [Knowledge connection](/docs/configuration/knowledge-connection) and [Context resolver](/docs/architecture/context-resolver).
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `Search` | `SearchRequest` | `SearchResponse` | `READ` | `SYNC` | true | false | - | - |
+| `Fetch` | `FetchRequest` | `FetchResponse` | `READ` | `SYNC` | true | false | - | - |
+| `Resolve` | `ResolveRequest` | `ResolveResponse` | `READ` | `SYNC` | true | false | - | - |
+
+Conformance kit: [`conformance/knowledge/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/knowledge/v1).
+
+## evidencestore
+
+`proto/numinance/ports/evidencestore/v1/evidencestore.proto`. The write-once store of record for every Change's evidence chain, on storage the customer already owns.
+
+- Callers: only the evidence context under the runner identity. Writes need the grant scope `evidence.write` and reads `evidence.read`; only a runner grant carries them, and a kernel floors rule denies them to every other actor kind. The scope names `evidence.write`, `evidence.read` and `transparencylog.append` are reserved.
+- The store keeps opaque bytes. A record is its canonical form, keyed by change id and sequence. The provider never parses, canonicalizes or repairs records.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `AppendLocked` | `AppendLockedRequest` | `AppendLockedResponse` | `HIGH` | `SYNC` | true | false | - | scope `evidence.write` |
+| `GetRecord` | `GetRecordRequest` | `GetRecordResponse` | `READ` | `SYNC` | true | false | - | scope `evidence.read` |
+| `ListRange` | `ListRangeRequest` | `ListRangeResponse` | `READ` | `SYNC` | true | false | - | scope `evidence.read` |
+| `Head` | `HeadRequest` | `HeadResponse` | `READ` | `SYNC` | true | false | - | scope `evidence.read` |
+
+Conformance kit: [`conformance/evidencestore/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/evidencestore/v1).
+
+See [Record chain](/docs/evidence/record-chain).
+
+## transparencylog
+
+`proto/numinance/ports/transparencylog/v1/transparencylog.proto`. An append-only Merkle log that anchors chain heads and attestations, served by a log that signs its own checkpoints: a customer-local ledger, Rekor (public or private) or a Tessera-based C2SP log. No provider re-signs another log's checkpoints.
+
+- Callers: only the evidence context under the runner identity. `Append` needs the scope `transparencylog.append` and every read needs `evidence.read`.
+- A leaf is exactly 33 bytes: kind `0x48` (chain head) or `0x41` (attestation), then a raw 32-byte hash. The verifier computes the leaf hash itself from the entry bytes the log returns.
+- `Lookup` is gated by the capability `transparencylog.lookup`: a log without a search index does not serve it.
+
+| RPC | Request | Response | Risk | Exec | Idempotent | Dry run | Compensating action | Evidence, capability, scopes |
+|---|---|---|---|---|---|---|---|---|
+| `Append` | `AppendRequest` | `AppendResponse` | `HIGH` | `SYNC` | true | false | - | scope `transparencylog.append` |
+| `Checkpoint` | `CheckpointRequest` | `CheckpointResponse` | `READ` | `SYNC` | true | false | - | scope `evidence.read` |
+| `Prove` | `ProveRequest` | `ProveResponse` | `READ` | `SYNC` | true | false | - | scope `evidence.read` |
+| `Lookup` | `LookupRequest` | `LookupResponse` | `READ` | `SYNC` | true | false | - | capability `transparencylog.lookup`; scope `evidence.read` |
+
+Conformance kit: [`conformance/transparencylog/v1`](https://github.com/dsha256/numinance-spec/tree/3c74d59/conformance/transparencylog/v1).
+
+See [Anchoring and receipts](/docs/evidence/anchoring-and-receipts).
+
+## Conformance
+
+Every port has a conformance kit under `conformance/PORT/v1` in the spec repository (authorexecutor, ciexecutor, evidencestore, knowledge, sandboxprovider, scm, ticketing, transparencylog, verifier), and an `evidence` kit for the evidence format. A kit is the executable definition of "implements the port". Run a provider against its kit before you trust it. See [Conformance](/docs/integrations/conformance) and, for the evidence vectors, [Conformance vectors](/docs/evidence/conformance-vectors).
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| Plugin does not declare every side-effecting RPC of its port | Host refuses the provider. |
+| Request names a resource outside the grant | Denied before dispatch. |
+| Request carries a field the host's descriptor copy does not know | Rejected (strict decoding). Send a field added in a later minor only when the negotiated spec version is at least that minor, or behind a negotiated capability. |
+| Provider succeeds without a declared evidence record | Recorded as PARTIAL. |
+| Provider answer contains instructions | Treated as untrusted data; it changes no policy, grant, tool list or approval. |
+| Wrong identity calls a verb (for example the author calls `MergePullRequest`) | Refused by the policy floors before `Invoke`. |
+
+## Troubleshooting
+
+- A newer field is rejected by an older host: gate it on the negotiated spec version or on a capability.
+- A verb you expected is missing from the plugin's allowed set: it has a non-empty `capability`, so it must be in the negotiated capabilities, not only the manifest.
+
+## Next steps
+
+<Cards>
+  <Card title="Governance annotations" href="/docs/protocol/governance-annotations" description="What the risk, exec and evidence columns mean." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="Run the kit for a port against your provider." />
+  <Card title="Build a custom plugin" href="/docs/guides/build-custom-plugin" description="Implement a port end to end." />
+</Cards>

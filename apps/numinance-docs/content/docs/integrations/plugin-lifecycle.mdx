@@ -1,0 +1,200 @@
+---
+title: Plugin lifecycle
+description: The full life of a provider process, from the host launching it to shutdown, with the exact RPCs, bounds and failure behavior of plugin/v1.
+---
+
+<FeatureStatus kind="public-spec">
+The protocol, the handshake constants and the stream checks are in the public tree. The plugin host that runs this lifecycle is part of the proprietary runtime; the open tree contains the provider side of the contract and the reference checks a host applies, not a host.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/plugin/v1/plugin.proto", "proto/numinance/plugin/v1/host.proto", "proto/numinance/plugin/v1/envelope.proto", "sdk/go/plugin/handshake.go", "sdk/go/plugin/serve.go", "sdk/go/plugin/stream_check.go"]} />
+
+<ShortProductTruth>A provider never starts itself, never chooses its own authority, and never writes evidence. The host launches it, reads what it claims to be, hands it one approved action at a time, and records what happened.</ShortProductTruth>
+
+## When to read this
+
+Read this page if you are writing a provider, reviewing one, or deciding what the host can and cannot trust from a plugin process. The wire-level reference for each service is in [PluginService](/docs/protocol/plugin-service) and [HostService](/docs/protocol/host-service); this page puts them in order and says what fails where.
+
+## The sequence
+
+<PluginInvocationSequence />
+
+Two services are involved. `PluginService` is **served by the provider and called by the host**. `HostService` is **served by the host and called by the provider** while it serves an `Invoke`. Neither is ever exposed as a model tool and neither is an action target.
+
+| Step | Direction | RPC or mechanism | What the host decides |
+| --- | --- | --- | --- |
+| 1. Launch | host to process | `exec` with three environment variables | Which binary, which protocol versions to offer |
+| 2. Announce | provider to host | one line on stdout | Whether the line is well formed and the socket path is acceptable |
+| 3. Negotiate | host to provider | `PluginService.Handshake` | Which version and capabilities are agreed |
+| 4. Declare | host to provider | `PluginService.GetManifest` | Whether the manifest equals the installed one |
+| 5. Describe | host to provider | `PluginService.GetDescriptors` | Whether the provider's port files match the host's own copy |
+| 6. Decide | inside the host | policy evaluation and grant check | Allow or deny, before the provider is told anything |
+| 7. Invoke | host to provider | `PluginService.Invoke` (server stream) | Builds the `Envelope` and `ActionContext` |
+| 8. Call back | provider to host | `HostService.*` | Validates each call against the invocation in flight |
+| 9. Record | inside the host | evidence append under the runner identity | What is written; the provider only submits |
+| 10. Health | host to provider | `PluginService.Health` | Whether the provider accepts calls |
+| 11. Shutdown | host to provider | `PluginService.Shutdown` | Cancels, revokes, then kills after a bounded grace |
+
+## Launch and the magic cookie
+
+The host starts the provider as a subprocess and passes three environment variables. The names and values are constants in `sdk/go/plugin/handshake.go`.
+
+```go title="sdk/go/plugin/handshake.go"
+const (
+	CookieEnv    = "NUMINANCE_PLUGIN_COOKIE"
+	ProtocolsEnv = "NUMINANCE_PLUGIN_PROTOCOLS"
+	HostAddrEnv  = "NUMINANCE_HOST_ADDR"
+	MagicCookie  = "numinance.plugin.v1/6d0b2f94-3c1e-4a58-9f7d-1e5b8a2c4d63"
+)
+```
+
+The cookie is **not a secret and not authority**. Its only job is to stop someone from running a provider binary from a shell and being puzzled by a handshake line. A provider whose cookie is wrong refuses to serve. `HostAddrEnv` carries the host's `HostService` address as `unix:` plus an absolute path, and the provider's environment is otherwise only these variables.
+
+## The handshake line
+
+After checking the cookie, `plugin.Serve` picks the highest protocol version both sides speak, listens on a Unix socket inside a new directory with mode `0700`, and prints one line on stdout in the go-plugin wire format, `CORE-PROTOCOL-VERSION|APP-PROTOCOL-VERSION|NETWORK-TYPE|NETWORK-ADDR|PROTOCOL`. A host reads at most 1024 bytes and rejects any line that:
+
+- does not have exactly five fields (a sixth field, the go-plugin mutual TLS certificate, is refused: v1 carries none because the socket is reachable only by the host and the provider),
+- has a core version other than 1, an app version below 1, a network other than `unix` or a protocol other than `grpc`,
+- names an address that is not an absolute path of at most 103 bytes, or contains `.`, `..` or empty segments, or a non-printable character.
+
+A rejection names the field and never its value, because the line comes from a process the host does not trust.
+
+<VerifiedSnippet what="the sample provider launched with the cookie and one offered protocol version (path shortened)" exit="0">
+
+```text
+1|1|unix|<tmpdir>/nump427867795/p.sock|grpc
+```
+
+</VerifiedSnippet>
+
+The line was printed by the `sample-knowledge` binary built from the pinned spec checkout, started with `NUMINANCE_PLUGIN_COOKIE` set to the value above and `NUMINANCE_PLUGIN_PROTOCOLS=1`, then stopped with an interrupt. Starting it with `NUMINANCE_PLUGIN_PROTOCOLS=2` instead fails with `the host serves no protocol version this provider speaks (1)` and exit status 1. Binding the Unix socket is blocked inside this documentation's sandbox, so that launch was run outside it.
+
+## Handshake
+
+`Handshake` negotiates the protocol version, the spec version and the non-Core capabilities.
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+message HandshakeRequest {
+  string spec_version = 1;
+  repeated uint32 protocol_versions = 2;
+  repeated string ports = 3;
+  repeated string capabilities = 4;
+}
+
+message HandshakeResponse {
+  uint32 protocol_version = 1;
+  string spec_version = 2;
+  repeated string capabilities = 3;
+}
+```
+
+- `protocol_versions` must equal the `NUMINANCE_PLUGIN_PROTOCOLS` offer. At install both carry the host's full set. At run time both carry **only the version locked at install**, so a provider cannot talk the host down to a lower protocol later.
+- `HandshakeResponse.protocol_version` must be one of the offered versions and equal the version on the stdout line. A zero or unoffered value aborts the handshake.
+- Negotiated `capabilities` must be a subset of both the host's offer and the manifest. Any entry not in both aborts the handshake. Core verbs are never negotiated; only vendor features beyond the core are.
+- `ports` lists the installed manifest's ports, each at the major it declares. A port the host cannot serve at that major fails install.
+- `spec_version` is recorded in lifecycle evidence. It never selects the host's validation path.
+
+## Manifest and descriptors
+
+`GetManifest` returns the manifest the provider declares, at most 1 MiB serialized. It **must equal (`proto.Equal`) the manifest decoded from the installed package's `manifest.yaml`**, whose digest the lockfile pins, or the host refuses to start the plugin. It is never a source of intents or capabilities the install did not review. See [Manifest and capabilities](/docs/integrations/manifest-and-capabilities).
+
+`GetDescriptors` returns a `FileDescriptorSet` of the ports the provider implements, at most 2 MiB and 64 files. For every port the host serves, **the host's compiled copy is authoritative**:
+
+- A shared port file that differs from the host copy in any option fails install.
+- An RPC that is not in a port file the host serves is not dispatchable.
+- Plugin-private files must not use the `numinance.` or `google.` package prefixes and must not extend any `google.protobuf` options message.
+- Options are always read through the host's own registry, and `source_code_info` of plugin-supplied files is discarded.
+
+The practical consequence: a provider cannot redefine a method's risk class, execution mode or dry-run support to change how the host treats it. In Go, `plugin.DescriptorSet(file)` builds this answer from the generated port file and everything it imports.
+
+## Invoke
+
+`Invoke` is the only action-carrying RPC, and it only carries an action whose target is a method in a `numinance.ports.*` package. The target's annotations in the host's descriptor copy govern the call, never `Invoke`'s own.
+
+```proto title="proto/numinance/plugin/v1/plugin.proto"
+rpc Invoke(InvokeRequest) returns (stream InvokeResponse)
+```
+
+The host builds the `Envelope`: the full method name, the `ActionContext` (invocation id, change id, run id, actor kind and principal, grant id, policy decision id, plan and profile digests, idempotency key, deadline, budget, residency, dry run) and the typed request, at most 4 MiB. The host never dispatches without a policy decision. The provider never supplies or changes the context. See [Envelope and ActionContext](/docs/protocol/envelope-action-context).
+
+The stream shape is bounded and checked:
+
+| Rule | Bound |
+| --- | --- |
+| Messages in a stream | At most 1024 |
+| A `RUNNING` message | At most 64 KiB, and only status and diagnostics (plus one stream item on a server-streaming target) |
+| The terminal message | At most 4 MiB, the only one carrying `evidence_ids`, `side_effects` and cost |
+| Non-`OPERATION` target | Exactly one message |
+| Result | Required on `SUCCEEDED`, absent otherwise, with the method's output type URL |
+| Unknown fields | Rejected at any depth |
+
+`sdk/go/plugin.StreamCheck` is the reference implementation of these rules. A host calls `Next` for each message as it arrives and `End` when the stream closes, so it never buffers the stream. The first failure is sticky.
+
+```go title="sdk/go/plugin/stream_check.go"
+func NewStreamCheck(method protoreflect.MethodDescriptor, rule PortRule) (*StreamCheck, error)
+func (c *StreamCheck) Next(m *pluginv1.ActionResult) error
+func (c *StreamCheck) End() error
+```
+
+A stream that breaks any rule is rejected and recorded as failed. A provider rejection with no stream message may only end `FAILED`.
+
+## HostService callbacks
+
+While serving an `Invoke`, a provider can call the host. Every request names the `invocation_id` the host assigned; any other id is rejected, so a provider can act only inside the authority of the call it serves. The host identifies the calling plugin by the connection it established at launch, never by request content.
+
+| RPC | Risk | What it does | Per-invocation limit |
+| --- | --- | --- | --- |
+| `Log` | LOW | One structured log entry with a reason code and bounded fields, redacted by the host | 1024 |
+| `EmitEvidence` | LOW | Submits one evidence item; the host validates it and appends it | 256 |
+| `RequestCredential` | PRIVILEGED | Returns a handle for a declared credential intent, never credential material | 16 |
+| `ResolveReference` | READ | Streams the content of a referenced artifact in chunks of at most 64 KiB, after verifying its sha256 | 64 |
+| `ReportProgress` | READ | Reports `completed` and `total`, never decreasing | 1024 |
+
+At most 2048 `HostService` calls per invocation in total. A call over any count is rejected and the invocation is recorded `FAILED`.
+
+Three details matter for security:
+
+- **Credential handles.** `RequestCredential` returns an opaque `handle`, an `expires_at` no later than the invocation deadline, and an `egress_proxy` address. The provider sends a request carrying the handle to that proxy as an absolute-form HTTP request for a destination its manifest declared. The proxy applies the credential and re-originates the request over TLS. With `dry_run` set, the broker issues a handle only for a read-class intent.
+- **References, not content.** `ResolveReference` serves only a `Reference` found by walking the method's input type with the host's descriptor copy. A reference marked `host_only` is refused regardless of how it is spelled.
+- **Evidence is submitted, not appended.** `EmitEvidence` takes an `emit_key` unique per item (a replay with identical content returns the same `evidence_id`), a `record_type` that the capability declared and the host allows plugins to emit, and a payload of at most 16 KiB. Lifecycle, policy decision, gate, approval and credential-issuance records are host-authored and rejected here. Record fields such as ids, actor, grant and timestamp come from the host's invocation state, never from the payload.
+
+## Evidence
+
+The host records each lifecycle call in its own lifecycle evidence and each `Invoke` under the target's declared evidence. `ActionResult.evidence_ids` lists the ids `EmitEvidence` returned for this invocation; any other id is rejected. The host derives the outcome itself and never trusts the claimed status: `PARTIAL` is never claimed by a provider, the host derives it when declared evidence is missing. Denials are recorded too. The chain itself is described in [Evidence and trust](/docs/concepts/evidence-and-trust).
+
+## Health and shutdown
+
+`Health` returns `HEALTH_STATUS_SERVING` or `HEALTH_STATUS_NOT_SERVING`; a not-serving plugin accepts no calls, and the zero value is rejected.
+
+`Shutdown` asks the whole plugin to stop. Before calling it, the host cancels in-flight operations and revokes the plugin's credential handles and egress grants. The plugin starts no new work after it, and the host kills the process after a bounded grace period. The host may always kill the process. In the Go SDK, `Runtime.Stop` ends `Serve`; the sample's `Shutdown` answers first and then calls `rt.Stop` in a goroutine.
+
+## Failure semantics
+
+| What goes wrong | What happens |
+| --- | --- |
+| Wrong or missing cookie | `Serve` returns `ErrNotLaunchedByHost`; the binary exits 1 |
+| No protocol version in common | `Serve` returns an error; no handshake line is printed |
+| Handshake line malformed or over 1024 bytes | The host rejects it with an error naming the field |
+| Handshake response names a version or capability the host did not offer | The handshake aborts |
+| Manifest differs from the installed one | The host refuses to start the plugin |
+| Port file option differs from the host copy | Install fails |
+| Invoke stream breaks a bound or carries an unknown field | The stream is rejected and recorded as failed |
+| Reported side effect above the capability's declared one | The call fails |
+| Declared evidence missing from a succeeded call | The host derives `PARTIAL` |
+| `HostService` call over a limit, or an invocation id not in flight | The call is rejected; over a limit, the invocation is recorded `FAILED` |
+| Deadline passes | The host cancels the call |
+| `Shutdown` not honored | The host kills the process after the grace period |
+
+## Troubleshooting
+
+- **The binary prints the "started by the plugin host" message.** Expected. It was run by hand; see [Write a plugin in Go](/docs/integrations/custom-plugin-go).
+- **The host rejects your descriptors.** You shipped a modified port file, or a private file under a reserved package prefix. Use the generated port descriptors unchanged.
+- **A call fails with a bound error naming `messages[3]`.** Paths are index based and never echo values. Check the stream bounds above against what your provider sent.
+
+## Next steps
+
+<Cards>
+  <Card title="Manifest and capabilities" href="/docs/integrations/manifest-and-capabilities" description="What the manifest declares and how the host compares it with grants." />
+  <Card title="PluginService reference" href="/docs/protocol/plugin-service" description="Field-level reference for the lifecycle RPCs." />
+  <Card title="Plugin host architecture" href="/docs/architecture/plugin-host" description="Where the host sits relative to the trust kernel and the egress proxy." />
+</Cards>

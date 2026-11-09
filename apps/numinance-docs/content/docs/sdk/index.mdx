@@ -1,0 +1,67 @@
+---
+title: SDKs
+description: Which language SDKs exist under numinance-spec today, what each one contains, and how to build against the contract in a language that has no SDK yet.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Go ships handwritten packages plus generated stubs. Python and TypeScript are generated stubs only. Rust and Java are not available yet.
+</FeatureStatus>
+
+<SourceReference paths={["sdk/", "proto/", "buf.gen.yaml"]} />
+
+<ShortProductTruth>
+  Build once against the contract. Bring your own capabilities. The SDKs are conveniences over the public Protobuf definitions; none of them is required, and none of them is the authority.
+</ShortProductTruth>
+
+## Language matrix
+
+<Cards>
+  <Card title="Go" href="/docs/sdk/go" description="Handwritten packages (plugin, ports, kindyaml, schema, cli, evidenceverify) plus generated stubs. Module path github.com/numinance/numinance-spec." />
+  <Card title="Python" href="/docs/sdk/python" description="Generated Protobuf and gRPC stubs, version 0.0.0. Generate from source; no package-index publication is claimed." />
+  <Card title="TypeScript" href="/docs/sdk/typescript" description="Generated protobuf-es code. The package is marked private at 0.0.0, so it is not installable from a registry." />
+  <Card title="Rust" href="/docs/sdk/rust" description="Coming soon. Not available; no distribution exists yet." />
+  <Card title="Java" href="/docs/sdk/java" description="Coming soon. Not available; no distribution exists yet." />
+  <Card title="Any other language" href="/docs/sdk/generating-clients" description="Generate Protobuf clients from the public .proto files. This is interoperability, not an official SDK." />
+</Cards>
+
+## What an SDK is and is not
+
+The contract is the set of `.proto` files under `proto/numinance/` plus the JSON Schemas generated from the configuration kinds. An SDK in this repository is one of three things:
+
+1. **Generated stubs.** Messages and service clients produced from the `.proto` files by a pinned generator. Python and TypeScript are only this.
+2. **Handwritten helpers.** Code that applies rules a Protobuf schema cannot express: stream-shape checks, a strict YAML loader, an offline evidence verifier. Only Go has these.
+3. **Command logic.** The Go package behind the `numi` command line, which the private engine build also runs.
+
+None of the SDKs is the Numinance engine. Importing one does not give you an autonomous engineer, and it cannot widen a grant, approve a change or bypass policy. Authority stays with the runtime and your policy.
+
+## Capability matrix
+
+The matrix below is generated from the same source as the rest of the site, so every row on every page agrees.
+
+<CapabilityMatrix />
+
+## Readiness of each SDK
+
+<AvailabilityMatrix group="SDKs" />
+
+## Choosing a path
+
+| You want to | Use |
+| --- | --- |
+| Load and validate kind YAML in a Go program | `sdk/go/kindyaml` (see [Go SDK](/docs/sdk/go)) |
+| Verify an evidence export offline from code | `sdk/go/evidenceverify` or `numi evidence verify` ([CLI](/docs/cli/evidence-verify)) |
+| Write a provider plugin | Go, against `sdk/go/plugin` and the generated stubs ([Custom plugin in Go](/docs/integrations/custom-plugin-go)) |
+| Read or write Numinance messages from Python or TypeScript | Generated stubs, built from source ([Python](/docs/sdk/python), [TypeScript](/docs/sdk/typescript)) |
+| Work in Rust, Java or any other language | Generate Protobuf clients yourself ([Generating clients](/docs/sdk/generating-clients)) |
+
+<Callout type="warn" title="No tagged release yet">
+  The repository declares Go 1.27 and the module is not tagged. Treat every SDK surface as pre-alpha: it can change before a tag, and the versioning policy for untagged packages is in the [versioning page](/docs/project/versioning).
+</Callout>
+
+## Next steps
+
+<Cards>
+  <Card title="Go SDK" href="/docs/sdk/go" description="Exact packages, import paths and a compile-checked example." />
+  <Card title="Generating clients" href="/docs/sdk/generating-clients" description="Build a client in any language from the public .proto files." />
+  <Card title="Protocol overview" href="/docs/protocol" description="The services and messages every SDK targets." />
+</Cards>

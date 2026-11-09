@@ -1,0 +1,74 @@
+---
+title: Authority and policy
+description: How a policy decision point outside the model, scoped grants, a credential broker and four separate identities bound what an agent can do.
+---
+
+<FeatureStatus kind="designed">
+  The decision point, broker and breaker are part of the proprietary runtime. The principal kinds and autonomy levels are public types.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/kinds/v1/playbook.proto"]} note="PrincipalKind and AutonomyLevel." />
+
+<ShortProductTruth>
+  Your policy decides. Not the model.
+</ShortProductTruth>
+
+## Explorer
+
+<AutonomyPolicyExplorer />
+
+## Decision point
+
+Before any privileged action the runtime asks a policy decision point, outside the model, for a decision of allow, deny or require approval. The input names the action and its risk, the actor and its kind, the change and its state, the autonomy level and floor, residency, remaining budget, present and required evidence and the digests of the profile, policy and plan. The result carries reasons, obligations such as extra evidence or dual control, approver constraints that exclude the author, and a decision identifier recorded in evidence. Floors are evaluated first and default to deny. Policy bundles are signed and verified at load; customer floors cannot be overridden by lower scopes.
+
+## Autonomy ladder
+
+The ladder is `AUTONOMY_LEVEL_OBSERVE`, `_SUGGEST`, `_IMPLEMENT`, `_PR`, `_MERGE`, `_STAGE`, `_RELEASE` and `_OPERATE`. A level is set per scope with inheritance and floors. Promotion is proposed from qualification statistics and accepted by a human; it is never automatic. The sandbox profile of the host also caps the effective level.
+
+## Grants
+
+A grant derives capabilities, resource scope, budgets, residency class, environment scope and expiry from the profile, playbook step, risk and level. It is immutable. A run can request a narrower grant for a sub-step and never a wider one. Every capability call and credential handle references its grant.
+
+## Capability broker
+
+The broker converts a grant plus a plugin's credential intent into the minimum material for one step: short-lived scoped sessions, or an injection rule for the egress proxy so the sandbox never sees bearer material. Handles expire with the step and are revoked on completion or breaker trip. The model never receives reusable credentials.
+
+## Four identities
+
+| Identity | `PrincipalKind` | Can | Cannot |
+| --- | --- | --- | --- |
+| Author agent | `PRINCIPAL_KIND_AUTHOR_AGENT` | Write in its sandbox, open pull requests | Approve, merge its own work, edit protected paths |
+| Reviewer agent | `PRINCIPAL_KIND_REVIEWER_AGENT` | Read-only review on a different model vendor | Write, issue the verdict alone |
+| Release pipeline | `PRINCIPAL_KIND_RELEASE_PIPELINE` | Merge and deploy where policy allows | Author the change it releases |
+| Human approver | `PRINCIPAL_KIND_HUMAN_APPROVER` | Approve where required | Approve their own change |
+
+The runner (`PRINCIPAL_KIND_RUNNER`) writes evidence and holds no customer credentials. Break-glass (`PRINCIPAL_KIND_BREAK_GLASS`) is a named human, time-boxed, and impossible for any agent identity to invoke.
+
+Policy denies an approver that equals the author, or that shares the author's run, structurally. Only the release pipeline deploys; deploy credentials are absent from the coding sandbox.
+
+## Circuit breaker
+
+The breaker has four positions: full automation, PR only, read only and stopped. It can be tripped by a human, an incident detector, budget or policy anomalies, an evidence-write failure or provider drift. Effects: revoke handles, pause at the next checkpoint, cap effective autonomy, record evidence. Reset needs a human and a reason. It runs in the customer runtime with no control plane dependency.
+
+## Boundary table
+
+| Question | Answer |
+| --- | --- |
+| Who decides | The policy decision point |
+| Who can widen a grant | No one holding it; a new grant is issued by policy |
+| Who can approve | An authenticated human distinct from the author |
+| Who can deploy | The release pipeline only |
+| Who can stop everything | A human, via the local breaker |
+
+## Failure cases
+
+- Agent asks for a tool outside its grant: denied and recorded as `TOOL_DENIED`.
+- Budget exhausted: pause and escalate.
+- Approver equals author: decision refused.
+- Policy bundle fails signature verification: load fails closed.
+
+<Cards>
+  <Card title="Autonomy policy" href="/docs/configuration/autonomy-policy" description="Configure the ladder." />
+  <Card title="Circuit breaker" href="/docs/operations/circuit-breaker" description="Operating the breaker." />
+  <Card title="Risk and approval" href="/docs/operations/risk-and-approval" description="Approval flows." />
+</Cards>

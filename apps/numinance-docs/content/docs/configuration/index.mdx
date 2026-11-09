@@ -1,0 +1,96 @@
+---
+title: Configuration
+description: How the typed YAML under .numinance/ works, the shared envelope, every configuration kind with its scope and owning page, and how scopes layer.
+---
+
+<FeatureStatus kind="public-spec">
+The kinds, their JSON Schemas and the open `numi validate --files` check are public. Profile resolution, floors and runtime enforcement belong to the proprietary engine, which is not generally available.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/meta.proto", "sdk/go/kindyaml/README.md", "schemas/examples"]} />
+
+<ShortProductTruth>Your SDLC is typed, reviewable YAML in your repositories. Your policy decides. Not the model.</ShortProductTruth>
+
+## How `.numinance/` works
+
+Numinance reads its configuration from a `.numinance/` directory in each repository, and from an organization policy repository for the org scope. Every file is one YAML document of one **kind**, and every kind is a protobuf message in `numinance.kinds.v1`. The JSON Schema used to validate the YAML is generated from those messages, so the proto, the schema and the loader cannot drift apart silently.
+
+Configuration is code. It goes through pull requests, branch protection and CODEOWNERS. The directory `.numinance/policy/` is the protected location: a policy-bearing document carries authority only when it is read from the protected branch of the repository or from a signed policy bundle. See [Layout and scopes](/docs/configuration/layout-and-scopes).
+
+## The envelope
+
+All kinds share one envelope.
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml (head)"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+```
+
+<TypeTable type={{
+  apiVersion: { type: "string", description: "Required. Must equal numinance.dev/v1. The loader enforces it.", required: true },
+  kind: { type: "string", description: "Required. The message name of the kind, for example SDLCProfile. Must match the spec body.", required: true },
+  metadata: { type: "Metadata", description: "Required. The loader enforces it; the schema cannot.", required: true },
+  "metadata.name": { type: "string", description: "Required, unique per kind and scope. Other kinds reference the object by this name. Not empty, at most 253 bytes, no control or bidi characters.", required: true },
+  "metadata.scope": { type: "SCOPE_ORG | SCOPE_REPO | SCOPE_COMPONENT", description: "Required. SCOPE_UNSPECIFIED is rejected by the loader.", required: true },
+  spec: { type: "object", description: "Required. The kind-specific body. The loader enforces its presence.", required: true },
+  extensions: { type: "map<string, any>", description: "Vendor or customer data under reverse-DNS keys. The engine never reads it. Not for credentials, endpoints or caps." },
+}} />
+
+Three spelling rules are worth memorising. The envelope key is `apiVersion`; every other key is `snake_case`. Enum values are written with their full proto name (`AUTONOMY_LEVEL_PR`, not `PR`). Durations use the protobuf JSON form (`7200s`). Unknown fields are errors everywhere except under `extensions`.
+
+## Kinds
+
+The proto directory defines sixteen kinds and the shared `meta` file. Fifteen kinds are authored (one of them, `EvalSet`, is alpha); `ContextBundle` is produced by Numinance and never loaded as configuration.
+
+| Kind | Scope | Purpose | Page |
+| --- | --- | --- | --- |
+| `SDLCProfile` | org, repo, component | Binds a component to stages, playbooks, packs, toolchains, adapters, autonomy, residency and budgets. | [SDLCProfile](/docs/configuration/sdlc-profile) |
+| `StageRegistry` | any; selected only by the org profile | Maps your stage names onto the fixed Change state machine. | [StageRegistry](/docs/configuration/stage-registry) |
+| `Playbook` | any | The procedure for one change type: steps, bounded repair, qualification. | [Playbooks](/docs/configuration/playbooks) |
+| `AutonomyPolicy` | any; floors only at org | Autonomy level per playbook, risk class and environment, under floors. | [AutonomyPolicy](/docs/configuration/autonomy-policy) |
+| `LanguageToolchain` | any | Language version and the deterministic verifiers for one language. | [Toolchains and packs](/docs/configuration/toolchains-and-packs) |
+| `ArchitecturePack` | any | Conventions bound to checks; a rule without a check fails validation. | [Toolchains and packs](/docs/configuration/toolchains-and-packs) |
+| `AdapterSelector` | any | Which provider and instance implements each port for a scope. | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `EnvironmentProvider` | any | How disposable environments are created. | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `IndexerPlugin` | any | How the code graph is built. | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `ExecutorManifest` | org only | Declares an author executor: adapter, capabilities, models, cost class. | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `KnowledgeConnection` | org only | An approved, read-only knowledge source the context resolver may search. | [KnowledgeConnection](/docs/configuration/knowledge-connection) |
+| `ControlPack` | org only | Controls of one compliance framework, required evidence and approvals, and added floors. | [Governance kinds](/docs/configuration/governance-kinds) |
+| `ResidencyPolicy` | any; floors only at org | Where execution and inference may happen, and data-handling limits. | [Governance kinds](/docs/configuration/governance-kinds) |
+| `BudgetPolicy` | any | Per-Change and per-run limits; exhaustion pauses and escalates. | [Governance kinds](/docs/configuration/governance-kinds) |
+| `EvalSet` | alpha, `v1alpha1` | Versioned, reference-only replay cases. Not part of profile resolution. | [Evals and ContextBundle](/docs/configuration/evals-and-context-bundle) |
+| `ContextBundle` | produced | The knowledge selected for one stage of one work unit. Never authored. | [Evals and ContextBundle](/docs/configuration/evals-and-context-bundle) |
+| `meta` (`Metadata`, `Scope`, `MergeDirective`) | not a kind | The envelope, the scope enum and the merge directives every kind uses. | this page |
+
+The scope column reads the proto and loader: `KnowledgeConnection`, `ControlPack` and `ExecutorManifest` are org-scoped only (the loader refuses another `metadata.scope`). A field marked with the `FORBID` merge directive can be set only by a document whose `metadata.scope` is `SCOPE_ORG`, or by a control pack.
+
+## Scopes, layering and precedence
+
+Three scopes exist: `SCOPE_ORG` applies to every repository of the organization, `SCOPE_REPO` to one repository, `SCOPE_COMPONENT` to one component of a repository. Resolution loads org, then repo, then component, a maximum depth of three. Each field of a kind declares how it merges.
+
+| Directive | Meaning |
+| --- | --- |
+| (none) | A singular message merges field by field. A scalar, enum, list, map or well-known type is replaced by the narrower scope. A `oneof` is replaced as a unit. |
+| `MERGE_DIRECTIVE_REPLACE` | The narrower scope's value replaces the whole value, a message included. Adapter bindings use it so one scope's provider is never paired with another scope's instance. |
+| `MERGE_DIRECTIVE_APPEND` | Keeps the wider scope's names, then adds the narrower scope's names not already present. Only on repeated string fields. A repository can add a playbook but cannot remove a control pack the org applies. |
+| `MERGE_DIRECTIVE_FORBID` | A floor. Only a kind loaded from the org scope, or a control pack, may set it. A narrower scope fails validation. |
+
+Two consequences define the trust model. A floor cannot be lowered by the scope it constrains. And a repository that asks for a playbook, toolchain or adapter name the org did not grant gets that name recorded as ignored (`outside the org-granted set`) and not applied; only the org scope selects the stage registry and grants names.
+
+<DesignNote title="Resolution and provenance">
+The design resolves the three layers into one profile with a pure function: the same inputs always give the same result. The resolved profile, together with the lockfile digests, is hashed to a profile digest that appears in every grant, evidence record and attestation, and provenance records which scope contributed each field. The open build does not run this resolution. Ordinary `numi validate` loads your documents, then stops with exit 7 and `profile resolution needs the Numinance engine build`.
+</DesignNote>
+
+## What the open tools check
+
+`numi validate --files PATH` runs the generated strict schema and the loader checks on each document. It does not resolve profiles, check floors across files or confirm that a named provider is installed. Every kind in `schemas/examples` passes it. See [Validation and errors](/docs/configuration/validation-and-errors) for the full catalogue of what is and is not caught, and [numi validate](/docs/cli/validate) for flags and exit codes.
+
+## Next steps
+
+<Cards>
+  <Card title="Layout and scopes" href="/docs/configuration/layout-and-scopes" description="Where files live, which path is protected, and the limits the loader enforces." />
+  <Card title="SDLCProfile" href="/docs/configuration/sdlc-profile" description="The document that binds a component to everything else." />
+  <Card title="First configuration" href="/docs/get-started/first-configuration" description="Generate and validate a real .numinance/ tree with numi init." />
+</Cards>

@@ -1,0 +1,60 @@
+---
+title: Verification and recovery
+description: How deterministic checks, an independent reviewer, bounded repair, canary observation, rollback and escalation decide whether a change keeps its authority.
+---
+
+<FeatureStatus kind="designed">
+  Verification orchestration is part of the proprietary runtime. The verifier port and the Playbook field that bounds repair are public.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/ports/verifier/v1/verifier.proto", "proto/numinance/kinds/v1/playbook.proto"]} />
+
+<ShortProductTruth>
+  Verification assembles independent evidence that a candidate deserves authority. The AI reviewer is one input, never the boundary.
+</ShortProductTruth>
+
+## Flow
+
+<VerificationAndRepair />
+
+## Layers
+
+Checks run in order and each layer short-circuits on failure into the repair loop: compile and type check; lint and format; existing tests; tests the agent wrote; mutation or property tests where the playbook asks; security scanning; architecture checks; compatibility checks; migration and deployment rehearsal; secondary AI review; the policy gate; and a canary after release. Verifiers are capability providers behind the verifier port with a `Run` RPC. They run under the reviewer identity in their own sandbox with read-only access to the candidate, and findings are stored as artifacts referenced by digest.
+
+## Independent reviewer
+
+The reviewer runs on a different model vendor with read-only tools and checks intent-to-implementation fit, test adequacy and risk. It returns findings with confidence and references, not a verdict. Its false-accept and false-reject rates are tracked per playbook. Deterministic checks come first so that correlated model error cannot be the only barrier.
+
+## Bounded repair
+
+On failure the change re-enters implementation with the findings reference as its only new input. The number of attempts is `max_repair_attempts` on the Playbook: finite, 0 to 10, defaulting to 2. After that the change is escalated. This is bounded repair, not unlimited retry.
+
+## Rehearsal, canary and rollback
+
+A disposable environment applies migrations and infrastructure changes in dry-run or plan mode and then for real, recording timings and plan digests, and is destroyed at its time to live. After release, a canary window evaluates service level objectives and declared business invariants. A regression triggers rollback under the release identity and opens a corrective change.
+
+## Escalation
+
+Escalation hands a change to a human with the findings, the evidence so far and the state. A human signal can resume implementation or abandon. Escalation never raises the autonomy level.
+
+## Boundary table
+
+| Party | Verifies | Cannot |
+| --- | --- | --- |
+| Deterministic verifiers | Findings against rules | Issue authority |
+| Reviewer agent | Fit and risk | Write, decide alone |
+| Policy gate | The aggregate verdict and required evidence | Be overridden by the author |
+| Release identity | Rollback | Exceed policy |
+
+## Failure cases
+
+- Verifier unavailable (for example a sandboxed test runner that is not ready): the layer is reported unavailable, not passed.
+- Repair attempts exhausted: escalate.
+- Canary regression: rollback and a corrective change.
+- Seeded defects not caught in replay: the playbook is not eligible for promotion.
+
+<Cards>
+  <Card title="Reliability and recovery" href="/docs/concepts/reliability-and-recovery" description="Concept view." />
+  <Card title="Rollback and recovery" href="/docs/operations/rollback-and-recovery" description="Operating recovery." />
+  <Card title="Verify a run" href="/docs/guides/verify-a-run" description="Check the evidence." />
+</Cards>

@@ -1,0 +1,174 @@
+---
+title: Toolchains, architecture packs and indexers
+description: Declare the language version and deterministic verifiers, bind architecture rules to checks, and choose the indexers that build the code graph.
+---
+
+<FeatureStatus kind="public-spec">
+  The three kinds below are defined in the public schema and validate with the open `numi validate --files`. Resolving them into a profile, and running the verifiers they name, happens in the proprietary runtime, which is not generally available.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/kinds/v1/language_toolchain.proto",
+    "proto/numinance/kinds/v1/architecture_pack.proto",
+    "proto/numinance/kinds/v1/indexer_plugin.proto",
+    "schemas/examples/LanguageToolchain/go-1.27.yaml",
+    "schemas/examples/ArchitecturePack/layered-service.yaml",
+    "schemas/examples/IndexerPlugin/polyglot.yaml",
+  ]}
+/>
+
+<ShortProductTruth>
+  A LanguageToolchain says which language version a component uses and which deterministic verifiers judge a change. An ArchitecturePack ties each convention to a check that can fail. An IndexerPlugin names who builds the code graph. None of them tells a model what to do; they tell the platform what to measure.
+</ShortProductTruth>
+
+## When to use these kinds
+
+Use them when a repository needs checks that do not depend on a model's opinion. Verifiers are the independent layer of [verification and repair](/docs/architecture/verification-recovery): the author agent proposes a change, and the toolchain's verifiers, not the author, decide whether it passes. An architecture rule is only enforceable if some verifier can report it, which is why the schema refuses a rule without a check.
+
+All three share the standard envelope described in [layout and scopes](/docs/configuration/layout-and-scopes): `apiVersion: numinance.dev/v1`, `kind`, `metadata.name`, `metadata.scope` and an optional `extensions` map under reverse-DNS keys.
+
+## Where they apply
+
+| Kind | Scopes in the public examples | Merge behaviour that the schema declares |
+| --- | --- | --- |
+| `LanguageToolchain` | `SCOPE_ORG` | `formatters` is appended: a narrower scope adds names to the wider scope's list |
+| `ArchitecturePack` | `SCOPE_ORG` | none declared; the pack is referenced by name from an SDLCProfile |
+| `IndexerPlugin` | `SCOPE_REPO` | none declared |
+
+Only the kinds named `orgOnly` in the loader (KnowledgeConnection, ControlPack, ExecutorManifest) are refused below the org. The three kinds on this page accept any non-zero scope, and the SDLCProfile decides which names a component uses. Whether a repository may select a name the org has not granted is a profile-resolution question; the open build does not answer it.
+
+## LanguageToolchain
+
+<TypeTable type={{
+  "spec.language": { type: "string", description: "Required. Matches ^[0-9A-Za-z.+-]{1,64}$.", required: true },
+  "spec.version": { type: "string", description: "Required. The language version, same pattern. Toolchain artifacts are pinned by digest in the lockfile, never by this string.", required: true },
+  "spec.verifiers": { type: "ToolchainVerifier[]", description: "Required and non-empty. The loader enforces non-empty; the schema cannot.", required: true },
+  "spec.verifiers[].name": { type: "string", description: "Required, unique in the toolchain. Playbook steps and architecture checks reference a verifier by this name.", required: true },
+  "spec.verifiers[].provider": { type: "string", description: "Required. The extension id of a verifier-port provider. It must resolve to a lockfile entry.", required: true },
+  "spec.verifiers[].config": { type: "object", description: "Passed to the verifier as is. The engine never reads it." },
+  "spec.formatters": { type: "string[]", description: "Formatter names. Each resolves to a declared provider with a lockfile entry; a name is never executed as a command. Merge: append." },
+  "spec.package_manager": { type: "string", description: "A name that resolves to a declared provider, never a command." },
+}} />
+
+```yaml title="schemas/examples/LanguageToolchain/go-1.27.yaml"
+apiVersion: numinance.dev/v1
+kind: LanguageToolchain
+metadata: {name: go-1.27, scope: SCOPE_ORG}
+spec:
+  language: go
+  version: "1.27"
+  verifiers:
+    - {name: unit-tests, provider: dev.numinance.official/go-test, config: {race: true}}
+    - {name: lint, provider: dev.numinance.official/golangci-lint}
+  formatters: [gofmt]
+  package_manager: go-modules
+```
+
+A provider id such as `dev.numinance.official/go-test` is a reference, not an installation. In the designed runtime it must resolve to a signed, digest-pinned entry in the lockfile before it runs; the schema checks only that the string is well formed. See [registry and trust](/docs/integrations/registry-and-trust).
+
+## ArchitecturePack
+
+<TypeTable type={{
+  "spec.rules": { type: "ArchitectureRule[]", description: "Required and non-empty.", required: true },
+  "spec.rules[].id": { type: "string", description: "Required, unique in the pack.", required: true },
+  "spec.rules[].statement": { type: "string", description: "Required. The convention in plain language. It is untrusted text, delimited and labelled as untrusted when it reaches a prompt.", required: true },
+  "spec.rules[].severity": { type: "FINDING_SEVERITY_INFO | _LOW | _MEDIUM | _HIGH | _CRITICAL", description: "Required. The severity of a finding of this rule. What a severity blocks is policy, not this enum.", required: true },
+  "spec.rules[].check": { type: "ArchitectureCheck", description: "Required. A rule without a check fails validation.", required: true },
+  "spec.rules[].check.verifier": { type: "string", description: "Required. The name of the verifier that runs the check.", required: true },
+  "spec.rules[].check.rule_id": { type: "string", description: "Required. The verifier's id of the rule its findings carry.", required: true },
+  "spec.rules[].check.config": { type: "object", description: "Passed to the verifier as is. The engine never reads it." },
+}} />
+
+```yaml title="schemas/examples/ArchitecturePack/layered-service.yaml"
+apiVersion: numinance.dev/v1
+kind: ArchitecturePack
+metadata: {name: layered-service, scope: SCOPE_ORG}
+spec:
+  rules:
+    - id: no-domain-io
+      statement: The domain layer performs no I/O.
+      severity: FINDING_SEVERITY_HIGH
+      check: {verifier: lint, rule_id: domain-imports, config: {forbidden: [net, os, database/sql]}}
+    - id: handlers-thin
+      statement: Transport handlers hold no business rules.
+      severity: FINDING_SEVERITY_MEDIUM
+      check: {verifier: lint, rule_id: transport-imports}
+```
+
+`check.verifier: lint` names the `lint` verifier of the toolchain above. The open loader does not cross-check that reference; it is resolved when the profile is built.
+
+An architecture rule is a convention that appears in two places. Its `statement` can reach a model as guidance inside a [context bundle](/docs/configuration/evals-and-context-bundle), labelled untrusted. Its `check` is the part that enforces. Enforcement never comes from the model having read the sentence.
+
+## IndexerPlugin
+
+<TypeTable type={{
+  "spec.indexers": { type: "Indexer[]", description: "Required and non-empty.", required: true },
+  "spec.indexers[].provider": { type: "string", description: "Required. The extension id of an indexer-port provider.", required: true },
+  "spec.indexers[].languages": { type: "string[]", description: "The languages the provider indexes." },
+  "spec.indexers[].edge_overlays": { type: "string[]", description: "Edge overlays added to the graph." },
+}} />
+
+```yaml title="schemas/examples/IndexerPlugin/polyglot.yaml"
+apiVersion: numinance.dev/v1
+kind: IndexerPlugin
+metadata: {name: polyglot, scope: SCOPE_REPO}
+spec:
+  indexers:
+    - provider: dev.numinance.official/scip-go
+      languages: [go]
+      edge_overlays: [http-routes]
+    - provider: dev.numinance.official/tree-sitter
+      languages: [python, typescript]
+extensions:
+  com.example.indexing: {nightly: true}
+```
+
+The `extensions` block shows the one place free-form data is allowed. Keys must be reverse-DNS, and the engine never reads them. Do not put credentials, endpoints or tool mappings there.
+
+## Security implications
+
+- Names are references, not commands. `formatters`, `package_manager` and `provider` are resolved against declared providers and the lockfile. A string in these fields is never handed to a shell.
+- `config` is opaque to the engine and is passed to the verifier. Treat it as the verifier's own contract and review it like code.
+- Verifier results are inputs to policy. A failing check lowers confidence and can block a stage; a passing check does not grant authority. Policy is evaluated outside the model before every privileged action.
+- A verifier that runs candidate code (for example a unit-test runner) needs an isolated execution environment. The `numi init` output notes that its generated Python `unit-tests` verifier is unavailable in the live verifier provider until a nested sandbox exists, so a verdict that depends on it comes out inconclusive, never as a pass.
+
+## Real failures
+
+I edited copies of the example files and ran the open validator. Each error below is the verbatim output; the path in the command is a scratch copy.
+
+<VerifiedSnippet what="Edited copies of the examples, run with the open numi build">
+
+```text
+$ numi validate --files bad/doc.yaml      # "verifiers:" renamed to "verifier:"
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/verifier\": additionalProperties
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # "verifiers: []"
+invalid  file "doc.yaml": kind: invalid: numinance.kinds.v1.LanguageToolchainSpec.verifiers is empty
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # a rule with no "check"
+invalid  file "doc.yaml": kind: invalid: numinance.kinds.v1.ArchitectureRule.check is empty
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # severity: HIGH instead of FINDING_SEVERITY_HIGH
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/rules/0/severity\": enum
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # extensions key "indexing" instead of "com.example.indexing"
+invalid  file "doc.yaml": kind: invalid: a key of numinance.kinds.v1.IndexerPlugin.extensions is not reverse-DNS
+(exit 3)
+```
+
+</VerifiedSnippet>
+
+Enums are always the full proto name. `HIGH` is not accepted; `FINDING_SEVERITY_HIGH` is.
+
+## Next steps
+
+<Cards>
+  <Card title="Validation and errors" href="/docs/configuration/validation-and-errors" description="Exit codes, the loader stages, and what a pass does not prove." />
+  <Card title="Verification and recovery" href="/docs/architecture/verification-recovery" description="How independent verifiers and bounded repair use these declarations." />
+  <Card title="Playbooks" href="/docs/configuration/playbooks" description="Steps that reference verifiers by name." />
+</Cards>

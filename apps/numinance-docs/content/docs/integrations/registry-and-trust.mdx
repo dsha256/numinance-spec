@@ -1,0 +1,117 @@
+---
+title: Registry and trust
+description: The designed distribution model for extensions, signed, digest-pinned and permission-declared, with permission-widening re-approval, trust tiers and human-approved capability-gap synthesis.
+---
+
+<FeatureStatus kind="designed">
+This page describes the intended distribution and trust model. There is no public registry, no public install command, no tier badges and no capability-gap factory. What is public today is the contract these mechanisms operate on: the manifest, its digest and signer fields, the permissions delta and the plugin protocol.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/plugin/v1/manifest.proto", "proto/numinance/plugin/v1/plugin.proto", "proto/numinance/ports/sandboxprovider/v1/sandboxprovider.proto"]} note="Only the manifest and protocol are public. The registry, governed install and capability builder are proprietary and under development." />
+
+<ShortProductTruth>An extension is not trusted because it is installed. It is trusted to the exact bytes, signer and permissions that a human or a policy approved, and it needs approval again the moment it asks for more.</ShortProductTruth>
+
+<Callout type="warn" title="Not a public factory">
+Nothing here lets you download, publish or generate a plugin today. The only runnable parts are in the open tree: the Go plugin SDK, a sample provider, and conformance kits. Do not read this page as an installation guide. For what you can run, see [Write a plugin in Go](/docs/integrations/custom-plugin-go) and [Conformance](/docs/integrations/conformance).
+</Callout>
+
+## When to read this
+
+Read it when you need to judge whether the extension model is strict enough for your environment, when you plan to build providers that will eventually be installed under a governed process, or when you wonder how an agent that is missing a capability can obtain one without granting itself authority.
+
+## The four extension classes
+
+The manifest `kind` already fixes the ceiling of authority.
+
+| Class | Contains | Authority | Trust requirement (design) |
+| --- | --- | --- | --- |
+| Skill | Knowledge rendered into guidance | None | Signed, content reviewed |
+| Playbook | Declarative procedure | Shapes grants, never widens them | Signed, schema-validated |
+| Control pack | Checks and constraints | Can only restrict | Signed, with a recorded review of its jurisdiction |
+| Capability provider | Executable plugin implementing ports | Explicit declared intents, enforced by the host | Signed, SBOM, provenance, conformance, permission diff on upgrade |
+
+## Governed install (designed)
+
+A capability provider is installed by a governed process owned by the runtime, not by copying a binary. The design has these steps, in order:
+
+1. **Verify signature and provenance.** The package is checked against a keyless signature identity (an OIDC issuer plus subject). The `signer_identity` in the manifest must match the verified identity exactly on both parts, and the SBOM and provenance references must verify. A mismatch fails the install.
+2. **Recompute the digest.** The host hashes the package content (with `manifest.yaml` excluded) and compares it with the declared `digest`. It pins the value it computed, never the declared one.
+3. **Compute the permission change.** The host compares the new manifest with the locked one and derives the permissions delta itself. See [widening rules](/docs/integrations/manifest-and-capabilities#permissions-delta-and-widening).
+4. **Run the conformance suite in a sandbox.** The `conformance_suite` named by each capability is looked up in the host's kit index and run by the host. It is a claim the host verifies, not one it takes on trust.
+5. **Evaluate policy.** Widening always requires approval. A lower-trust tier is non-production by default.
+6. **Pin and record.** The digest, content hashes and signer identity are written to the lockfile, and the install is recorded as evidence.
+
+Versions are locked for the duration of a change. There is no dynamic installation during a run.
+
+Parts of this are visible in the public protocol. The manifest comments define the install-time comparisons exactly (a rollback is a widening; a version equal to the locked one with a different digest is rejected; no lock entry means the whole manifest is a widening). The install itself, the lockfile writer and the approval workflow are not in the public tree.
+
+## Digest-pinned, signed, permission-declared
+
+The three properties are enforced at different points:
+
+| Property | Where it is declared | How it is enforced |
+| --- | --- | --- |
+| **Digest-pinned** | `Manifest.digest`; the lockfile entry | The host recomputes the digest at install; at launch the running manifest must equal the installed one, and the process is the pinned one |
+| **Signed** | `Manifest.signer_identity`, `sbom_ref`, `provenance_ref` | Verified at install; the signature covers the whole artifact including `manifest.yaml` |
+| **Permission-declared** | `CapabilityDescriptor` intents, `permissions_delta` | The host compares intents with grants at dispatch; a request outside the declared intents is refused |
+
+## Permission widening re-approval
+
+An upgrade that adds a capability, a credential intent, a network destination, an environment or a writable path, that lowers a risk floor or removes declared evidence, or that raises timeouts or budgets, is a widening. The same holds for a changed signer or a rollback to a lower version. A widening cannot install on policy alone: a human approval is required, and what the approver sees is the delta the host recomputed from the lock, not the delta the publisher wrote. A narrowing needs no new approval.
+
+This is the practical meaning of "agents cannot widen grants": a plugin cannot enlarge its own authority by shipping a new version, and an agent cannot cause a plugin to be installed that its policy would not approve.
+
+## Trust tiers (designed)
+
+Distribution is designed around tiers that decide how much a registry vouches for an extension and what conformance evidence exists for it.
+
+| Tier | Meaning | Conformance basis |
+| --- | --- | --- |
+| Official | Built and published by Numinance | Replay, plus a live run by the registry |
+| Private | Built by a customer, installed from the customer's own registry or a local directory | Replay |
+| Verified | A partner's extension, on demand | A live run in a runner the registry attests |
+| Community | Third-party submissions | Not opened; the schema keeps the tier field so no contract changes if it is |
+
+Revocation is intended to be a signed index update after which the runner refuses a revoked digest. Badges are scoped and expire. Tiers do not change what a manifest declares or what the host enforces; they change what must be reviewed before install and whether the result may run in production by default.
+
+These three modes of conformance correspond to the kit modes on the [Conformance](/docs/integrations/conformance) page.
+
+## Capability-gap bounded provider synthesis (designed)
+
+Sometimes a change needs a capability no installed provider offers: an internal API, an in-house tool. Stopping for a person to write a plugin caps throughput at the engineer the system is meant to free. Letting the agent write and use its own tool defeats the trust model. The design resolves this with a bounded, approved path:
+
+1. The orchestrator opens a child build workflow for the missing capability, inspecting the internal API or documentation that discovery or knowledge found.
+2. A provider is generated from the SDK template, with a manifest, declared permissions, conformance tests and security tests.
+3. It is built with an SBOM and provenance, and signed.
+4. Behavior tests run in a sandbox with canaries.
+5. **A named human approves the new authority**, meaning the exact permission set the manifest declares.
+6. Only then is the provider published to the private tier, and the parent change resumes pinned to the exact digest.
+
+The synthesis may add capabilities outside the trust kernel. It may never modify policy evaluation, the credential broker, evidence integrity, plugin verification, sandbox enforcement, approval flow or the circuit breaker, and a protected list makes those unreachable as a build target. The synthesized provider is an ordinary extension from then on: pinned, signed, declared, conformance-run and widening-reviewed like any other. The agent does not approve itself, and the generated plugin does not receive standing authority from having been generated.
+
+## What a reader can verify today
+
+Without any registry, you can check the contract that a registry would rely on:
+
+- `manifest.proto` states each install-time rule in its field comments.
+- The sample and official providers build manifests whose digest is the real sha256 of their executable, and say plainly that their SBOM and provenance references are placeholders that install would refuse.
+- The kits show what a conformance suite looks like. See [Conformance](/docs/integrations/conformance).
+
+## Failure modes and safeguards
+
+| Failure | Designed result |
+| --- | --- |
+| Signature identity does not match `signer_identity` | Install fails |
+| Digest recomputed differs from declared | Install fails; the recomputed value is what would be pinned |
+| Upgrade widens permissions | Human approval required; the delta shown is host-computed |
+| Revoked digest | The runner refuses it |
+| Capability builder asked to modify a kernel component | Refused by the protected list |
+| Generated provider fails conformance or security tests | It is not published and the parent change does not resume on it |
+| A change needs a new provider while the approver is absent | The change waits; it does not widen its own grants |
+
+## Next steps
+
+<Cards>
+  <Card title="Manifest and capabilities" href="/docs/integrations/manifest-and-capabilities" description="The exact fields and widening rules the install enforces." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="The replay and live modes that tiers refer to." />
+  <Card title="Status" href="/docs/status" description="What is available now and what is under development." />
+</Cards>

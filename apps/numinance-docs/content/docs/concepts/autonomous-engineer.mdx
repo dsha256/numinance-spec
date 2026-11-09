@@ -1,0 +1,62 @@
+---
+title: The autonomous engineer
+description: What separates an autonomous engineer from a coding agent - bounded work units, an objective-to-outcome contract, and explicit limits on what is built.
+---
+
+<FeatureStatus kind="designed">The autonomous engineer is the proprietary runtime. The configuration kinds and protocol it uses are public-spec.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/kinds/v1/playbook.proto"]} note="ChangeState and the Playbook kind." />
+
+<ShortProductTruth>
+A coding agent answers a prompt. An autonomous engineer owns a change from objective to outcome, under rules it cannot rewrite.
+</ShortProductTruth>
+
+## Agent versus engineer
+
+A coding agent is a model with tools. It is as capable as its model, and its limits are whatever its host happens to enforce. An autonomous engineer in the Numinance sense is the whole system around that model: it gathers context, classifies the change, plans, hands bounded work to an agent, checks the result with independent verifiers, and records evidence. The model is replaceable. The system is what you configure and audit.
+
+| Question | Coding agent | Autonomous engineer |
+| --- | --- | --- |
+| What is the unit of work? | A conversation or session. | A change, split into work units. |
+| Who decides what it may do? | The tool host, often implicitly. | A policy evaluated outside the model. |
+| Who checks the result? | The same agent, or you. | Independent verifiers and a reviewer identity. |
+| What remains afterwards? | A transcript. | An append-only evidence chain. |
+| What happens when it fails? | It retries until stopped. | Finite repair, then escalation or rollback. |
+
+## Work units and bounded scope
+
+The runtime does not hold one long agent session. A change is a durable state machine, and the agent implements one **work unit** at a time. Each work unit gets its own bounded authority: a grant naming what it may touch, at which risk class, in which environment, until when. When the unit finishes, that authority ends. The next stage starts with fresh authority, decided again by policy.
+
+Bounded scope has three practical effects:
+
+- A compromised or confused agent can only affect what its current grant covers.
+- Parallel work units cannot widen each other's authority.
+- A failure is local. It is repaired, escalated or rolled back without poisoning the rest of the change.
+
+## From objective to outcome
+
+An objective is a request: fix this bug, upgrade this dependency, add this endpoint. An outcome is a recorded result: a pull request, a merged change, a release that was observed, or an escalation that explains why it stopped. Between them the runtime follows the [change lifecycle](/docs/concepts/change-lifecycle) and records each transition. The outcome is not "the agent said it was done". It is what the verifiers and evidence show.
+
+Playbooks describe how a type of change is carried out. The `bugfix-bounded` playbook written by `numi init` is a real example: its steps are `fix`, `review` and `pr-status`, each bound to a different capability set, and it sets `max_repair_attempts: 2`. No step merges.
+
+## Designed versus available
+
+<Callout type="warn" title="Installing numi does not install an autonomous engineer">
+There are three separate things: the open `numi` CLI, the `numinance-spec` repository, and the proprietary runtime. The runtime is private and not generally available. With the open build you can validate configuration (`numi validate --files`) and verify evidence exports. The run, plan and approve commands are designed but absent from the open build.
+</Callout>
+
+See the [status page](/docs/status) for the current matrix, and [Open vs proprietary](/docs/concepts/open-vs-proprietary) for the boundary.
+
+## What it is not
+
+- It is not unrestricted. Full autonomy means configurable, governed, qualified and human-accepted, bounded by floors, policy, grants and the breaker.
+- It cannot widen its own grants, approve its own work, or promote its own autonomy level.
+- It does not prove its changes are correct. Verification and evidence reduce and expose risk. They do not remove it.
+
+## Next steps
+
+<Cards>
+  <Card title="Context first" href="/docs/concepts/context-first" description="How the engineer learns what it needs before acting." />
+  <Card title="Change lifecycle" href="/docs/concepts/change-lifecycle" description="The stages every change passes through." />
+  <Card title="Playbooks" href="/docs/configuration/playbooks" description="Configure how a type of change is carried out." />
+</Cards>

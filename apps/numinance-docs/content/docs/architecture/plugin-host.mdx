@@ -1,0 +1,69 @@
+---
+title: Plugin host
+description: How out-of-process gRPC plugins are launched, handshaken, sandboxed and mediated by the host, with no ambient authority.
+---
+
+<FeatureStatus kind="public-spec">
+  PluginService and HostService are public contracts. The host that serves them is part of the proprietary runtime and is designed.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/plugin/v1/plugin.proto", "proto/numinance/plugin/v1/host.proto", "proto/numinance/plugin/v1/manifest.proto", "proto/numinance/plugin/v1/envelope.proto"]} />
+
+<ShortProductTruth>
+  Build once against the contract. Bring your own capabilities. The plugin describes what it needs; Numinance decides what it gets.
+</ShortProductTruth>
+
+## Invocation sequence
+
+<PluginInvocationSequence />
+
+## Roles
+
+| Role | Implements | Responsibility |
+| --- | --- | --- |
+| Plugin | `PluginService` | Performs capability verbs for one or more ports |
+| Host | `HostService` | Mediates every privileged request the plugin makes |
+| Engine | n/a | Decides when to call a plugin and obtains the policy decision first |
+
+`PluginService` has `Handshake`, `GetManifest`, `GetDescriptors`, `Invoke` (server streaming), `Health` and `Shutdown`. `HostService` has `Log`, `EmitEvidence`, `RequestCredential`, `ResolveReference` (server streaming) and `ReportProgress`.
+
+## Handshake and manifest
+
+The host offers its spec version, the protocol versions it will speak, the ports of the installed manifest and the non-core capabilities it knows. The plugin answers with one protocol version from that offer and a subset of capabilities present in both the offer and its manifest. Anything else aborts the handshake. The negotiated version is recorded at install and only that version is offered afterwards, so a plugin cannot later downgrade the protocol.
+
+`GetManifest` must equal the manifest decoded from the installed package, whose digest the lockfile pins. A mismatch means the host refuses to start the plugin. The manifest is never a source of authority by itself; the host enforces the declared network, filesystem and credential intents.
+
+## Sandbox boundaries
+
+- Each plugin is a separate process in its own container, never co-located with the executor.
+- Egress is limited to the destinations in its manifest, through the egress proxy.
+- The host identifies the calling plugin by the connection it launched, not by request content, and rejects an `invocation_id` that is not in flight for that plugin.
+- `RequestCredential` returns an opaque handle bound to the invocation and intent, usable only through the proxy, expiring no later than the invocation deadline. It never returns credential material.
+- Every dispatch carries a host-set `ActionContext` with a `policy_decision_id`. The host never dispatches without one.
+- A plugin that cannot accept an idempotency key declares it, and steps calling it need a compensation or approval.
+
+## Governed install
+
+Install verifies signature and provenance, computes a permission difference against the lockfile, runs the conformance suite in a sandbox, evaluates policy (widening always needs approval) and pins digest and signer identity. Versions are locked for the duration of a change; nothing is installed dynamically during a run.
+
+## Boundary table
+
+| Party | Holds | Does not hold |
+| --- | --- | --- |
+| Plugin | Its own logic and a handle for the current invocation | Credentials, the right to widen its manifest |
+| Host | Enforcement and the evidence emit path | The plugin's business logic |
+| Broker and proxy | Credential material and injection | Decisions |
+
+## Failure cases
+
+- Handshake offers a lower protocol than locked: aborted.
+- Manifest differs from the pinned package: plugin not started.
+- Call without a policy decision: not dispatched.
+- Request to an undeclared host: denied by the proxy and recorded.
+- Provider unhealthy: `Health` fails and capability invocations are denied until recovery.
+
+<Cards>
+  <Card title="Plugin service" href="/docs/protocol/plugin-service" description="Field-level reference." />
+  <Card title="Host service" href="/docs/protocol/host-service" description="Field-level reference." />
+  <Card title="Build a custom plugin" href="/docs/guides/build-custom-plugin" description="Write one against the contract." />
+</Cards>

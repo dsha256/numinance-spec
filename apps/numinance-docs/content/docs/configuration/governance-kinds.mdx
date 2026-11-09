@@ -1,0 +1,248 @@
+---
+title: Governance kinds
+description: ControlPack, ResidencyPolicy and BudgetPolicy, the org-owned kinds that set floors and limits a repository and an agent cannot loosen.
+---
+
+<FeatureStatus kind="public-spec">
+  The schemas, examples and loader checks are public. Evaluating floors, deriving a residency class from a live executor, and enforcing budgets happen in the proprietary runtime, which is not generally available. The open `numi validate --files` checks shape only.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/kinds/v1/control_pack.proto",
+    "proto/numinance/kinds/v1/residency_policy.proto",
+    "proto/numinance/kinds/v1/budget_policy.proto",
+    "schemas/examples/ControlPack/pci-dss-4.0.1.yaml",
+    "schemas/examples/ResidencyPolicy/eu-zdr.yaml",
+    "schemas/examples/ResidencyPolicy/eu-training-forbidden.yaml",
+    "schemas/examples/BudgetPolicy/org-default.yaml",
+    "sdk/go/kindyaml/README.md",
+  ]}
+/>
+
+<ShortProductTruth>
+  Your policy decides. Not the model. These three kinds are where the org writes the limits: what a compliance framework requires, where data may go, and how much a run may spend. They tighten; none of them grants a power.
+</ShortProductTruth>
+
+## When to use these kinds
+
+- Your change process must satisfy a framework such as PCI DSS: use a ControlPack to record which evidence and approvals each control needs and to add floors for regulated changes.
+- Your data may not leave an account, a region or a retention window: use a ResidencyPolicy.
+- You want a ceiling on tokens, wall-clock time, tool calls or blast radius per change: use a BudgetPolicy. Exhaustion pauses and escalates to a human.
+
+## How floors work
+
+A floor is a limit that only tightens. The merge directive `FORBID` marks a field as a floor: only a kind loaded from the org scope, or a control pack, may set it, and a narrower scope that tries fails validation. Floors from the org and from every applicable pack all hold together. For autonomy, the lowest matching `max_level` wins; for residency, every matching floor must be met.
+
+This is why the three kinds below are authority-bearing when, and only when, they come from a protected path or a signed policy bundle. A copy in an ordinary repository branch, even one that writes `SCOPE_ORG`, is repository-authored and carries no authority. `metadata.scope` is the document's own claim, not proof.
+
+## ControlPack
+
+A ControlPack holds the controls of one framework, the evidence and approvals each requires, and the floors the pack adds. A pack only restricts: its floors add to the org's and never displace them.
+
+<TypeTable type={{
+  "metadata.scope": { type: "SCOPE_ORG", description: "The loader refuses any other scope.", required: true },
+  "spec.jurisdiction": { type: "string", description: "Required. Where the framework applies, such as global or eu.", required: true },
+  "spec.framework": { type: "string", description: "Required. The framework's name, such as pci-dss.", required: true },
+  "spec.version": { type: "string", description: "Required. The framework's version, such as 4.0.1.", required: true },
+  "spec.effective_date": { type: "string (YYYY-MM-DD)", description: "Required. The day the version takes effect, as a real calendar day.", required: true },
+  "spec.sources": { type: "string[]", description: "Texts the pack reads, unique. Each is one line of at most 1024 bytes." },
+  "spec.applicability": { type: "string (CEL)", description: "An expression over policy-computed facts of the change. Absent means every change of a component whose resolved profile names the pack. At most 4096 bytes on one line. An evaluation error means the pack applies." },
+  "spec.controls": { type: "Control[]", description: "Required, non-empty and unique by id.", required: true },
+  "spec.controls[].id": { type: "string", description: "Required. The control's id within the pack, such as req-6.4.2.", required: true },
+  "spec.controls[].requires_evidence": { type: "string[]", description: "Evidence a change the control applies to must record, unique. Missing declared evidence turns success into PARTIAL." },
+  "spec.controls[].approval": { type: "ControlApproval", description: "The human approval the control requires. Absent requires none beyond the stage gates." },
+  "approval.human": { type: "bool", description: "True when a human principal must approve. Absent means false." },
+  "approval.group": { type: "string", description: "Approver group. Membership comes from the org's identity provider, never from repository files. Needs human: true." },
+  "approval.dual_control": { type: "bool", description: "True when two distinct human principals, neither the author nor acting in the author's run, must approve. Needs human: true." },
+  "spec.floors.autonomy": { type: "AutonomyFloors", description: "Caps autonomy levels as an AutonomyPolicy does. The lowest matching max_level of the org and every pack holds. Merge: FORBID." },
+  "spec.floors.residency": { type: "ResidencyFloors", description: "Adds residency floors as a ResidencyPolicy does. Every floor of the org and every pack holds." },
+  "spec.export_views": { type: "ExportView[]", description: "Named selections of a change's evidence for one audience, unique by name. Each lists control ids the pack defines." },
+  "spec.counsel_status": { type: "COUNSEL_STATUS_NOT_REVIEWED | _UNDER_REVIEW | _REVIEWED", description: "Required. How far legal counsel has reviewed the pack's reading of the framework. Unspecified is rejected.", required: true },
+}} />
+
+```yaml title="schemas/examples/ControlPack/pci-dss-4.0.1.yaml"
+apiVersion: numinance.dev/v1
+kind: ControlPack
+metadata: {name: controls/payments/pci-dss/4.0.1, scope: SCOPE_ORG}
+spec:
+  jurisdiction: global
+  framework: pci-dss
+  version: 4.0.1
+  effective_date: "2024-03-31"
+  sources: [PCI DSS v4.0.1 Requirement 6]
+  applicability: risk_at_least(change.risk, "MEDIUM")
+  controls:
+    - {id: req-6.2.3, requires_evidence: [review-record, diff], approval: {human: true, group: payments-reviewers}}
+    - {id: req-6.5.1, requires_evidence: [change-record, rollback-plan], approval: {human: true, dual_control: true}}
+  floors:
+    autonomy:
+      rules: [{match: {environment: production}, max_level: AUTONOMY_LEVEL_PR}]
+    residency: {floor: RESIDENCY_CLASS_IN_ACCOUNT}
+  export_views:
+    - {name: pci-dss-req6, controls: [req-6.2.3, req-6.5.1]}
+  counsel_status: COUNSEL_STATUS_NOT_REVIEWED
+```
+
+Read it as a pair of promises. A change that triggers the pack must record the named evidence and obtain the named approvals, and in production its autonomy is capped at `AUTONOMY_LEVEL_PR` (a pull request, no merge) while residency must meet `RESIDENCY_CLASS_IN_ACCOUNT`.
+
+<Callout type="warn" title="A pack is not a certification">
+  This example reads one framework requirement into machine-checkable evidence and approvals. It is a sample, its own `counsel_status` is `COUNSEL_STATUS_NOT_REVIEWED`, and a pack that validates does not mean you comply with PCI DSS, nor that Numinance or its evidence is certified or audited. Have your own compliance and legal functions own the interpretation.
+</Callout>
+
+`approval.dual_control` is where self-approval stops. Approver must differ from author, and approvers who merely act inside the author's run are excluded. Policy enforces it at the release gate whatever the StageRegistry says; it only adds to the registry's gates. See [autonomy policy](/docs/configuration/autonomy-policy) for the level ladder and [stage registry](/docs/configuration/stage-registry) for gates.
+
+## ResidencyPolicy
+
+A ResidencyPolicy says where execution and inference may happen. In the designed runtime, the class derived from an executor's live configuration must meet every floor that applies, or the change is refused at start.
+
+<TypeTable type={{
+  "spec.floors.floor": { type: "RESIDENCY_CLASS_IN_ACCOUNT | _PRIVATE_ENDPOINT | _VENDOR_ZDR | _VENDOR_STANDARD | _AIRGAPPED", description: "Required in the floors message. Applies to every change, together with every matching rule's floor. Org scope only (FORBID). Absent in the org means the floor IN_ACCOUNT." },
+  "spec.floors.rules[].match": { type: "{component?, environment?}", description: "Selects changes. An absent key matches every value, and a key the change has no value for counts as a match." },
+  "spec.floors.rules[].floor": { type: "ResidencyClass", description: "Required. A rule adds a floor and never relaxes floors.floor." },
+  "spec.regions": { type: "string[]", description: "Required and non-empty. The allowed source and destination regions, each a single region name; * is refused. Refused below the org scope.", required: true },
+  "spec.cross_region": { type: "bool", description: "True when inference may run in a region other than the source region. Absent means false. Org scope only.", default: "false (when absent)" },
+  "spec.retention_max": { type: "duration", description: "The longest a model vendor may retain prompts and responses. Absent means no retention. Org scope only." },
+  "spec.require_customer_keying": { type: "bool", description: "True when data at rest must use customer-managed keys. Absent means false. Org scope only.", default: "false (when absent)" },
+  "spec.training_use": { type: "TRAINING_USE_FORBIDDEN | TRAINING_USE_ALLOWED", description: "Whether a model vendor may train on prompts and responses. Absent means TRAINING_USE_FORBIDDEN. TRAINING_USE_ALLOWED is accepted only in an org-scoped document.", default: "TRAINING_USE_FORBIDDEN (when absent)" },
+}} />
+
+```yaml title="schemas/examples/ResidencyPolicy/eu-zdr.yaml"
+apiVersion: numinance.dev/v1
+kind: ResidencyPolicy
+metadata: {name: eu-zdr, scope: SCOPE_ORG}
+spec:
+  floors:
+    floor: RESIDENCY_CLASS_VENDOR_ZDR
+    rules: [{match: {component: payments-api}, floor: RESIDENCY_CLASS_IN_ACCOUNT}]
+  regions: [eu-central-1]
+  cross_region: false
+  require_customer_keying: true
+```
+
+The org floor is `RESIDENCY_CLASS_VENDOR_ZDR` (a vendor endpoint with zero data retention). Changes touching `payments-api` need `RESIDENCY_CLASS_IN_ACCOUNT`. A second example shows only the floor, the region list and an explicit training ban:
+
+```yaml title="schemas/examples/ResidencyPolicy/eu-training-forbidden.yaml"
+apiVersion: numinance.dev/v1
+kind: ResidencyPolicy
+metadata: {name: eu-training-forbidden, scope: SCOPE_ORG}
+spec:
+  floors:
+    floor: RESIDENCY_CLASS_VENDOR_ZDR
+  regions: [eu-central-1]
+  training_use: TRAINING_USE_FORBIDDEN
+```
+
+### Compute, inference, egress and retention are different questions
+
+The class names are compact answers to a longer question. `RESIDENCY_CLASS_IN_ACCOUNT` runs compute and inference in your account. `RESIDENCY_CLASS_PRIVATE_ENDPOINT` reaches a vendor model over a private network path. `RESIDENCY_CLASS_VENDOR_ZDR` is a vendor endpoint with zero data retention. `RESIDENCY_CLASS_VENDOR_STANDARD` is a vendor endpoint with standard retention, and `RESIDENCY_CLASS_AIRGAPPED` has no external network path. The enum is unordered: strictness comes from an explicit order table, never from the numbers, so do not assume a higher value is stricter.
+
+<DesignNote title="The class is derived, not declared">
+  A manifest cannot state its own class; the schema forbids it. The designed runtime derives the class from the executor's actual configuration (where it computes, where inference runs, whether prompts leave, which regions are possible, vendor retention and training terms) and compares that to the floor when a change starts. Running on a cloud platform or through a managed model service does not by itself mean `RESIDENCY_CLASS_IN_ACCOUNT`: a cross-region route or a retention setting can change the answer. The public ResidencyPolicy carries `regions`, `cross_region`, `retention_max`, `require_customer_keying` and `training_use` for the policy side. Resolver and reviewer inference are bound by the same floor as author inference. See [adapters and environments](/docs/configuration/adapters-and-environments#residency-is-not-declared-here).
+</DesignNote>
+
+## BudgetPolicy
+
+A BudgetPolicy sets per-change and per-run limits. An absent field is unset and comes from a wider scope. Exhaustion pauses the run and escalates.
+
+<TypeTable type={{
+  "spec.tokens": { type: "uint32", description: "Maximum model spend in tokens." },
+  "spec.wall_clock": { type: "duration", description: "Maximum elapsed time, in proto JSON form such as 7200s." },
+  "spec.tool_calls": { type: "uint32", description: "Maximum number of tool calls." },
+  "spec.files_changed": { type: "uint32", description: "Maximum number of files changed." },
+  "spec.lines_changed": { type: "uint32", description: "Maximum number of lines changed." },
+  "spec.repositories": { type: "uint32", description: "Maximum number of repositories touched." },
+  "spec.services": { type: "uint32", description: "Maximum number of services touched." },
+  "spec.network_destinations": { type: "uint32", description: "Maximum number of distinct network destinations." },
+  "spec.retries": { type: "uint32", description: "Maximum number of retries." },
+  "spec.max_risk_escalation": { type: "RISK_CLASS_READ | _LOW | _MEDIUM | _HIGH | _PRIVILEGED", description: "The highest risk class a run may escalate to." },
+}} />
+
+```yaml title="schemas/examples/BudgetPolicy/org-default.yaml"
+apiVersion: numinance.dev/v1
+kind: BudgetPolicy
+metadata: {name: org-default, scope: SCOPE_ORG}
+spec:
+  tokens: 400000
+  wall_clock: 7200s
+  tool_calls: 300
+  files_changed: 40
+  lines_changed: 2000
+  repositories: 1
+  services: 2
+  network_destinations: 5
+  retries: 3
+  max_risk_escalation: RISK_CLASS_MEDIUM
+```
+
+The numbers are the schema's example values, not recommended defaults and not measured limits. Choose yours from your own repositories. The retries cap matters for [bounded repair](/docs/concepts/reliability-and-recovery): repair is finite, followed by independent checks and escalation, never an open loop.
+
+## Security implications
+
+- Floors only tighten. A pack cannot lower the org's limit, a repository cannot set a floor, and the agent cannot edit its way out of one.
+- Authority comes from where a document was loaded, not from what it says. Keep these files under protected paths or in a signed policy bundle, reviewed by humans other than the author agent.
+- `applicability` that fails to evaluate means the pack applies. The failure mode is stricter, not looser.
+- `training_use` absent means forbidden; allowing it is an explicit, org-only act. Residency and retention terms are the vendor's contractual position: this config states your requirement, it does not verify the vendor's behaviour.
+- Evidence recorded for a control proves provenance under pinned keys; it does not prove the change was correct. See [evidence and trust](/docs/concepts/evidence-and-trust).
+
+## Real failures
+
+<VerifiedSnippet what="Edited copies of the examples, run with the open numi build">
+
+```text
+$ numi validate --files bad/doc.yaml      # ControlPack metadata.scope: SCOPE_REPO
+invalid  file "doc.yaml": kind: invalid: ControlPack is org-scoped only
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # approval: {group: payments-reviewers} with no human: true
+invalid  file "doc.yaml": kind: invalid: an approval with a group or dual control does not require a human
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # an export view naming control req-9.9, which the pack lacks
+invalid  file "doc.yaml": kind: invalid: an export view names a control the pack does not define
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # effective_date: 31-03-2024
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.ControlPackSpec.effective_date fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # counsel_status removed
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/counsel_status\": required
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # residency floor RESIDENCY_CLASS_IN_REGION
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/floors/residency/floor\": enum
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # ResidencyPolicy at SCOPE_REPO with floors
+invalid  file "doc.yaml": kind: invalid: numinance.kinds.v1.ResidencyPolicySpec.floors is set only at the org scope
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # regions: ["*"]
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.ResidencyPolicySpec.regions fails its check
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # training_use: TRAINING_USE_UNSPECIFIED
+invalid  file "doc.yaml": kind: invalid: numinance.kinds.v1.ResidencyPolicySpec.training_use is TRAINING_USE_UNSPECIFIED
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # BudgetPolicy wall_clock: 2h
+invalid  file "doc.yaml": kind: does not match the kind schema: a value is not in protobuf JSON form
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # BudgetPolicy tokens: -5
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/tokens\": minimum
+(exit 3)
+```
+
+</VerifiedSnippet>
+
+`RESIDENCY_CLASS_IN_REGION` and `ANY` do not exist in the current schema: the five classes above are the only values.
+
+## Next steps
+
+<Cards>
+  <Card title="Autonomy policy" href="/docs/configuration/autonomy-policy" description="The level ladder and floors that a ControlPack can tighten." />
+  <Card title="Risk and approval" href="/docs/operations/risk-and-approval" description="How human approval and dual control operate around a change." />
+  <Card title="Validation and errors" href="/docs/configuration/validation-and-errors" description="What a schema pass proves and what it leaves to resolution." />
+</Cards>

@@ -1,0 +1,299 @@
+---
+title: Offline verification
+description: Verify an evidence/v1 export with numi evidence verify or the Go package, with every flag, the JSON report, the exit codes, and real runs of success, tampering and a wrong key.
+---
+
+<FeatureStatus kind="public-spec">`numi evidence verify` and the Go package `sdk/go/evidenceverify` are in the open build and pass every conformance vector. `numi evidence export` is not in the open build.</FeatureStatus>
+
+<SourceReference paths={["cli/README.md", "docs/evidence/verification.md", "sdk/go/evidenceverify/README.md", "sdk/go/evidenceverify/options.go", "sdk/go/evidenceverify/report.go"]} />
+
+<ShortProductTruth>
+The verifier is offline, read-only and size-bounded. It never defaults to trusting the directory: you pin the keys, or you get a weaker level.
+</ShortProductTruth>
+
+## When to use it
+
+Use the verifier when you hold an export and want to know how strongly it can be believed: an auditor reading a change, a CI job gating on evidence, a second team re-checking a run, or a developer of another verifier comparing results. It needs no engine and opens no network connection.
+
+## Prerequisites
+
+- A checkout of the public repository and the Go toolchain declared by its `go.mod`.
+- An export directory.
+- The runner public key, the log public key and the log origin, each obtained out of band. A key file holds the 32-byte public key as 64 hexadecimal characters, with optional surrounding whitespace, in at most 1024 bytes.
+
+```bash title="Build the open numi"
+git clone https://github.com/dsha256/numinance-spec.git
+cd numinance-spec
+go build -o ./bin/numi ./cli/numi
+```
+
+`go run ./cli/numi evidence verify ...` works the same way without a build step. Installing `numi` gives you this verifier and the other open commands. It does not install an autonomous engineer, and it cannot produce exports.
+
+## Command reference
+
+```text
+numi evidence verify [flags] DIR
+```
+
+| Flag | Meaning |
+| --- | --- |
+| `DIR` | The export directory. Exactly one |
+| `--runner-key FILE` | A pinned runner public key. Repeatable. Any pinned key may sign a record, the attestation and the manifest |
+| `--trust-bundle-keys` | Trust the keys in `provenance/signers.json`. Best level is `self-consistent` |
+| `--skip-signatures` | Check no signature. Best level is `unauthenticated` |
+| `--log-key FILE` and `--log-origin ORIGIN` | The pinned transparency log. Both or neither |
+| `--allow-unanchored` | Accept a head not proved under a pinned log |
+| `--allow-incomplete` | Accept a chain with no terminal record |
+| `--allow-unsigned` | Accept the export of an Abandoned or RolledBack change |
+| `--complete` | Fail when a part of the design list is absent |
+| `--expect-change CHG_ID` | Fail unless the chain is this change |
+| `--expect-head DIGEST` | Fail unless this is the last record's hash or the anchored hash |
+| `--json` | Print one JSON object instead of the text report |
+
+Exactly one key mode is required: pinned `--runner-key`, `--trust-bundle-keys` or `--skip-signatures`. None, or two, is a usage error (exit 2). `--trust-bundle-keys` is refused together with a pinned key or `--skip-signatures`. A key file over 1024 bytes is an error and is never read as a truncated key.
+
+## A full pass, in text and in JSON
+
+The fixture is `conformance/evidence/v1/exports/closed-author`, run from `conformance/evidence/v1` of the spec checkout. It is a golden export generated with fixed test keys.
+
+<VerifiedSnippet what="numi evidence verify, text report" exit="0">
+```text
+$ numi evidence verify --runner-key keys/runner.pub --log-key keys/log.pub --log-origin numinance.test/log --complete exports/closed-author
+change: chg_01010101010101010101010101010101
+records: 12, head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48
+state: ended Closed
+level: verified
+chain: records link, hash and end as stated
+signatures: verified under the pinned runner keys
+anchor: head proved under the pinned log
+attestation: signed, re-derived from the chain
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+not applicable: deployment.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+not applicable: observation.json (not applicable at PR level: the change closed from Merging (design section 6) and was never released, deployed or observed)
+result: verified
+```
+</VerifiedSnippet>
+
+With `--json` the same run prints one object. The `not_applicable` array is shortened here for reading; the run printed the full strings.
+
+<VerifiedSnippet what="numi evidence verify --json (not_applicable entries shortened)" exit="0">
+```json
+{"ok":true,"change_id":"chg_01010101010101010101010101010101","records":12,
+ "head_record_hash":"sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48",
+ "anchored_head_record_hash":"sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48",
+ "ended":true,"terminal_state":"Closed","sealed":false,
+ "level":"verified","level_enum":"verified","weakened_by_flags":[],
+ "chain":"records link, hash and end as stated",
+ "signatures":"verified under the pinned runner keys",
+ "anchor":"head proved under the pinned log",
+ "attestation":"signed, re-derived from the chain",
+ "not_applicable":[{"part":"deployment.json","not_applicable":true,"...":"..."},{"part":"observation.json","not_applicable":true,"...":"..."}],
+ "credential_scopes":"unsourced: no credential broker statement is in the attestation",
+ "network_policy":"unsourced: no egress proxy statement is in the attestation"}
+```
+</VerifiedSnippet>
+
+## The JSON report
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `ok` | boolean | True exactly when the exit code is 0, which includes passes that carry an allowance |
+| `change_id`, `records`, `head_record_hash` | string, integer, string | The verified chain |
+| `anchored_head_record_hash` | string | The hash the log's head leaf holds. Differs from `head_record_hash` only on a sealed chain |
+| `ended`, `terminal_state`, `sealed` | boolean, string, boolean | What the records state |
+| `level` | string | The display level, suffixes included, such as `verified, unanchored` |
+| `level_enum` | string | The level without suffix: `verified`, `failed`, `unauthenticated`, `self-consistent`, `incomplete`, `unsigned` or `unanchored` |
+| `weakened_by_flags` | array of string | The allowance suffixes, in fixed order: `unanchored`, `incomplete`, `unsigned export` |
+| `weaknesses` | array of string | Sentences for people, one per weakness not covered by a flag |
+| `chain`, `signatures`, `anchor`, `attestation` | string | What was proved of each |
+| `absent`, `not_applicable` | array of part objects | `{part, reason, owner, not_applicable?}` |
+| `credential_scopes`, `network_policy` | string | `unsourced...` when the attestation holds no broker or proxy statement |
+| `trajectory` | string | Present only when the chain holds a trajectory statement; a finding to read, never a failure |
+| `findings` | array of `{code, message}` | Absent when empty. The codes are normative; the messages are not |
+
+A report is printed only when the verifier got as far as verifying a directory. Exit 2, a refused path (3) and a missing path (4) print none.
+
+<Callout type="warn" title="Automation: read three things, not one">
+Exit 0 and `ok: true` are also produced by `verified, unanchored`, `verified, incomplete` and `verified, unsigned export`. Do not match a prefix of `level`. A full pass is exit `0`, `level_enum` equal to `verified`, and an empty `weakened_by_flags`. If you need every part, also read `absent` or pass `--complete`. A pipeline that accepts an allowance must say which one it accepts.
+</Callout>
+
+## Exit codes
+
+| Exit | Name | When |
+| --- | --- | --- |
+| 0 | OK | No finding, and a level that starts with `verified`, with or without suffixes |
+| 1 | internal | An internal error, a cancelled context, a report that cannot be encoded |
+| 2 | usage | Unknown flag, not exactly one directory, an unreadable or malformed key file, a half-given log pin, no key mode or more than one, a malformed `--expect-*` value, an empty path |
+| 3 | invalid | At least one finding, or the directory path itself is refused (not a directory, a link, changed while opened) |
+| 4 | not found | The directory does not exist |
+| 5 | weak | No finding, but the level does not start with `verified`: `unauthenticated`, `self-consistent`, `incomplete`, `unsigned` or `unanchored` |
+| 7 | unavailable | An I/O error that is not a refusal |
+| 8 | timeout | The deadline was exceeded |
+
+Exit 6 is never produced by `verify`. Exit 5 is "a conflict" elsewhere in the `numi` table, but `verify` never produces a conflict: for `verify`, 5 means the directory is consistent and the check was weaker than `verified`. Exits 1, 7 and 8 depend on the environment and have no data vector.
+
+## Tampering is a named finding
+
+Copy the fixture, change one byte of one record (the `risk_class` of record 6 from `READ` to `HIGH`), and run the same command.
+
+<VerifiedSnippet what="verify a copy of closed-author with one edited record (filtered to level, FAIL and result lines)" exit="3">
+```text
+level: failed
+FAIL digest_mismatch: a file differs from its index entry
+FAIL chain_broken: a record does not match its record_hash
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+result: failed
+```
+</VerifiedSnippet>
+
+The edit is caught three ways at once: the index digest no longer matches, the record no longer hashes to its `record_hash`, and, because the chain is no longer verified, the claim that deployment and observation are not applicable can no longer be borne out. All of these are findings and the exit is 3. Appending a line to `diff.digest` instead gives `digest_mismatch`, `diff_mismatch` and `manifest_mismatch`, also exit 3.
+
+## Pinning the wrong key
+
+Pin a key that did not sign the export (`keys/other-runner.pub`) and the verifier does not fall back to the key the directory claims.
+
+<VerifiedSnippet what="same export, wrong runner key" exit="3">
+```text
+FAIL signer_untrusted: a record names a key that is not trusted
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+FAIL part_contradiction: a part is declared not applicable and the chain does not bear it out
+result: failed
+```
+</VerifiedSnippet>
+
+A wrong log pin fails the same way. Pinning the right key with the wrong origin, or the wrong log key with the right origin, gives `anchor_invalid`, `attestation_proof` and `manifest_mismatch`, with messages that say "the checkpoint origin is not the pinned origin" or "the checkpoint signature does not verify under the pinned log key".
+
+## Binding the result to a change or a head
+
+A verifier cannot tell an export from another genuine export of the same change signed by the same keys. If you know the change or the head from another source, say so.
+
+```bash title="Fail unless this is the change and head you expected"
+numi evidence verify \
+  --runner-key keys/runner.pub --log-key keys/log.pub --log-origin numinance.test/log \
+  --expect-change chg_01010101010101010101010101010101 \
+  --expect-head sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48 \
+  exports/closed-author
+```
+
+<VerifiedSnippet what="the command above, and the same with another change id" exit="0 for the command above, 3 with --expect-change chg_02020202020202020202020202020202">
+```text
+result: verified
+
+FAIL expectation_mismatch: the change is not the one expected
+result: failed
+```
+</VerifiedSnippet>
+
+`--expect-head` accepts either the last record's hash or the anchored hash. They differ on a sealed chain, where the last record is the seal and the log holds the terminal record before it.
+
+## Calling the package from Go
+
+`numi evidence verify` is a thin wrapper over `evidenceverify.Verify`. A Go program can call it directly. The package is in the module `github.com/numinance/numinance-spec` and has no dependency outside the standard library. No tagged release of the module is published, so until one is, point a `replace` at your checkout.
+
+```go title="main.go"
+package main
+
+import (
+	"context"
+	"crypto/ed25519"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/numinance/numinance-spec/sdk/go/evidenceverify"
+)
+
+func main() {
+	dir, runnerFile, logFile := os.Args[1], os.Args[2], os.Args[3]
+
+	runnerKey, err := evidenceverify.ReadKeyFile(runnerFile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	logKey, err := evidenceverify.ReadKeyFile(logFile)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rep, err := evidenceverify.Verify(ctx, dir, evidenceverify.Options{
+		RunnerKeys: []ed25519.PublicKey{runnerKey}, // pinned out of band
+		LogKey:     logKey,                         // pinned out of band
+		LogOrigin:  "numinance.test/log",
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "no report:", err)
+		os.Exit(evidenceverify.ExitCode(nil, err))
+	}
+
+	fullPass := rep.ExitCode() == 0 && rep.LevelEnum == "verified" && len(rep.WeakenedByFlags) == 0
+	fmt.Printf("level=%q level_enum=%q weakened_by_flags=%v findings=%v full_pass=%v\n",
+		rep.Level, rep.LevelEnum, rep.WeakenedByFlags, rep.FindingCodes(), fullPass)
+	os.Exit(rep.ExitCode())
+}
+```
+
+```text title="go.mod"
+module example.com/check
+
+go 1.27
+
+require github.com/numinance/numinance-spec v0.0.0
+
+replace github.com/numinance/numinance-spec => /path/to/numinance-spec
+```
+
+This program was built with the Go toolchain against the spec checkout through exactly such a `replace`, with the module cache offline. It passed `go vet` and ran three times:
+
+<VerifiedSnippet what="go build, then ./check with the closed-author export (three runs)" exit="0, 3 and 4 respectively">
+```text
+$ ./check exports/closed-author keys/runner.pub keys/log.pub
+level="verified" level_enum="verified" weakened_by_flags=[] findings=[] full_pass=true
+
+$ ./check exports/closed-author keys/other-runner.pub keys/log.pub
+level="failed" level_enum="failed" weakened_by_flags=[] findings=[part_contradiction signer_untrusted] full_pass=false
+
+$ ./check exports/nope keys/runner.pub keys/log.pub
+no report: the directory does not exist
+```
+</VerifiedSnippet>
+
+The exported surface you need is small. `Options` carries `RunnerKeys`, `TrustBundleKeys`, `SkipSignatures`, `LogKey`, `LogOrigin`, `AllowUnanchored`, `AllowIncomplete`, `AllowUnsigned`, `Complete`, `ExpectChange` and `ExpectHead`. `Verify` returns a `*Report` whose fields mirror the JSON keys above (`LevelEnum`, `WeakenedByFlags`, `Findings`, `Absent`). When there is no report, `Verify` returns an `*Error` whose `Kind` (`KindUsage`, `KindInvalid`, `KindNotFound`, `KindUnavailable`, `KindTimeout`, `KindInternal`) maps to exit codes 2, 3, 4, 7, 8 and 1 through `ExitCode(rep, err)`. `ParseKey` and `ReadKeyFile` read key files the way the command does. Read the exact definitions in the package before you depend on a field.
+
+## What the verifier checks, in order
+
+1. Read the directory and refuse what cannot be read.
+2. Name check, then the index against every file.
+3. Decode the summary.
+4. Walk the chain: decode, links, signatures, bounds; then compare the summary and `diff.digest` with what the records give.
+5. Anchor: decode `signers.json`, verify the head proof under the pinned log.
+6. Derived parts: the three views, `tool-events.ndjson`, `change.json`.
+7. Attestation: signature, re-derivation, per-change checkpoint and proof.
+8. Ticket cross-check, then the manifest.
+9. Parts present or declared absent, then the level.
+
+Steps that need a verified chain do not run when the chain did not verify, and are reported as not checked. The directory checks, the index, the presence of the attestation and the manifest, and the parts always run, so one failure can come with others. The set of finding codes is normative; their order in a report is not.
+
+## Troubleshooting
+
+| Problem | Cause and fix |
+| --- | --- |
+| Exit 2 with "choose exactly one key mode" | You gave no key mode, or more than one. Pin a runner key |
+| Exit 2 with "--log-key and --log-origin go together" | Give both or neither |
+| Exit 5, level `unanchored` | No log pinned. Pin the log, or pass `--allow-unanchored` and accept a `verified, unanchored` result that you must handle explicitly |
+| Exit 5, level `incomplete` | The chain has no terminal record, or the attestation of a Closed change was not made |
+| Exit 5, level `unsigned` | The change ended Abandoned or RolledBack and has no signed manifest |
+| Exit 3, `anchor_missing` | A log is pinned and the directory holds no head proof |
+| Exit 0 but `PARTIAL` in the result line | The export declares absent parts. Read `absent`, or use `--complete` |
+
+<Cards>
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="What each level means and which one your pipeline should require." />
+  <Card title="Verify a run" href="/docs/guides/verify-a-run" description="The task-oriented walkthrough." />
+  <Card title="CLI: evidence verify" href="/docs/cli/evidence-verify" description="The command page in the CLI reference." />
+</Cards>

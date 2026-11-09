@@ -1,0 +1,240 @@
+---
+title: Governance annotations
+description: The action and field options every Numinance RPC and field must carry, with the exact RiskClass, ExecMode, ActionOptions and FieldAnnotations definitions.
+---
+
+<FeatureStatus kind="public-spec">`numinance.annotations.v1` is part of the Apache-2.0 numinance-spec protocol. The package is protocol-level and protected: any change needs an RFC and a security review.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/annotations/v1/annotations.proto", "rfcs/0001-host-only-field-annotation.md", "rfcs/0002-resource-name-field-annotation.md"]} />
+
+<ShortProductTruth>
+Your policy decides. Not the model. The risk of an action is declared in the contract and read from descriptors by the host before policy runs, never inferred from what the model says it is doing.
+</ShortProductTruth>
+
+## When to use this page
+
+You need it when you write or review a port or plugin: to see what an RPC must declare, to understand why the host treats a call as it does, or to look up the exact option names. Policy authors use the same vocabulary: `RISK_CLASS_*` values appear in [autonomy policies](/docs/configuration/autonomy-policy).
+
+## Mechanism
+
+Annotations are protobuf extensions. The Engine and the plugin host read them from descriptors (through protobuf reflection) before policy evaluation; they are never parsed from `.proto` text. Two extensions carry the contract:
+
+```proto title="proto/numinance/annotations/v1/annotations.proto"
+extend google.protobuf.MethodOptions {
+  ActionOptions action = 50001;
+}
+
+extend google.protobuf.FieldOptions {
+  FieldAnnotations field = 50002;
+}
+```
+
+Extension number 50003 is `numinance.kinds.v1.merge` on `FieldOptions` (see [Kinds and JSON Schema](/docs/protocol/kinds-and-jsonschema#scope-and-merge-directives)). Every RPC in every Numinance service sets the `action` option, and every message and field in the file is `since: "1.0.0"`.
+
+Because the host reads annotations from its own copy of the descriptors, a plugin cannot change the risk or execution mode of a verb by shipping a different file. A shared port file that differs from the host copy in any option fails install ([GetDescriptors](/docs/protocol/plugin-service#getdescriptors)).
+
+## RiskClass
+
+RiskClass classifies the worst-case effect of an action. A change's risk class is the maximum over its playbook steps. A capability's risk_floor can never be lowered, neither by a provider nor by a customer; lowering the risk of an existing RPC in a later release is a contract-breaking change.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `RISK_CLASS_UNSPECIFIED` | The zero value. It has no meaning and is rejected by lint and by the plugin host. |
+| 1 | `RISK_CLASS_READ` | Has no side effect. |
+| 2 | `RISK_CLASS_LOW` | Reversible and narrowly scoped. |
+| 3 | `RISK_CLASS_MEDIUM` | Reversible with effort, or wide in scope. |
+| 4 | `RISK_CLASS_HIGH` | Affects production or is hard to reverse. |
+| 5 | `RISK_CLASS_PRIVILEGED` | Touches credentials, IAM, policy, deployment, or is destructive. |
+
+## ExecMode
+
+ExecMode says how an action is executed and which verb shape it follows.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `EXEC_MODE_UNSPECIFIED` | The zero value. It has no meaning and is rejected by lint and by the plugin host. |
+| 1 | `EXEC_MODE_SYNC` | A single request and response. |
+| 2 | `EXEC_MODE_OPERATION` | A long-running operation: start, get, cancel. |
+| 3 | `EXEC_MODE_DECLARATIVE` | Observe, plan, apply with a plan_digest. |
+
+## ActionOptions
+
+`ActionOptions` is the governance contract of one RPC. The host checks each invocation against these values and the caller's grant before dispatch.
+
+```proto title="proto/numinance/annotations/v1/annotations.proto"
+message ActionOptions {
+  RiskClass risk = 1;
+  ExecMode exec = 2;
+  bool idempotent = 3;
+  bool supports_dry_run = 4;
+  string compensating_action = 5;
+  repeated string evidence = 6;
+  string capability = 7;
+  string since = 8;
+  string llm_description = 9;
+  repeated string tool_groups = 10;
+  repeated string scopes = 11;
+}
+```
+
+| Field | Number | Meaning |
+|---|---:|---|
+| `risk` | 1 | Worst-case risk class of the RPC. Must be honest for the worst case and must never be lowered in a later release. |
+| `exec` | 2 | The execution mode the RPC follows. |
+| `idempotent` | 3 | True when replaying the call with the same idempotency key has no additional effect. A port may declare a verb idempotent under a caller-owned reconciliation rule stated in the verb's comment; the host still treats the verb as retryable. |
+| `supports_dry_run` | 4 | True when the RPC can run without side effects and report what it would do. A side-effecting RPC that does not support it must justify that in the RPC comment. |
+| `compensating_action` | 5 | The RPC (`Service.Method`) that undoes this one, or empty when the action cannot be compensated. |
+| `evidence` | 6 | Evidence record types this RPC must produce. Missing declared evidence turns a success into PARTIAL. |
+| `capability` | 7 | The negotiated capability name (`port.feature`) that gates this RPC. Empty means the RPC is a Core verb of its port. |
+| `since` | 8 | Strict x.y.z spec version in which the RPC was introduced. |
+| `llm_description` | 9 | The description shown to a model when the RPC is exposed as a tool. Written as documentation, not as instructions. |
+| `tool_groups` | 10 | Tool groups the RPC belongs to, used to scope which tools an agent sees. |
+| `scopes` | 11 | Grant scopes a caller needs to invoke the RPC. |
+
+## FieldAnnotations
+
+`FieldAnnotations` carries lifecycle and sensitivity metadata for one field and is set through the `field` option.
+
+```proto title="proto/numinance/annotations/v1/annotations.proto"
+message FieldAnnotations {
+  string since = 1;
+  string deprecated_in = 2;
+  string replaced_by = 3;
+  bool sensitive = 4;
+  bool host_only = 5;
+  bool resource_name = 6;
+}
+```
+
+| Field | Number | Meaning |
+|---|---:|---|
+| `since` | 1 | Strict x.y.z spec version in which the field was introduced. Required on every field added after 1.0.0. |
+| `deprecated_in` | 2 | Spec version in which the field was deprecated, or empty. |
+| `replaced_by` | 3 | The field or RPC that supersedes a deprecated field. |
+| `sensitive` | 4 | The field may hold a secret or personal data. Redacted in logs and never copied into evidence in clear text. |
+| `host_only` | 5 | Marks a `types.v1.Reference` field of a port request that only the host may resolve. `HostService.ResolveReference` refuses a reference equal to the value of such a field, even when the same value also sits in a field that is not host-only; the mark applies to every `Reference` nested under a marked message-typed field. Allowed on a `Reference` field, or a wrapper of `Reference` values, in a `numinance.ports.*` file only (annotation lint `HOST_ONLY_INVALID`). Added by RFC-0001. |
+| `resource_name` | 6 | Marks a string or repeated string field of a port request whose values name resources the call touches (a repository, an environment, an artifact), in the spelling a grant's resource scope uses. The Engine derives the policy input's `action.resource_scope` from the marked fields of the request itself, never from a value the caller states beside it; a marked value outside the acting grant's resource scope is denied. Allowed on a string or repeated string field of a message that an RPC input reaches, in a `numinance.ports.*` file only (annotation lint `RESOURCE_NAME_INVALID`). Added by RFC-0002. |
+
+Two rules of `resource_name` matter for port authors. A request that names no resource through a marked field is denied, and so is a request with an unknown field, so never mark an optional filter field: mark only the fields a call must name. An empty marked string names nothing and is never defaulted to an implicit resource.
+
+## Annotated RPCs, exactly as they appear
+
+These excerpts are copied from the port files.
+
+### A read that needs a scope and a capability
+
+```proto title="proto/numinance/ports/transparencylog/v1/transparencylog.proto"
+  rpc Lookup(LookupRequest) returns (LookupResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      capability: "transparencylog.lookup"
+      since: "1.0.0"
+      llm_description: "Finds the index of a leaf in the transparency log."
+      scopes: "evidence.read"
+    };
+  }
+```
+
+`Lookup` is gated by a non-Core capability, so a log without a search index does not serve it. The caller needs the `evidence.read` scope.
+
+### A write with declared evidence and a compensating action
+
+```proto title="proto/numinance/ports/scm/v1/scm.proto"
+  rpc OpenPullRequest(OpenPullRequestRequest) returns (OpenPullRequestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_MEDIUM
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "ScmService.UpdatePullRequest"
+      evidence: "pr-ref"
+      since: "1.0.0"
+      llm_description: "Opens a pull request for a verified candidate branch."
+    };
+  }
+```
+
+If the plugin succeeds but the `pr-ref` evidence is missing, the host records PARTIAL, not success. A compensating action exists (`UpdatePullRequest`, which can close the pull request).
+
+### A privileged action
+
+```proto title="proto/numinance/ports/scm/v1/scm.proto"
+  rpc MergePullRequest(MergePullRequestRequest) returns (MergePullRequestResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_PRIVILEGED
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "ScmService.CommentOnPullRequest"
+      since: "1.0.0"
+      llm_description: "Merges a verified pull request into its base branch."
+    };
+  }
+```
+
+The annotation sets the floor for risk. Who may call it is a separate rule: per the port's comment, merging is allowed only to the release-pipeline identity under a grant of level Merge or above, and the policy floors refuse the author of the Change. See [Capability ports](/docs/protocol/capability-ports#scm).
+
+### A long-running operation
+
+```proto title="proto/numinance/ports/ciexecutor/v1/ciexecutor.proto"
+  rpc StartOperation(StartOperationRequest) returns (StartOperationResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_OPERATION
+      idempotent: true
+      supports_dry_run: true
+      compensating_action: "CiExecutorService.CancelOperation"
+      evidence: "ci-run-ref"
+      since: "1.0.0"
+      llm_description: "Starts one run of a customer pipeline at a given commit."
+    };
+  }
+```
+
+### Field annotations
+
+```proto title="proto/numinance/ports/scm/v1/scm.proto"
+  string repository = 1 [(numinance.annotations.v1.field) = {since: "1.0.0", resource_name: true}];
+```
+
+```proto title="proto/numinance/ports/authorexecutor/v1/authorexecutor.proto"
+  numinance.types.v1.Reference worktree_ref = 6 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    host_only: true
+  }];
+```
+
+```proto title="proto/numinance/plugin/v1/host.proto"
+  string handle = 1 [(numinance.annotations.v1.field) = {
+    since: "1.0.0"
+    sensitive: true
+  }];
+```
+
+## Versioning rules the annotations enforce
+
+- A capability's `risk_floor` can never be lowered, neither by a provider nor by a customer. Lowering the `risk` of an existing RPC in a later release is a contract-breaking change.
+- Every addition after 1.0.0 carries `since`. See [Protocol overview](/docs/protocol#versioning-and-compatibility).
+- `*_UNSPECIFIED` values are rejected by lint and by the plugin host.
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| RPC without the `action` option | Fails lint; required on every RPC. |
+| Missing declared evidence on a successful action | Recorded as PARTIAL. |
+| `resource_name` on a non-string field, or outside a port file | Fails annotation lint `RESOURCE_NAME_INVALID`. |
+| `host_only` on a field that is not a `Reference` or wrapper | Fails annotation lint `HOST_ONLY_INVALID`. |
+| Request names a resource outside the grant's resource scope | Denied before dispatch. |
+| Plugin ships a port file whose options differ from the host copy | Install fails. |
+
+## Next steps
+
+<Cards>
+  <Card title="Capability ports" href="/docs/protocol/capability-ports" description="Per-port tables of every RPC with its risk, exec mode and evidence." />
+  <Card title="Shared types" href="/docs/protocol/shared-types" description="The other shared enums: PrincipalKind, AutonomyLevel, TrustClass and more." />
+  <Card title="RFCs" href="/docs/project/rfcs" description="How a protected file such as this one is changed." />
+</Cards>

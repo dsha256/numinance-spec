@@ -1,0 +1,51 @@
+---
+title: Numinance and numinance-spec
+description: How the proprietary runtime and the Apache-2.0 specification relate, and what each one contains.
+---
+
+<FeatureStatus kind="public-spec">numinance-spec is public and Apache-2.0. The Numinance runtime is proprietary, private and not generally available.</FeatureStatus>
+
+<SourceReference paths={["README.md", "LICENSE", "GOVERNANCE.md", "VERSIONING.md"]} />
+
+Numinance has two parts with different licensing and different purposes. "The brain is private. The contract is open."
+
+## The Numinance runtime
+
+The runtime is the autonomous engineering intelligence and orchestration system. It follows a fixed understand, plan, act, verify, evidence loop. It is proprietary, private and not part of numinance-spec, and these docs do not describe its internals. Where a page describes runtime behaviour, it is marked <StatusBadge kind="designed" /> so design is never read as shipped.
+
+## numinance-spec
+
+numinance-spec is the open contract. It is licensed under Apache-2.0 and is intended to be inspected and implemented independently.
+
+| Path | Contents |
+| --- | --- |
+| `proto/` | Protobuf definitions: shared types, plugin and host services, ports, governance annotations, configuration kinds |
+| `schemas/` | JSON Schemas and examples for configuration kinds |
+| `docs/evidence/` | The normative `evidence/v1` pages |
+| `sdk/` | Go, Python and TypeScript SDK sources (see [SDKs](/docs/sdk)) |
+| `plugins/` | Sample and official plugins |
+| `conformance/` | Conformance suites and vectors |
+| `rfcs/` | Design proposals, including the evidence chain format |
+| `cli/` | The open `numi` CLI |
+| `GOVERNANCE.md`, `VERSIONING.md` | Project rules |
+
+## Three distinct objects
+
+| Object | What it is | Licence |
+| --- | --- | --- |
+| `numi` | The open CLI for validating configuration and verifying evidence | Apache-2.0 |
+| numinance-spec | The repository that holds the contract, SDKs, plugins, conformance and the CLI | Apache-2.0 |
+| The runtime | The autonomous engineer | Proprietary, not generally available |
+
+Installing `numi` does not install an autonomous engineer.
+
+## Why the split matters
+
+A third party can build an adapter, generate a client, validate configuration or verify an evidence export using only the open contract. None of these requires the runtime. Build once against the contract. Bring your own capabilities.
+
+See [Open vs proprietary components](/docs/concepts/open-vs-proprietary) for the boundary in detail and [Status](/docs/status) for what is claimed today.
+
+<Cards>
+  <Card title="Project" href="/docs/project" description="Governance, versioning, RFCs and license." />
+  <Card title="Quickstart" href="/docs/get-started/quickstart" description="Clone the spec and run the open CLI." />
+</Cards>

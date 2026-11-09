@@ -1,0 +1,157 @@
+---
+title: Anchoring and receipts
+description: How a transparency log commits the chain head and the attestation, how inclusion proofs are checked against a pinned log, and how the credential broker, egress proxy and executor are recorded as receipts and attestations.
+---
+
+<FeatureStatus kind="public-spec">The leaf, checkpoint and proof rules and the receipt grammars are public and normative for `evidence/v1`. The log service, the credential broker and the egress proxy are components of the proprietary runtime.</FeatureStatus>
+
+<SourceReference paths={["docs/evidence/log-and-checkpoints.md", "docs/evidence/receipts.md", "docs/evidence/attestation-and-manifest.md", "docs/evidence/trajectory.md", "schemas/evidence/v1/checkpoint.schema.json", "schemas/evidence/v1/inclusion-proof.schema.json", "conformance/evidence/v1/receipt-request-lines.json"]} />
+
+<ShortProductTruth>
+Signatures say the runner wrote the chain. The log says no second, different chain was committed for the same change. Receipts say what the trusted components did, in the same chain.
+</ShortProductTruth>
+
+## Why anchoring exists
+
+A runner key proves who signed a chain. It does not stop the holder of that key from signing a second, different chain for the same change and handing out whichever one suits them. A transparency log closes part of that gap. It commits the head of each chain in a Merkle tree and signs the tree's checkpoint with a **log key** that is separate from the runner key. An export carries a checkpoint and an inclusion proof, so a verifier with the log's public key and origin can confirm, offline, that the head it is looking at is the one the log committed.
+
+The verifier never contacts the log. Everything it needs is in the export plus the two things you pinned.
+
+## Leaves and the tree
+
+A leaf is exactly 33 bytes: one kind byte followed by 32 raw hash bytes.
+
+| Kind byte | Name | The hash it holds |
+| --- | --- | --- |
+| `0x48` | head leaf | `head_record_hash`, the hash of the last record of the chain, except on a sealed chain (below) |
+| `0x41` | attestation leaf | the attestation's signing digest, `sha256` of its canonical form without the signature |
+
+Hashing follows RFC 6962 and RFC 9162. `leaf_hash = sha256(0x00 || leaf)` and `node_hash = sha256(0x01 || left || right)`. A verifier refuses any other leaf length or kind.
+
+On a **sealed** chain the head leaf is committed before the seal record exists, so it holds the hash of the terminal record that the seal follows. That is the "anchored hash". It is why the JSON report carries `anchored_head_record_hash` beside `head_record_hash`, and why `--expect-head` accepts either.
+
+## Checkpoint and inclusion proof
+
+These are the real files from the `closed-author` fixture.
+
+```json title="head-checkpoint.json"
+{"canon_version":1,"origin":"numinance.test/log","root_hash":"sha256:6cf544f86f5f2dc36436e0c91eae808e154f1e0ddbd01eba537d6a7e92b76d29","signature":"rfZfCzuf9AVihnc+xNmMqLENf+eec0qH+n0T4B18skwjyyLdw9L+LrD2F3Msn2sccxeJ3Cl+RKk72FCL+QbBBw==","signing_key_id":"sha256:b62e867fa2f33afe62d5d6b1642e1621d543307846b2a57b897e710919b76709","timestamp":"2026-11-01T12:00:00Z","tree_size":13}
+```
+
+```json title="head-inclusion-proof.json"
+{"audit_path":["sha256:9a8503c331e849c6042bb99cb88e2cefa364861dbdc3416d35fb505a3d2d6fbf","sha256:353d8bf9b28719c50586ffc190275ed4dcf89ccaffcd470a79a28c52fca085cb","sha256:adb5b606b20fca5e77dce02aa57b8214c87968e77680bd18e43191e2f7b3a9ef","sha256:3c4ad335b4a7374c7ad10c6605a34a6536a156da023c6c02c5a3daa04f669044"],"leaf_index":11,"tree_size":13}
+```
+
+The checkpoint covers a tree of 13 leaves and the head leaf is at index 11. The proof shape is fixed by `(leaf_index, tree_size)`: the audit path must have exactly the length those two numbers imply, which is four entries here, and at most 64. A proof with the wrong length is refused before any hashing.
+
+A verifier checks a leaf under a checkpoint in this order, and any failure is a failed proof:
+
+1. The checkpoint signature verifies under the **pinned** log key, and `signing_key_id` is that key's id.
+2. `checkpoint.origin` equals the **pinned** origin, byte for byte.
+3. The leaf is a valid 33-byte leaf and `proof.tree_size` equals `checkpoint.tree_size`.
+4. The proof shape rules hold.
+5. The root recomputed from the leaf and the audit path equals `checkpoint.root_hash`.
+
+The checkpoint signature is `Ed25519(log_key, "numinance.evidence.v1.Checkpoint" || sha256(canonical(checkpoint without signature)))`. A log key and origin that the export itself states are never used.
+
+## Where proofs appear
+
+| File or field | Leaf | Checkpoint |
+| --- | --- | --- |
+| `head-inclusion-proof.json` | head leaf (anchored hash) | `head-checkpoint.json` |
+| `attestation.json`, field `inclusion_proof` | head leaf of the attestation's `head_record_hash` | `attestation-checkpoint.json`, named by `checkpoint_ref` |
+| `bundle-manifest.json`, field `inclusion_proof` | the same head leaf; must equal `head-inclusion-proof.json` | `head-checkpoint.json` |
+| `bundle-manifest.json`, field `attestation_inclusion_proof` | the attestation leaf | `head-checkpoint.json` |
+
+An export is **fully anchored** when the head proof, the attestation's own proof and the manifest's attestation proof all verified under the pinned log. Only then can the level be a bare `verified`. At Close the runner commits a per-change checkpoint, signs the attestation naming it, appends the attestation leaf to the log, and the next checkpoint seals that leaf. The head checkpoint is at or after the checkpoint that holds the attestation leaf.
+
+## What anchoring catches, in real runs
+
+These are conformance vectors run against the open verifier, each with the runner key and the log pinned.
+
+| Vector | What was done to the export | Exit | Level | Finding codes |
+| --- | --- | --- | --- | --- |
+| `head-proof-absent-log-pinned` | The head proof was removed | 3 | `failed` | `anchor_missing`, `manifest_mismatch` |
+| `head-proof-non-verifying` | The head proof does not verify under the pinned log | 3 | `failed` | `anchor_invalid`, `manifest_mismatch` |
+| `head-proof-half-present` | The checkpoint came without its proof | 3 | `failed` | `anchor_invalid`, `manifest_mismatch` |
+| `attestation-checkpoint-missing` | The per-change checkpoint was removed | 3 | `failed` | `attestation_proof` |
+| `attestation-checkpoint-swapped` | Another checkpoint was substituted | 3 | `failed` | `attestation_proof` |
+
+Pinning the wrong log is the same failure. On `closed-basic`, a wrong log key gave `anchor_invalid`, `attestation_proof` and `manifest_mismatch` ("the checkpoint signature does not verify under the pinned log key"), and a wrong origin gave the same three ("the checkpoint origin is not the pinned origin"); both exit 3.
+
+## What anchoring does not do
+
+- **No pin, no check.** Without a pinned log the verifier does not even decode the anchor files. It requires only that the checkpoint and proof come as a pair and, for a Closed change, that the manifest names the checkpoint by digest. The head is then reported as not anchored, and the level cannot be `verified` unless you pass `--allow-unanchored`.
+- **Equivocation by a holder of both keys.** A party that holds both the runner key and the log key can build a second consistent chain, log and export for the same change. Both verify. Only a witness outside that party's control can tell them apart, for example a head obtained from a second source and passed as `--expect-head`. Witness cosignatures are not part of `evidence/v1`.
+- **Consistency proofs between checkpoints** exist between the log and the runner, to refuse a log that rewrites history. An `evidence/v1` export carries none and a verifier is not required to check any.
+
+## Receipts: components state what they did
+
+The chain is written by the runner, but two trusted components act on behalf of a change: the **credential broker** issues scoped handles instead of handing the agent credentials, and the **egress proxy** judges outbound requests. Each states its activity as records in the same chain, with its own `actor_kind` (`broker` or `egress-proxy`), so an auditor reads component behavior from the chain and not from a side log. A receipt names refs, numbers, classes and digests. It never holds a handle, a credential, a body, a header, a query or a URL.
+
+| Action | Author | Facts |
+| --- | --- | --- |
+| `HandleIssued.v1` | broker | A handle was issued: epoch, number, handle ref, invocation, intent, delivery, expiry, up to 256 scope-line digests |
+| `HandleRevoked.v1` | broker | A handle was revoked, and why |
+| `NetworkRequests.v1` | egress proxy | One to 256 request lines: decision, rule, class, port, step, destination, status, bytes, handle |
+| `ReceiptsOverflow.v1` | broker or proxy | A ledger or chain cap was reached, a component started or restarted, or denials were counted and not stored |
+
+A handle is named by `nhref_` and 12 lowercase hex characters, a prefix of its digest and never the handle itself. A request line has ten fields, or eleven when the eleventh is the literal `injected` (added in spec 1.1.0): the proxy selected a rule-bound credential injection for the request. It is one bit. It does not say the upstream accepted the credential, and its absence does not say no credential was attached.
+
+```text title="conformance/evidence/v1/receipt-request-lines.json (hand-written cases)"
+1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab
+1/allow/allow_list/write/443/inv_07070707070707070707070707070707/api.github.com/201/12/nhref_0123456789ab/injected
+1/deny/not_allowed/read/80/inv_07070707070707070707070707070707/h-0123456789abcdef/403/0/none
+```
+
+The destination of a request the allow-list refused appears as `h-` and 16 hex characters, a digest and not a name, because the host of a refused request is chosen by the sandboxed agent and can carry data, and a chain cannot be cleaned afterward.
+
+### Bounds that keep receipts honest
+
+A component never acts without a receipt: it reserves a slot first. It keeps at most 4096 receipts per change, and the chain holds at most 8192 receipt records. When no slot is free the broker refuses to issue a handle and the proxy denies the request, and the refusal is counted. A restart, a refusal count or a cap becomes an explicit statement in the chain (`component_restarted`, `ledger_full`, `chain_cap`, `denied_overflow`), so a reader sees, for each component and epoch, the receipts or the reason there are none. Reaching a chain cap stops the change.
+
+### What a receipt proves
+
+It proves what the runner signed. The check that only the runner appends receipts for the configured component is the writer's, in its own process. It is not a cryptographic boundary against a compromised writer, which holds the runner key and can sign any well-formed receipt and leave real ones out. The open verifier checks the **shape** of each receipt record; it does not check that numbers are continuous across records and it does not yet derive the attestation's `credential_scopes` or `network_policy` from receipts. An export-level conformance vector that carries a receipt record is not yet in the kit; the request-line grammar is tested from the hand-written cases above.
+
+## Attestations: what the runner states at Close
+
+The attestation is the runner's signed summary of a Closed change. Four groups of statements are re-derived from the chain by the verifier, and a disagreement is `attestation_mismatch`:
+
+| Group | Fields |
+| --- | --- |
+| Executor | `executor_id`, `model_id`, `sandbox_image_digest`; the executor id has the form `name@sha256:...`, naming the executor manifest by digest |
+| Identity | `actors`: the distinct principal and kind pairs, and `approval_ev_ids`: every plan-gate decision |
+| Policy | `policy_bundle_digest` and `profile_digest` of the terminal record |
+| Verification and result | `verifier_results` from `verifier.run` records, and `result_commit`, which must hash to a `publish/commit` output in the chain |
+
+The remaining fields are **leaf fields** the runner states and the signature binds: `ticket`, `repository`, `base_commit`, `toolchain_digest`, `ci_run_ids`, `deployment_ids`, `credential_scopes` and `network_policy`. The broker's scope lines are in the form `nhref_<12 hex> <kind>:<value>`, sorted and led by a digest line, and the proxy's allow-list statement is a reference of the form `egress-policy.v1/` plus the change id with a digest. The verifier checks their form and their binding, not their truth.
+
+When no broker or proxy sourced a field, the attestation stays valid and the report says so as a note. This is the line seen in every real run on this section:
+
+```text
+credential_scopes: unsourced: no credential broker statement is in the attestation
+network_policy: unsourced: no egress proxy statement is in the attestation
+```
+
+An unsourced field never fails verification and never changes the level. It tells you the claim is not there.
+
+## Trajectory statements
+
+An executor's event stream is what the agent *reports* it did. It is stored as an artifact and is not evidence of record. Evidence of record comes from receipts. Where the two overlap, the runner compares them before the change ends and states the result as a `TrajectoryCompared.v1` record: `corroborated`, `mismatch` or `unverifiable`, with counts and no paths, hosts or free text. The verifier checks the record's shape and reports the result in `trajectory`, as a finding to read and never as a failure. A chain without the statement is valid.
+
+## Troubleshooting
+
+| You see | Meaning |
+| --- | --- |
+| `anchor_missing` | A log is pinned and the directory holds no head proof |
+| `anchor_invalid` | The checkpoint and proof are not a pair, do not decode, or the head leaf does not verify under the pinned log |
+| `attestation_proof` | The per-change checkpoint is missing, is not the one `checkpoint_ref` names, or the attestation leaf does not verify |
+| `manifest_mismatch` alongside the above | The manifest's proofs do not agree with the head checkpoint; usually the same root cause |
+| `record_invalid` on a receipt | A request line outside the grammar, an action and `actor_kind` that do not go together, or an output outside `receipt/`. A verifier older than 1.1.0 fails a line carrying `injected` |
+
+<Cards>
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="How the log pin changes the level." />
+  <Card title="Threat model and limits" href="/docs/evidence/threat-model-and-limits" description="Equivocation, forks and what receipts cannot prove." />
+  <Card title="Conformance vectors" href="/docs/evidence/conformance-vectors" description="Run the anchoring vectors yourself." />
+</Cards>

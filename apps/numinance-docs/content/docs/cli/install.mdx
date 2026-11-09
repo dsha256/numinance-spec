@@ -1,0 +1,94 @@
+---
+title: Install numi
+description: Build and run the open numi CLI from a source checkout. Release binaries and Homebrew are planned and have no commands yet.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Building from source is the only available method. Other methods are planned.
+</FeatureStatus>
+
+<SourceReference paths={["go.mod", "cli/numi/", "cli/README.md"]} />
+
+<ShortProductTruth>
+  The only real install today is a source build with the Go toolchain. Installing `numi` does not install the Numinance engine.
+</ShortProductTruth>
+
+## Prerequisites
+
+A Go toolchain that satisfies `go.mod`: `go 1.27`, `toolchain go1.27.3`. See the [shared install guide](/docs/get-started/install) for the wider setup this page shares wording with.
+
+## Install methods
+
+<Tabs items={["GitHub source build", "GitHub Releases", "Homebrew"]}>
+<Tab value="GitHub source build">
+
+<StatusBadge kind="pre-alpha" /> Available.
+
+```bash
+git clone https://github.com/dsha256/numinance-spec.git
+cd numinance-spec
+go run ./cli/numi version
+```
+
+To produce a binary instead of running through `go run`:
+
+```bash
+go build -o ./bin/numi ./cli/numi
+./bin/numi version
+```
+
+A prebuilt open CLI built from the checkout this site documents printed:
+
+<VerifiedSnippet what="numi version" exit="0">
+```text
+0.0.0-dev
+```
+</VerifiedSnippet>
+
+</Tab>
+<Tab value="GitHub Releases">
+
+<StatusBadge kind="planned" /> Planned. No release binaries are published, so there is no download command, artifact name or checksum to show. Build from source.
+
+</Tab>
+<Tab value="Homebrew">
+
+<StatusBadge kind="planned" /> Planned. There is no formula or tap to install from, so there is no command to show. Build from source.
+
+</Tab>
+</Tabs>
+
+## Check that it works
+
+```bash
+./bin/numi validate --files schemas/examples/AutonomyPolicy
+```
+
+<VerifiedSnippet what="numi validate --files on one example kind, from the repository root" exit="0">
+```text
+revision: "files"
+ok       file "org-ladder.yaml" AutonomyPolicy "org-ladder"
+```
+</VerifiedSnippet>
+
+Run the repository's tests for the command with `go test ./cli/... ./sdk/go/cli ./sdk/go/evidenceverify` from the checkout root.
+
+## Failure modes
+
+| Symptom | Cause | Response |
+| --- | --- | --- |
+| Toolchain download or version error | Local Go older than `go.mod` | Install a Go toolchain that meets `go.mod` |
+| `numi: command not found` | You built to `./bin/numi` and did not put it on `PATH` | Run it by path, or add the directory to `PATH` yourself |
+| Relative example paths not found | You ran the binary from another directory | Run from the checkout root |
+
+## What this does not give you
+
+The open build validates, scaffolds and verifies. It cannot resolve a profile, run a change, export evidence or reach a runtime. See [open build versus engine build](/docs/cli).
+
+## Next steps
+
+<Cards>
+  <Card title="numi init" href="/docs/cli/init" description="Scaffold a .numinance tree in a Python repository." />
+  <Card title="numi validate" href="/docs/cli/validate" description="Check kind documents." />
+  <Card title="Get started" href="/docs/get-started/quickstart" description="The end-to-end first steps." />
+</Cards>

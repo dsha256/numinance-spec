@@ -1,0 +1,128 @@
+---
+title: Threat model and limits
+description: What a verified evidence/v1 export proves and what it cannot, which attacks the format detects, which need a witness outside the runner, and why conformance is not an audit.
+---
+
+<FeatureStatus kind="public-spec">The trust limits below are stated by the public specification (`verification.md`, section 9) and demonstrated by the conformance vectors. They describe `evidence/v1` at spec 1.0.0.</FeatureStatus>
+
+<SourceReference paths={["docs/evidence/verification.md", "docs/evidence/receipts.md", "docs/evidence/attestation-and-manifest.md", "conformance/evidence/v1/VECTOR-COVERAGE.md"]} />
+
+<ShortProductTruth>
+Evidence tells you who did what, in what order, under which decision, and that none of it was altered afterwards under keys you trust. It does not tell you the work was good.
+</ShortProductTruth>
+
+## The one-sentence claim
+
+A `verified` result means: the records link, hash and end as stated; every signature verifies under runner keys you pinned; and the head, and the attestation, are proved under a transparency log you pinned. Nothing in that sentence says anything about whether the code is correct.
+
+## What verification proves
+
+| Property | How it is established |
+| --- | --- |
+| The records are those the runner signed, in this order, unaltered | Strict canonical decoding, hash links, Ed25519 signatures under pinned keys |
+| The summary, diff digest, derived views and attestation fields agree with the chain | They are re-derived by the verifier and compared byte for byte |
+| Every file in a Closed export is the one the runner signed for | The signed manifest lists every file with digest and size |
+| A truncated or edited Closed export is detected without the log | The manifest and attestation name the first and last sequence and the terminal record's hash, and only the runner key signs them |
+| This is the head the pinned log committed | Inclusion proof under the pinned log key and origin |
+| A denied action that the runner recorded is in the chain | A denial is an ordinary signed record with outcome `denied`; it counts in `summary.json` |
+
+## What it cannot prove
+
+<Callout type="error" title="Verified does not mean correct">
+A passing verification does not prove that the code is correct, that tests were thorough, that the model reasoned well, that the change is safe to deploy, or that every event on a compromised host was logged. Numinance's independent verifier stages, your review and your policy decide quality. Evidence decides provenance and integrity.
+</Callout>
+
+### Quality and intent
+
+The chain records that a verifier ran and what it reported. It does not judge the verifier's coverage. A change can be fully `verified` and still be a bad change, because the evidence records what happened, not whether it was wise.
+
+### Completeness against a compromised host
+
+The runner writes the records and holds the signing key. If the runner host is compromised, the attacker holds the key and can sign any well-formed record, attestation or receipt, and can leave real events out. The format cannot detect events that never reached the runner or that the runner chose not to record. The specification says this plainly for receipts: the writer's checks that only the runner appends them are not a cryptographic boundary against a compromised writer. Moving signing out of the runner process (a sign-only or key-management signer) is a later decision, not a feature of `evidence/v1`.
+
+What helps today is outside the format: component receipts from the broker and egress proxy cross-check what the agent says it did (trajectory statements), reconciliation against the source-control host and CI is a separate workflow. None of these turns a compromised runner into a trustworthy one.
+
+### Completeness of a chain
+
+The chain by itself does not prove it is the whole chain. Only the terminal record, the signed manifest and the transparency log do. In practice:
+
+- A **Closed** export's completeness rests on the manifest and the attestation. A truncation fails without a log key (vectors `truncated-closed-summary-rewritten-runner-key-only` and `truncated-closed-allow-unanchored-only`).
+- An **Abandoned or RolledBack** export has no signed manifest. A prefix of such a chain, with the summary and index rewritten to agree, is not detected unless the log is pinned. The level never hides this: it is `unsigned`, or `incomplete`, or an explicit allowance in the level (vector `truncated-abandoned-flags-visible`). A prefix whose own head the log holds verifies at best as `incomplete` or `verified, incomplete`, never as `verified`.
+- A chain with **no terminal record** is reported `incomplete`: it may be a prefix of a longer chain.
+
+### Key handling
+
+| Limit | Consequence |
+| --- | --- |
+| **Keys come out of band** | If you pin the wrong key, `verified` says nothing. A key, log key or origin stated by the bundle is never used for `verified` |
+| **No rotation, expiry or revocation in v1** | A pinned key is trusted for every signature it ever made. Handle rotation by pinning the keys that were valid for the change |
+| **No per-role key separation** | Any pinned runner key may sign records, the attestation and the manifest. The log key is a separate pin |
+| **A compromised runner key** | Can sign any record, attestation and manifest |
+
+### Equivocation and forks
+
+A party that holds both the runner key and the log key can build a second consistent chain, a second log and a second export for the same change. A verifier cannot tell the two apart: both verify. Two chains for one change, each signed by the pinned key, each verify. What can tell them apart is a witness outside that party's control: a head obtained from a second source and passed as `--expect-head`, or a published checkpoint. Witness cosignatures are not part of `evidence/v1`.
+
+Without `--expect-change` and `--expect-head`, a verifier cannot tell an export from another genuine export of the same change signed by the same keys. The vector `another-chain-of-the-same-change` verifies for exactly this reason.
+
+### Statements, not facts
+
+Some fields are the runner's statements, bound by its signature and the attestation leaf. The verifier checks their form and not their truth:
+
+- Leaf fields: `ticket`, `repository`, `base_commit`, `toolchain_digest`, `ci_run_ids`, `deployment_ids`, `credential_scopes`, `network_policy` and `postgres_transport`. Checking them against the source-control host, the CI executor, the cloud and the IAM is a separate reconciliation workflow.
+- `model_id` is the executor's own claim, checked only against its grammar. The executor manifest check proves which manifest the host routed the run under. It does not prove the executor obeyed that manifest.
+- Timestamps are statements. No timestamp is checked against a clock, and timestamps in a chain are not required to increase.
+- A field the runner could not source is empty, bound as empty, and reported as `unsourced`. That is a note, not a failure. Do not read an unsourced `credential_scopes` as "no credentials were used".
+
+## Attacks and what detects them
+
+Each row below is a vector in the kit, run against the open verifier with the runner key and log pinned unless noted.
+
+| Attack | Detected by | Result |
+| --- | --- | --- |
+| Edit a record's content | Record hash no longer matches | `failed`, `chain_broken` |
+| Drop or reorder a record | Sequence and link checks | `failed`, `chain_broken` |
+| Edit a signature in place | Signature check | `failed`, `signature_invalid` |
+| Sign a whole chain with an attacker's key | The key is not pinned | `failed`, `signer_untrusted`. Under `--trust-bundle-keys` the same export is `self-consistent` |
+| Edit a file after the manifest was signed | Manifest entry digest | `failed`, `manifest_mismatch` |
+| Remove the attestation or the manifest | Presence checks | `failed`, `attestation_missing` or `manifest_missing` |
+| Truncate a Closed export and rewrite the summary and index | Signed manifest and attestation | `failed` |
+| Replace the whole export with another consistent one | Only a pinned log, `--expect-head` or an out-of-band witness | Not detectable by the verifier alone against equivocation |
+| Hide a part | Parts must be held or declared absent | `part_missing`, or `PARTIAL` on a pass, or `parts_absent` with `--complete` |
+| Plant an unknown file | Name check | `failed`, `unknown_file` |
+| Swap in a symlink | Directory read | `failed`, `directory_refused` |
+
+The first, second, fourth and fifth rows were reproduced in the real runs on [Offline verification](/docs/evidence/offline-verification), [Trust levels](/docs/evidence/trust-levels) and [Conformance vectors](/docs/evidence/conformance-vectors).
+
+## What conformance is not
+
+<Callout type="warn" title="Conformance is not an audit or a certification">
+Passing the conformance vectors shows that a verifier agrees with the specification at a version. It does not audit a Numinance deployment, certify the runtime, or attest compliance with any regulation or standard. This site makes no such claim. There is no external audit report, certification or third-party attestation for Numinance evidence at this time.
+</Callout>
+
+Two related facts keep this honest. First, the conformance exports are generated fixtures with fixed test keys. They show the verifier works. They are not exports of real engineering work, and no export from a real deployment is published on this site. Second, the runtime that produces exports is proprietary and not generally available. The open pieces are the contract, the format and the verifier.
+
+## Recommendations for a high-trust setup
+
+1. **Pin keys from a channel other than the export.** Store the runner public key and log key in your own repository or secret store and pass them with `--runner-key` and `--log-key`. Never use `--trust-bundle-keys` in a gate.
+2. **Gate on the full-pass rule.** Require exit 0, `level_enum == "verified"` and an empty `weakened_by_flags`. Add `--complete` if every part must be present. See [Trust levels](/docs/evidence/trust-levels).
+3. **Bind to what you expect.** Pass `--expect-change` and `--expect-head`, where the head comes from a source other than the export (the log, or a second recipient of the same attestation).
+4. **Keep the log key and the runner key under separate control.** Equivocation needs both.
+5. **Reconcile the leaf fields** against the SCM, CI and cloud records you already trust.
+6. **Treat `unsourced` as a gap to close,** not as a clean bill.
+7. **Judge quality separately.** Read the verifier results the chain cites, and review the change. Evidence does not replace review.
+
+## Troubleshooting
+
+| Question | Answer |
+| --- | --- |
+| "It verified, so was the code reviewed?" | It verified that the records are those the runner signed. Whether a reviewer-agent record or a human-approver record exists is in the chain; read `review/review.json` and the actors in the attestation |
+| "Can I trust an export from a host we do not control?" | Only as far as you trust the pinned runner key's custody and the log you pinned. A compromised host with the key can sign anything |
+| "The export has no events from the last hour." | Look for the terminal record and the manifest range. A chain without a terminal record is `incomplete` |
+| "Can the verifier prove an event did not happen?" | No. It can prove a record exists, or that a denial was recorded. Absence from a chain is evidence of absence only to the extent the runner and its custody are trusted |
+
+<Cards>
+  <Card title="Trust levels" href="/docs/evidence/trust-levels" description="The levels and the automation rule." />
+  <Card title="Evidence and trust" href="/docs/concepts/evidence-and-trust" description="The concept-level framing." />
+  <Card title="Open vs proprietary" href="/docs/concepts/open-vs-proprietary" description="What is open, what is private, and what is neither." />
+</Cards>

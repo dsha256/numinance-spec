@@ -1,0 +1,126 @@
+---
+title: SDLCProfile
+description: The kind that binds a component to its stages, playbooks, packs, toolchains, adapters, autonomy, residency and budgets, with field reference and merge rules.
+---
+
+<FeatureStatus kind="public-spec">
+The schema and loader checks are public. Resolution of org, repo and component profiles into one effective profile is a proprietary engine feature.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/sdlc_profile.proto", "schemas/examples/SDLCProfile"]} />
+
+<ShortProductTruth>One profile per scope says which playbooks, packs, toolchains and adapters apply, and which of those a narrower scope may only add to.</ShortProductTruth>
+
+## Purpose and scopes
+
+An `SDLCProfile` is the join table of the configuration. Other kinds are referenced by name (stages, playbooks, packs, toolchains, knowledge connections); adapters, autonomy, residency and budgets are inline. A profile can be written at `SCOPE_ORG`, `SCOPE_REPO` or `SCOPE_COMPONENT`. An absent field is unset and comes from a wider scope.
+
+A policy-bearing field has authority only when the profile is loaded from a protected path or a signed policy bundle. Any other copy, even one claiming `SCOPE_ORG`, is `RepositoryAuthored` and has no authority.
+
+## Field reference
+
+<TypeTable type={{
+  "spec.stages": { type: "string", description: "Names the StageRegistry the component follows. FORBID: only an org-scoped profile sets it, so a narrower scope cannot select a registry without the org gates." },
+  "spec.playbooks": { type: "string[]", description: "Playbook names the component may run, unique. APPEND: a narrower scope adds names, never removes one." },
+  "spec.control_packs": { type: "string[]", description: "ControlPack names that apply, unique. APPEND: a repo cannot drop a pack the org applies. Each name resolves only to a ControlPack." },
+  "spec.architecture_packs": { type: "string[]", description: "ArchitecturePack names that apply, unique. APPEND." },
+  "spec.toolchains": { type: "string[]", description: "LanguageToolchain names of the component, unique. APPEND." },
+  "spec.adapters": { type: "AdapterPorts", description: "Binds ports as AdapterSelector does. adapters.knowledge names the KnowledgeConnection objects the component may read. Each port binding is replaced as a unit." },
+  "spec.autonomy": { type: "AutonomyPolicySpec", description: "Sets levels as AutonomyPolicy does, one more layer at the profile scope after that scope's AutonomyPolicy. Its floors carry FORBID." },
+  "spec.residency": { type: "ResidencyPolicySpec", description: "Sets limits as ResidencyPolicy does. Floors and limits carry FORBID and required regions are refused below the org scope, so only an org-scoped profile sets it." },
+  "spec.budgets": { type: "BudgetPolicySpec", description: "Sets limits as BudgetPolicy does. FORBID: only an org-scoped profile sets it, because a narrower scope could otherwise raise a count or max_risk_escalation." },
+}} />
+
+The envelope (`apiVersion`, `kind`, `metadata`, `extensions`) is described in [Configuration](/docs/configuration). The loader also requires that `playbooks`, `control_packs`, `architecture_packs` and `toolchains` have no duplicate element, and that each name and each adapter `provider`, `instance` and `knowledge` name is made of `/`-joined ASCII segments.
+
+## Example: organization baseline
+
+```yaml title="schemas/examples/SDLCProfile/org-baseline.yaml"
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: org-baseline, scope: SCOPE_ORG}
+spec:
+  stages: trunk-with-cab
+  control_packs: [controls/payments/pci-dss/4.0.1]
+  autonomy:
+    defaults: {level: AUTONOMY_LEVEL_PR}
+    rules:
+      - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  residency: {floors: {floor: RESIDENCY_CLASS_IN_ACCOUNT}, regions: [eu-central-1], cross_region: false}
+  budgets: {tokens: 400000, wall_clock: 7200s, tool_calls: 300, files_changed: 40}
+```
+
+This is the only place the org picks the stage registry, applies a control pack, sets residency and fixes budgets. Everything below it can only add.
+
+## Example: component profile
+
+```yaml title="schemas/examples/SDLCProfile/payments-api.yaml"
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: payments-api, scope: SCOPE_COMPONENT}
+spec:
+  playbooks: [dependency-upgrade, bugfix-bounded, runtime-eol-upgrade]
+  architecture_packs: [layered-service]
+  toolchains: [go-1.27]
+  adapters:
+    scm: {provider: dev.numinance.official/github, instance: main}
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: ci-prod}
+    knowledge: [confluence-eng, jira-pay]
+```
+
+<VerifiedSnippet what="Both profile examples against the strict schema and loader" exit="exit 0">
+```text
+$ numi validate --files schemas/examples/SDLCProfile
+revision: "files"
+ok       file "org-baseline.yaml" SDLCProfile "org-baseline"
+ok       file "payments-api.yaml" SDLCProfile "payments-api"
+```
+</VerifiedSnippet>
+
+The component profile sets no `stages`, `control_packs`, `residency` or `budgets`. They come from the org profile.
+
+## Merge and resolution semantics
+
+| Field | Behaviour across org, repo, component |
+| --- | --- |
+| `stages` | Org only (FORBID). |
+| `playbooks`, `control_packs`, `architecture_packs`, `toolchains` | APPEND: wider names first, then the narrower scope's names not already present. Nothing can be removed. |
+| `adapters` | Per port, REPLACE as a unit; a provider is never paired with another scope's instance. |
+| `autonomy` | Layered after the same scope's AutonomyPolicy. Rules of a narrower scope replace the wider list. Floors are FORBID and cannot be lowered. |
+| `residency`, `budgets` | Org only for floors, limits and required regions. |
+
+A repository that asks for an ungranted playbook, toolchain or adapter name gets it recorded as ignored (`outside the org-granted set`) and not applied.
+
+## Security implications
+
+- A repo cannot pick its own gates: `stages` is org-only.
+- A repo cannot drop a compliance pack: `control_packs` only appends.
+- A repo cannot raise budgets or relax residency: both are org-only.
+- Adapter bindings only name providers. They do not grant credentials; the credential broker issues material per step.
+
+## Common misconfigurations
+
+<VerifiedSnippet what="payments-api edited to set stages at SCOPE_COMPONENT" exit="exit 3">
+```text
+$ numi validate --files stages-repo.yaml
+revision: "files"
+invalid  file "stages-repo.yaml": kind: invalid: numinance.kinds.v1.SDLCProfileSpec.stages is set only at the org scope
+```
+</VerifiedSnippet>
+
+An unknown key such as `extras` is rejected with `"/spec/extras": additionalProperties` and exit 3.
+
+## What validation checks, and what it does not
+
+The open build checks keys, enums, duration form, uniqueness and the org-only rules. It does not check that `stages` names an existing StageRegistry, that a playbook exists, that a provider is installed, or that the merged result satisfies the floors. Ordinary `numi validate` on a repository passes the schema and then exits 7: `profile resolution needs the Numinance engine build`.
+
+<DesignNote title="Planned runtime meaning">
+In the design the engine resolves the three layers, refuses a profile whose references do not resolve, validates the merged profile, and stamps its digest into every grant and evidence record. Playbooks and tools a step may use are derived from the resolved profile, not from the repository the agent is editing.
+</DesignNote>
+
+## Next steps
+
+<Cards>
+  <Card title="AutonomyPolicy" href="/docs/configuration/autonomy-policy" description="Levels, rules and org floors." />
+  <Card title="StageRegistry" href="/docs/configuration/stage-registry" description="The stage names the org profile selects." />
+  <Card title="Toolchains and packs" href="/docs/configuration/toolchains-and-packs" description="What the toolchain and pack names resolve to." />
+</Cards>

@@ -1,0 +1,88 @@
+---
+title: Numinance documentation
+description: Documentation for the open Numinance protocol and the governed autonomous-engineering model around it, with the shipped surface separated from the designed one.
+---
+
+<DocsHomeHero />
+
+## What do you want to accomplish?
+
+Start from the outcome. Every path below ends on something you can run from the public `numinance-spec` repository today, except the last, which describes a design.
+
+<PathCards
+  items={[
+    { title: "Explore the open protocol", href: "/docs/protocol", description: "Typed services, capability ports, governance annotations and configuration kinds as protobuf and JSON Schema.", status: "public-spec" },
+    { title: "Configure a repository", href: "/docs/get-started/first-configuration", description: "Run numi init, read every file it writes, and validate it with the open build.", status: "public-spec" },
+    { title: "Build a plugin", href: "/docs/get-started/first-plugin", description: "Build the sample knowledge provider, see why it refuses to run by hand, and read how a host launches it.", status: "pre-alpha" },
+    { title: "Verify evidence", href: "/docs/get-started/evidence-quickstart", description: "Check an evidence/v1 export offline under keys you pin yourself.", status: "public-spec" },
+    { title: "Understand the architecture", href: "/docs/architecture", description: "Data plane, control plane, trust kernel, plugin host and the separation of duties.", status: "designed" },
+    { title: "Evaluate an engine deployment", href: "/docs/architecture/deployment-modes", description: "How a customer-controlled runtime is designed to be deployed. Not installable today.", status: "designed" },
+  ]}
+/>
+
+## Three objects, not one
+
+The word "Numinance" names three different things. Most confusion about what you can install comes from mixing them up.
+
+| Object | What it is | License and availability |
+| --- | --- | --- |
+| The `numi` CLI | A command line you can build from source. Open build: `version`, `init`, `validate`, `validate --files`, `evidence verify`. | Open source (Apache-2.0), in the public repository. |
+| The `numinance-spec` repository | The contract: protobuf services, ports, governance annotations, kinds and schemas, SDKs, sample and official plugins, conformance kits, the `evidence/v1` specification and verifier. | Open source (Apache-2.0). Pre-alpha. |
+| The Numinance runtime (the engine) | The proprietary system that runs the understand, plan, act, verify, evidence loop under your policy. | Private. Not generally available. Not installable. |
+
+Installing `numi` does not install an autonomous engineer. It installs the tool that scaffolds and validates the configuration the engine reads, and the verifier that checks what the engine exports. Read [Open versus proprietary](/docs/concepts/open-vs-proprietary) for the full boundary.
+
+> The brain is private. The contract is open.
+
+## Current availability
+
+<AvailabilityMatrix group="Open CLI" />
+
+This is the open command line. The full matrix, with SDKs, evidence, integrations, runtime and distribution, is on [Status](/docs/status). The short version:
+
+- **You can run today**: build `numi` from source, scaffold `.numinance/` for a Python repository, schema-validate configuration, and verify an `evidence/v1` export offline.
+- **Pre-alpha**: protobuf contracts, the Go SDK, generated Python and TypeScript stubs, the official providers.
+- **Under development, not installable**: the autonomous engine and managed or sovereign deployment.
+- **Planned**: GitHub Releases binaries and Homebrew. No install command exists for either.
+- **Coming soon**: Rust SDK, Java SDK, air-gapped deployment. No dates, package names or versions are promised.
+
+## What the design promises
+
+These statements describe the architecture the contract encodes. Each links to the page that explains the mechanism and what it does and does not guarantee.
+
+- **Give it context. Let it engineer.** The runtime resolves repository, ticket and knowledge context before it plans. See [Context first](/docs/concepts/context-first).
+- **Your policy decides. Not the model.** Policy is evaluated outside the model before every privileged action, and grants are capability-based. See [Governed execution](/docs/concepts/governed-execution).
+- **Your infrastructure. Not our playground.** The data plane is designed to run in the customer environment. See [Deployment modes](/docs/architecture/deployment-modes).
+- **Don't trust the agent. Check the evidence.** Append-only evidence is written by the runner identity and checked offline under keys the verifier pins. See [Evidence and trust](/docs/concepts/evidence-and-trust).
+
+Full autonomy here means configurable, governed, qualified and human-accepted, bounded by floors, policy, grants and a customer-local circuit breaker. It is never unrestricted, and an agent cannot widen its own grants or promote its own autonomy. See [Autonomy levels](/docs/concepts/autonomy-levels).
+
+## Status legend
+
+Every capability page carries one of six statuses. They are rendered from one table, so the wording never drifts.
+
+<div className="not-prose my-4 flex flex-wrap gap-2">
+  <StatusBadge kind="public-spec" />
+  <StatusBadge kind="pre-alpha" />
+  <StatusBadge kind="designed" />
+  <StatusBadge kind="planned" />
+  <StatusBadge kind="coming-soon" />
+  <StatusBadge kind="illustrative" />
+</div>
+
+| Status | What it promises | What it does not |
+| --- | --- | --- |
+| Available in public spec | Source, schema, CLI function or verifier exists in the public tree. | Stability. It can still be pre-alpha. |
+| Pre-alpha | Code exists; APIs and packaging may change before a tagged release. | A published package or a support commitment. |
+| Under development | Part of the designed architecture. | That it is distributed, runnable or scheduled. |
+| Planned distribution | An install channel is intended. | A published artifact. No install command is given. |
+| Coming soon | It is on the roadmap. | A date, package name, version or command. |
+| Illustrative | An example or simulation. | That it came from a real run. |
+
+## Next steps
+
+<Cards>
+  <Card title="Get started" href="/docs/get-started" description="Choose a path by role and run the first commands." />
+  <Card title="Status" href="/docs/status" description="The source-backed matrix of what is shipped, designed and not claimed." />
+  <Card title="Roadmap" href="/docs/roadmap" description="Available, under development, next and coming soon, without dates." />
+</Cards>

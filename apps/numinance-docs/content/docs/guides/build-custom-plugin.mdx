@@ -1,0 +1,290 @@
+---
+title: Build a custom plugin
+description: Walk the whole path of a capability provider, from picking a port and reading its protobuf to the handshake, Invoke, HostService calls and conformance, using the real sample-knowledge provider.
+---
+
+<FeatureStatus kind="pre-alpha">
+The plugin protocol, the Go helpers in `sdk/go/plugin`, the sample provider and the conformance kits are in the public spec. The plugin host that launches providers in production is part of the proprietary engine. Packaging, signing and the lockfile are designed and not in the open build.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/plugin/v1/plugin.proto",
+    "proto/numinance/plugin/v1/host.proto",
+    "proto/numinance/plugin/v1/envelope.proto",
+    "proto/numinance/plugin/v1/manifest.proto",
+    "proto/numinance/ports/knowledge/v1/knowledge.proto",
+    "sdk/go/plugin/",
+    "plugins/examples/sample-knowledge/",
+    "conformance/knowledge/v1/README.md",
+  ]}
+/>
+
+<ShortProductTruth>Build once against the contract. Bring your own capabilities. A plugin is a subprocess that serves one or more ports, declares what it intends to do, and acts only inside the authority the host hands it for each call.</ShortProductTruth>
+
+## When to use this
+
+Write a plugin when the capability you need is not covered by [the official providers](/docs/integrations/official-providers): an internal ticket system, a source of knowledge the bridge cannot reach, a verifier for your own toolchain. If you only need the reference for the Go surface, read [Custom plugin in Go](/docs/integrations/custom-plugin-go). This guide is the teaching path through the same material and explains the reasons behind each step.
+
+## Prerequisites
+
+- A clone of the spec: `git clone https://github.com/dsha256/numinance-spec.git`. The Go module path is `github.com/numinance/numinance-spec`, not the GitHub path.
+- The Go toolchain named in `go.mod` (go 1.27, toolchain go1.27.3).
+- No engine is required to build, test against a conformance kit, or read the protocol. You cannot run a plugin inside a production host without the proprietary engine.
+- Python and TypeScript have generated protobuf stubs only (pre-alpha, not published packages) and no ergonomic plugin SDK. Rust and Java are coming soon. The rest of this page uses Go, the only language with handwritten helpers. See [SDKs](/docs/sdk).
+
+## The lifecycle at a glance
+
+<PluginInvocationSequence />
+
+Everything below follows that sequence, in order.
+
+## Step 1: pick a port
+
+A port is a protobuf service under `numinance.ports.*` that names one capability class. The spec defines nine: `authorexecutor`, `ciexecutor`, `evidencestore`, `knowledge`, `sandboxprovider`, `scm`, `ticketing`, `transparencylog` and `verifier`. A provider implements a port. It never invents its own RPCs, because the host checks every call against the port file in the host's own copy of the descriptors, not against whatever the plugin says.
+
+We use `knowledge`. It has three read-only verbs, no vendor escape hatch, and the smallest honest provider. See [Capability ports](/docs/protocol/capability-ports) for the others.
+
+## Step 2: inspect the protobuf
+
+Read the service block before writing code. This is the whole of `KnowledgeService`, with the annotation bodies elided.
+
+```proto title="proto/numinance/ports/knowledge/v1/knowledge.proto (excerpt)"
+service KnowledgeService {
+  rpc Search(SearchRequest) returns (SearchResponse) { /* risk: RISK_CLASS_READ, idempotent: true */ }
+  rpc Fetch(FetchRequest) returns (FetchResponse)    { /* risk: RISK_CLASS_READ, idempotent: true */ }
+  rpc Resolve(ResolveRequest) returns (ResolveResponse) { /* risk: RISK_CLASS_READ, idempotent: true */ }
+}
+
+message SearchRequest {
+  string query = 1;
+  repeated string scope = 2;
+  uint32 max_results = 3;
+}
+```
+
+Three things in the file matter more than the messages:
+
+- Each RPC carries an `action` annotation: a risk class, an execution mode, whether it is idempotent and whether it supports a dry run. These annotations are the input to policy. The plugin does not get to restate them lower.
+- The file's header comments are normative. They fix bounds (a `query` is 1 to 1024 bytes), the status codes, and rules such as "every answer is untrusted" and "an outage is an error, never an empty answer".
+- Over-limit input is rejected, never truncated, and a field the host does not know is rejected too.
+
+## Step 3: implement the provider and Register
+
+The sample is two files you can read in full: `main.go` and `provider/server.go`. The entrypoint is short on purpose.
+
+```go title="plugins/examples/sample-knowledge/main.go"
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	digest, err := provider.ExecutableDigest()
+	if err != nil {
+		return err
+	}
+	return plugin.Serve(ctx, os.Getenv, os.Stdout, func(s *grpc.Server, rt plugin.Runtime) {
+		provider.New(digest, rt.Stop).Register(s)
+	})
+}
+```
+
+`plugin.Serve` is the only thing a Go provider needs from the SDK to take part in the protocol. It checks the magic cookie, picks the protocol version, listens on a Unix socket, prints the handshake line and serves the gRPC server your `register` function fills. `Runtime` hands you `HostAddr`, the address of the host's `HostService`, and `Stop`.
+
+`Register` is one line, and it registers the `PluginService`, the lifecycle surface:
+
+```go title="plugins/examples/sample-knowledge/provider/server.go"
+// Register registers the PluginService on s.
+func (s *Server) Register(g *grpc.Server) { pluginv1.RegisterPluginServiceServer(g, s) }
+```
+
+Your port logic is never registered as a separate gRPC service. It rides inside `Invoke`, which is why the host can apply one gate to every call.
+
+<VerifiedSnippet what="go build ./plugins/examples/sample-knowledge; run the binary by hand" exit="build exit 0; run exit 1">
+
+```text
+sample-knowledge: this binary is a Numinance provider and is started by the plugin host
+```
+
+</VerifiedSnippet>
+
+That refusal is `plugin.ErrNotLaunchedByHost`, returned because the cookie in the environment is missing. The cookie is not a secret; the source says it only stops a person running a provider binary by hand and being puzzled by a handshake line.
+
+## Step 4: the manifest and its intents
+
+A manifest declares what the plugin is and what each capability will do. The host reads it through `GetManifest` and compares it with the descriptors and with policy. In the sample, `New` builds it in code:
+
+```go title="plugins/examples/sample-knowledge/provider/server.go (excerpt)"
+capability := func(verb string) *pluginv1.CapabilityDescriptor {
+	return &pluginv1.CapabilityDescriptor{
+		Name: "knowledge." + verb, RiskFloor: annotationsv1.RiskClass_RISK_CLASS_READ, SideEffect: pluginv1.SideEffect_SIDE_EFFECT_READ,
+		Idempotency: pluginv1.Idempotency_IDEMPOTENCY_NATURAL, EnvironmentScope: []string{"dev", "staging"},
+		ConformanceSuite: "conformance/knowledge/v1/basic", LlmDescription: "Reads documents of a small in-memory sample source.",
+		Timeout: durationpb.New(10_000_000_000),
+	}
+}
+```
+
+Each field is a promise the host can check or enforce:
+
+| Field | Why it exists |
+| --- | --- |
+| `name` | `<port>.<snake_case rpc>`. The host dispatches only a method that has a capability entry |
+| `risk_floor`, `side_effect` | Floored by the port's `action` annotation. A plugin cannot claim `READ` for a `PRIVILEGED` RPC; the manifest is rejected |
+| `idempotency` | `NONE`, `KEYED` or `NATURAL`. A non-idempotent RPC permits only `NONE` |
+| `credential_intents`, `network_intents`, `filesystem_intents` | The intents the capability needs. The sample declares none, since it has no network and holds no credential |
+| `evidence_declared` | Evidence record types the capability will produce. Missing declared evidence turns success into `PARTIAL` |
+| `conformance_suite` | Required for a capability provider: `conformance/<port>/<major>/<suite>` |
+| `environment_scope`, `timeout`, `resource_budget` | Requests that only narrow what a grant allows |
+
+The manifest also carries `plugin_id`, `version`, `digest`, `signer_identity`, `kind` (here `EXTENSION_CLASS_CAPABILITY_PROVIDER`), the `ports` it serves, and references to an SBOM and provenance. The sample declares the real sha256 of its own executable. Its SBOM and provenance references are placeholders, which the extensions context would refuse at install; the README says so.
+
+<Callout type="info" title="Intents are declarations, not permissions">
+Declaring `network_intents` does not open the network. The host compares the manifest with the grant and policy, and the egress proxy enforces the result. A manifest can ask for less than a grant allows, never more.
+</Callout>
+
+## Step 5: the host launches a subprocess
+
+The host starts the binary with three environment variables and reads one line from its standard output. The constants are in `sdk/go/plugin/handshake.go`:
+
+```go title="sdk/go/plugin/handshake.go (excerpt)"
+CookieEnv    = "NUMINANCE_PLUGIN_COOKIE"
+ProtocolsEnv = "NUMINANCE_PLUGIN_PROTOCOLS"
+HostAddrEnv  = "NUMINANCE_HOST_ADDR"
+```
+
+The provider prints `CORE-PROTOCOL-VERSION|APP-PROTOCOL-VERSION|NETWORK-TYPE|NETWORK-ADDR|PROTOCOL`, which is the go-plugin line format implemented in the standard library. In v1 the network is always `unix` and the protocol always `grpc`; a line with a sixth field (a TLS certificate) is rejected because the socket lives in a `0700` directory only the host and the provider reach. The host then dials that socket. `Serve` creates the directory, chmods it and removes it on return.
+
+The provider's environment is exactly these variables. There is no ambient proxy setting and no inherited credential.
+
+## Step 6: handshake and descriptors
+
+Before any action, the host calls three lifecycle RPCs. In the sample:
+
+```go title="plugins/examples/sample-knowledge/provider/server.go (excerpt)"
+func (s *Server) Handshake(_ context.Context, req *pluginv1.HandshakeRequest) (*pluginv1.HandshakeResponse, error) {
+	for _, v := range req.GetProtocolVersions() {
+		if v == plugin.AppProtocolVersion {
+			return &pluginv1.HandshakeResponse{ProtocolVersion: plugin.AppProtocolVersion, SpecVersion: SpecVersion}, nil
+		}
+	}
+	return nil, status.Error(codes.FailedPrecondition, "no common protocol version")
+}
+
+func (s *Server) GetDescriptors(context.Context, *pluginv1.GetDescriptorsRequest) (*pluginv1.GetDescriptorsResponse, error) {
+	set, err := plugin.DescriptorSet(knowledgev1.File_numinance_ports_knowledge_v1_knowledge_proto)
+	// ...
+}
+```
+
+`Handshake` negotiates the protocol version and the spec version; the plugin chooses from the host's offer and an unknown choice aborts the handshake. `GetManifest` returns the manifest from step 4. `GetDescriptors` returns the port file and everything it imports as a `FileDescriptorSet`, built by `plugin.DescriptorSet`. The host does not trust it. The host's own copy of the port descriptors is the authority for risk, idempotency and dry run, and a manifest that contradicts it is rejected.
+
+`Health` and `Shutdown` complete the surface. `Shutdown` answers, then stops the process; before it is called the host cancels in-flight operations and revokes the plugin's credential handles and egress grants.
+
+## Step 7: Invoke, the only door for actions
+
+`Invoke` is server-streaming. It carries one policy-approved action as an `Envelope`: the full method name, a host-built `ActionContext`, and the typed request packed in an `Any`. For a non-operation method like these three, the provider sends exactly one terminal message.
+
+```go title="plugins/examples/sample-knowledge/provider/server.go (excerpt)"
+func (s *Server) Invoke(req *pluginv1.InvokeRequest, stream grpc.ServerStreamingServer[pluginv1.InvokeResponse]) error {
+	env := req.GetEnvelope()
+	if env.GetContext().GetInvocationId() == "" || env.GetContext().GetPolicyDecisionId() == "" {
+		return status.Error(codes.InvalidArgument, "no host-assigned context")
+	}
+	resp, err := s.dispatch(env)
+	// ... on success:
+	res = &pluginv1.ActionResult{Status: pluginv1.InvokeStatus_INVOKE_STATUS_SUCCEEDED, Result: packed}
+	// ... on a CallError:
+	res = &pluginv1.ActionResult{Status: pluginv1.InvokeStatus_INVOKE_STATUS_FAILED, Diagnostics: []*pluginv1.Diagnostic{{Reason: failure.Reason, Severity: pluginv1.Severity_SEVERITY_ERROR}}}
+	// ...
+	return stream.Send(&pluginv1.InvokeResponse{Result: res})
+}
+```
+
+The guard at the top matters. The host sets `ActionContext` after the policy decision, and the plugin never supplies or changes it. The sample refuses any call that lacks an invocation id or a policy decision id, because a host that dispatched without a decision would be a host bug the plugin should not paper over. The context carries `actor_kind`, `actor_principal`, `grant_id`, `policy_decision_id`, `idempotency_key`, `deadline`, an effective `budget`, the Change's `residency` class and `dry_run`.
+
+`dispatch` switches on `env.GetMethod()` with the exact method names (`/numinance.ports.knowledge.v1.KnowledgeService/Search` and the other two), checks the type URL of the request, unmarshals it and calls the source:
+
+```go title="plugins/examples/sample-knowledge/provider/server.go (excerpt)"
+case svc + "Search":
+	var r knowledgev1.SearchRequest
+	if err := in(&r); err != nil {
+		return nil, err
+	}
+	return s.source.Search(&r)
+```
+
+A rejected request is an `INVALID_ARGUMENT` failure with one diagnostic reason, not a partial answer. The `Search` implementation checks the scope grammar and `max_results`, then returns only documents whose scope is among the requested entries, comparing whole segments, so a document in scope `other` is never returned for scope `kit`.
+
+For an operation-style method (a port whose RPC is server-streaming, such as `authorexecutor.Execute`) the provider instead sends `RUNNING` messages that each carry one stream message, then a terminal `SUCCEEDED` or `FAILED`. The helpers `plugin.NewStreamCheck` and `plugin.ValidateInvokeStream` apply the same shape rules a host and a conformance kit apply: at most 1024 messages, 64 KiB per running message, 4 MiB for the terminal one.
+
+## Step 8: call back into HostService
+
+A plugin does not act on the world directly. When it needs something privileged, it calls the `HostService` the host serves, and every request quotes the `invocation_id` of the call in flight. The host identifies the calling plugin by the connection it established at launch, never by request content. An id that is not in flight for that plugin is rejected, so a plugin acts only inside the authority of the call it is serving.
+
+```proto title="proto/numinance/plugin/v1/host.proto (excerpt)"
+service HostService {
+  rpc Log(LogRequest) returns (LogResponse)
+  rpc EmitEvidence(EmitEvidenceRequest) returns (EmitEvidenceResponse)
+  rpc RequestCredential(RequestCredentialRequest) returns (RequestCredentialResponse)
+  rpc ResolveReference(ResolveReferenceRequest) returns (stream ResolveReferenceResponse)
+  rpc ReportProgress(ReportProgressRequest) returns (ReportProgressResponse)
+}
+```
+
+- `RequestCredential` returns a handle for an intent the capability declared and the grant allows. The response carries a handle and never credential material; it is opaque, bound to the invocation and the intent, and usable only through the egress proxy. This is how `scm-github` calls GitHub. See [Connect source control and CI](/docs/guides/connect-source-control-and-ci).
+- `EmitEvidence` submits one evidence item. The host validates it and appends it under the runner identity; the plugin never appends. The payload is never a source of record fields: ids, actor, policy decision, grant, risk class and timestamp come from the host's invocation state. The returned `ev_` id is what the plugin lists in `ActionResult.evidence_ids`.
+- `ResolveReference` streams the content of an artifact the request references, in size-capped chunks. There are no presigned URLs. `plugin.CheckResolvable` encodes which references are allowed: a field marked `host_only` in the port is refused even if another field holds the same digest.
+- `Log` and `ReportProgress` record structured entries and progress.
+
+The sample is a read-only provider with no network access, so it calls none of these. It receives `rt.HostAddr` from `Serve` and ignores it. A provider that makes outbound calls, such as `scm-github`, asks for a handle per call and sends only the handle.
+
+<Callout type="warn" title="A plugin cannot widen what it was given">
+The manifest asks, policy decides, and the grant bounds. A capability that tries to name a credential intent the grant does not allow is rejected by `RequestCredential`. A call that returns data outside the declared scope is rejected by the host's response checks. A plugin that reports a side effect above what it declared fails the call and the failure is recorded.
+</Callout>
+
+## Step 9: conformance
+
+The knowledge kit is the acceptance test. It is a Go package that runs cases such as `CORE-001` (a search returns `doc-a`, with the zero-width character in its title replaced by U+FFFD, and nothing from scope `other`) against any target, with fixtures the publisher supplies. The sample's own packages have no tests; the kit tests it.
+
+```bash title="from a numinance-spec checkout"
+go test ./conformance/knowledge/...
+```
+
+<VerifiedSnippet what="go test ./conformance/knowledge/... in the spec checkout" exit="exit 0">
+
+```text
+ok  	github.com/numinance/numinance-spec/conformance/knowledge/v1	0.305s
+```
+
+</VerifiedSnippet>
+
+The kit separates provider cases (`CORE-xxx`) from host checks (`HOST-xxx`) that the plugin host must enforce on any provider, such as rejecting a digest that does not match the content or a scope that breaks the grammar. A provider that passes the kit has shown it behaves under the port; it has not shown that a particular host enforces its side. See [Conformance](/docs/integrations/conformance).
+
+## Step 10: package, sign and lock
+
+<DesignNote title="Distribution is designed, not shipped">
+Installing a plugin means the extensions context verifies a signed, digest-pinned package, compares its permissions delta with the previous version, writes it into a lockfile, and pins the negotiated protocol version. A plugin that adds a capability or widens an intent shows up as a permissions change that a human approves. The sample's placeholder SBOM and provenance references are exactly what that stage refuses. The packaging format and the signing flow are not in the open build, and there is no registry to publish to. See [Registry and trust](/docs/integrations/registry-and-trust).
+</DesignNote>
+
+## What to do in another language
+
+The protocol is language-neutral gRPC over a Unix socket. In Python or TypeScript you would generate stubs from `proto/` (see [Generating clients](/docs/sdk/generating-clients)), implement `PluginService` yourself, print the handshake line, create the `0700` socket directory, and perform the checks that `sdk/go/plugin` performs for you. Those packages are pre-alpha stubs, not ergonomic SDKs, and none is published as a verified package. The Go helpers are the reference to port from.
+
+## Failure modes and safeguards
+
+| Failure | What happens |
+| --- | --- |
+| Binary started by hand | `ErrNotLaunchedByHost`, exit 1, no socket |
+| No common protocol version | `Handshake` returns `FailedPrecondition`; install aborts |
+| Manifest claims a lower risk than the port | Manifest rejected |
+| Request breaks a bound | `FAILED` with `INVALID_ARGUMENT`; nothing is truncated |
+| Response has an unknown field or breaks a rule | The host rejects it and records the call failed |
+| Handle requested for an undeclared intent | `RequestCredential` is rejected |
+| Plugin calls `HostService` with an id not in flight | Rejected; a plugin cannot act outside its call |
+
+## Next steps
+
+<Cards>
+  <Card title="Custom plugin in Go" href="/docs/integrations/custom-plugin-go" description="The reference version of this walk-through." />
+  <Card title="Plugin service protocol" href="/docs/protocol/plugin-service" description="Every PluginService RPC and its bounds." />
+  <Card title="HostService" href="/docs/protocol/host-service" description="Credentials, evidence, references and logs." />
+</Cards>

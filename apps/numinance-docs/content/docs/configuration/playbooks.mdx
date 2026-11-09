@@ -1,0 +1,122 @@
+---
+title: Playbooks
+description: Define the procedure for one change type as steps with capability sets, risk, evidence and verifiers, a bounded repair loop, and the qualification record that gates autonomy promotion.
+---
+
+<FeatureStatus kind="public-spec">
+The kind, schema and loader checks are public. Running a playbook is a proprietary engine feature; the open `numi` build does not run changes.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/playbook.proto", "schemas/examples/Playbook/dependency-upgrade.yaml"]} />
+
+<ShortProductTruth>A playbook shapes grants and never widens them: it names the capability set a step needs, and policy decides whether the step may have it.</ShortProductTruth>
+
+## Purpose and scopes
+
+A `Playbook` is the procedure for one change type, for example `bugfix` or `dependency-upgrade`. It can be written at any scope, and an `SDLCProfile` lists the playbook names a component may run (an append-only list). A change's risk class is the maximum over its steps.
+
+## Field reference
+
+<TypeTable type={{
+  "spec.change_type": { type: "string", description: "Required. The change type the playbook handles.", required: true },
+  "spec.steps": { type: "PlaybookStep[]", description: "Required and non-empty. The loader enforces it.", required: true },
+  "spec.steps[].name": { type: "string", description: "Required and unique in the playbook.", required: true },
+  "spec.steps[].capability_set": { type: "string", description: "Required. The name of the capability set the step grant is derived from.", required: true },
+  "spec.steps[].risk": { type: "RiskClass", description: "Required. The declared risk class, which only raises: the resolved risk is the maximum of this and the action risk of every RPC the capability set grants.", required: true },
+  "spec.steps[].evidence": { type: "string[]", description: "Evidence the step must record. Missing declared evidence turns success into PARTIAL." },
+  "spec.steps[].verifiers": { type: "string[]", description: "Verifiers that run on the step output." },
+  "spec.steps[].rehearse": { type: "boolean", description: "True when the step is rehearsed in a disposable environment first." },
+  "spec.max_repair_attempts": { type: "uint32", description: "Bounds the repair loop, 0 to 10. Absent means the default 2." },
+  "spec.qualification": { type: "Qualification", description: "What the playbook must show before autonomy is promoted. Absent means it is not promotable unless the AutonomyPolicy floor qualifies it. Merges field by field; a narrower scope may only tighten it." },
+  "spec.qualification.min_runs": { type: "uint32", description: "Minimum number of qualifying runs. Absent means the AutonomyPolicy floor applies." },
+  "spec.qualification.max_rework_rate": { type: "uint32", description: "Highest share of runs that needed rework, in basis points (0 to 10000)." },
+  "spec.qualification.max_regression_rate": { type: "uint32", description: "Highest share of runs that caused a regression, in basis points." },
+  "spec.qualification.max_rollback_rate": { type: "uint32", description: "Highest share of releases rolled back, in basis points." },
+  "spec.qualification.zero_security_escapes": { type: "boolean", description: "True when one security escape blocks promotion. Absent means true; only an explicit false relaxes it." },
+}} />
+
+Rates are basis points: `10000` is every run, `1000` is ten percent, `50` is half a percent.
+
+## Example: a bounded bugfix
+
+This is the playbook `numi init` writes for a Python repository.
+
+```yaml title=".numinance/policy/playbook-bugfix-bounded.yaml (numi init output)"
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: bugfix-bounded, scope: SCOPE_REPO}
+spec:
+  change_type: bugfix
+  steps:
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_MEDIUM, evidence: [diff, pr-ref], verifiers: [unit-tests, lint, typecheck]}
+    - {name: review, capability_set: review, risk: RISK_CLASS_LOW}
+    - {name: pr-status, capability_set: release, risk: RISK_CLASS_LOW}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+```
+
+One step per identity kind: `implement` is the author-agent (branch push and pull request), `review` is the reviewer-agent (`verifier.run`), `release` is the release pipeline (read-only status of the pull request). No step merges: with this playbook Numinance opens pull requests only. The verifier names must be those of the `LanguageToolchain` the repository uses.
+
+## Example: dependency upgrade
+
+```yaml title="schemas/examples/Playbook/dependency-upgrade.yaml"
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: dependency-upgrade, scope: SCOPE_ORG}
+spec:
+  change_type: dependency-upgrade
+  steps:
+    - {name: bump, capability_set: scm-write, risk: RISK_CLASS_LOW, evidence: [diff, lockfile-digest], verifiers: [unit-tests, lint]}
+    - {name: open-pr, capability_set: scm-pr, risk: RISK_CLASS_MEDIUM, evidence: [pr-ref], rehearse: false}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+```
+
+<VerifiedSnippet what="The dependency-upgrade example against the strict schema and loader" exit="exit 0">
+```text
+$ numi validate --files schemas/examples/Playbook
+revision: "files"
+ok       file "dependency-upgrade.yaml" Playbook "dependency-upgrade"
+```
+</VerifiedSnippet>
+
+## Bounded repair loop
+
+When verification fails the engine enters the repair loop at most `max_repair_attempts` times. The bound is finite by schema (0 to 10; absent means 2), each attempt is checked by independent verifiers, and exhausting it escalates to a human instead of retrying. Setting `0` disables repair. See [Verification and recovery](/docs/architecture/verification-recovery).
+
+## Merge and resolution semantics
+
+A playbook is referenced by name from `SDLCProfile.playbooks`, which only appends. Its `qualification` merges field by field, and a narrower scope may only tighten a threshold: `min_runs` up, a max rate down, `zero_security_escapes` never from true or absent to false. The reference implementation refuses a loosening. Qualification is what a human reads before accepting a promotion; see [Qualify autonomy](/docs/guides/qualify-autonomy).
+
+## Security implications
+
+- `capability_set` names a set of capabilities; it does not carry credentials. Policy evaluates every call, and a playbook cannot grant more than the profile and floors allow.
+- `risk` can only raise. Declaring a step LOW does not lower the resolved risk of the RPCs it can call.
+- Declared `evidence` that is missing downgrades success to PARTIAL, so a step cannot silently skip its own evidence.
+
+## Common misconfigurations
+
+<VerifiedSnippet what="dependency-upgrade with steps misspelt as step" exit="exit 3">
+```text
+$ numi validate --files bad-steps.yaml
+revision: "files"
+invalid  file "bad-steps.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/step\": additionalProperties
+```
+</VerifiedSnippet>
+
+Others: a short enum for `risk` (write `RISK_CLASS_LOW`), a verifier name that the toolchain does not define, and a `capability_set` name the deployment does not define. The last two are not caught by the open build.
+
+## What validation checks, and what it does not
+
+Checked by `numi validate --files`: keys, enums, non-empty `steps`, required step fields. Not checked: a `max_repair_attempts` above 10 passes the open loader (a copy with `11` returned exit 0); the 0 to 10 range and the 0 to 10000 basis-point range are enforced by the profile context in the engine build. Also not checked: that capability sets, verifiers and evidence names exist.
+
+<DesignNote title="Planned runtime meaning">
+In the design a step's grant is derived from the resolved profile, the step's capability set, its risk and the autonomy level. A step runs in the author, reviewer or release identity as its capability set says; a run can only request a narrower grant for a sub-step. Rehearsal applies migrations or infrastructure to a disposable environment before the real one.
+</DesignNote>
+
+## Next steps
+
+<Cards>
+  <Card title="Bugfix with verification" href="/docs/guides/bugfix-with-verification" description="Walk the bounded bugfix playbook end to end." />
+  <Card title="Dependency upgrade" href="/docs/guides/dependency-upgrade" description="The low-risk path to MERGE autonomy." />
+  <Card title="Toolchains and packs" href="/docs/configuration/toolchains-and-packs" description="Where verifier names come from." />
+</Cards>

@@ -1,0 +1,81 @@
+---
+title: Temporal orchestration
+description: How a durable workflow carries a change through its stages with idempotency, checkpoints, pause and resume, and reference-only payloads.
+---
+
+<FeatureStatus kind="designed">
+  The orchestration layer belongs to the proprietary runtime. The stage and state vocabulary is public in the protocol types.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/kinds/v1/playbook.proto"]} note="ChangeState and the Playbook max_repair_attempts field." />
+
+<ShortProductTruth>
+  The lifecycle is a durable state machine with fresh authority per stage, not one long agent session. Temporal schedules the work. It never grants authority.
+</ShortProductTruth>
+
+## Shape of the orchestration
+
+One `ChangeLifecycle` workflow exists per change. It owns the state machine and delegates each stage to an activity or a child workflow: context resolution, one `WorkUnitExecution` per work unit, verification and release. Intake is idempotent: a second request to open the same change attaches to the existing workflow instead of starting another.
+
+<ChangeLifecycleTimeline />
+
+## Stage states
+
+A change moves through opened, understood, classified, planned and a plan gate, then implementing, integrated, verifying and rehearsing, then a release gate, merging and, where the autonomy level allows, releasing and observing. Terminal states are closed, abandoned and rolled back. Paused and escalated are holding states, not endings.
+
+| Gate | Authority row | Who decides |
+| --- | --- | --- |
+| Plan gate | Planning under an initial grant | Policy decision; a human where the decision requires approval |
+| Release gate | Release identity only | Policy decision; a human where required |
+
+## Reliability mechanics
+
+| Mechanism | What it does |
+| --- | --- |
+| Signals | Deliver approvals, rejections, incident notices, breaker trips and resets, and cancellation |
+| Timeouts | Every activity is bounded; approval waits have a timer, after which the change escalates |
+| Idempotency keys | Each side-effecting step derives a key from the change, step and target, so a retry cannot repeat a merge or deploy |
+| Reconciliation | Before retrying, the step queries the provider for the outcome; success whose response was lost is recorded, not repeated |
+| Checkpoints | The sandbox snapshots the worktree on checkpoint events; after a crash, a run restarts from the last snapshot |
+| Pause and resume | A breaker trip pauses at the next heartbeat, revokes handles and resumes only on a human reset |
+| Continue-as-new | Long histories roll over carrying only the change identifier and current state |
+| Worker versioning | Running workflows stay pinned to the build that started them; replay tests run recent histories against new builds |
+
+<Callout type="info" title="No token-level resume">
+  A harness process cannot resume mid-turn after a crash. Numinance restarts from the last snapshot with the event stream so far as input, and budgets count across restarts.
+</Callout>
+
+## Payloads carry only references
+
+Every workflow and activity argument and result is limited to identifiers, artifact references, digests, statuses, enum codes and timestamps. Source, diffs, tickets, prompts, logs, findings and secrets live in the artifact store and travel as references. A payload codec rejects shapes outside that allow-list, and failure details are held to the same rule: activities return an error class, a stable code and a diagnostic reference, not vendor or model error text.
+
+## Repair, budgets and escalation
+
+A failed verification re-enters implementation with the findings reference as the only new input, at most `max_repair_attempts` times (the generated Playbook defaults to 2, bounded 0 to 10), then the change is escalated. Budgets bound every loop independently of attempt counts. An exhausted budget pauses and escalates. It never widens the grant.
+
+## Authority stays outside the workflow
+
+- Approvals arrive as signals validated against the authenticated human principal. An approver equal to the author is rejected.
+- The workflow requests a policy decision and a grant per stage; it cannot mint either.
+- A replayed or duplicated signal cannot create authority because decisions are recorded as evidence with their own identifiers.
+
+## Boundary table
+
+| Holder | Holds | Does not hold |
+| --- | --- | --- |
+| Workflow engine | Durable state, timers, references | Content, credentials, the right to approve |
+| Activities | One use case each, under a stage grant | Grants beyond the stage |
+| Approvers | Signals attributable to an authenticated human | Approval of their own work |
+
+## Failure cases
+
+- Worker crash mid-run: restart from the last checkpoint, no repeated external effect.
+- Approval timeout: the change escalates; it does not proceed by default.
+- Payload outside the allow-list: rejected at the codec, which fails the step rather than leaking content.
+- Evidence sealing fails at close: retried until success and the failure trips the breaker.
+
+<Cards>
+  <Card title="Change lifecycle" href="/docs/concepts/change-lifecycle" description="The concept view of the stages." />
+  <Card title="Verification and recovery" href="/docs/architecture/verification-recovery" description="What happens when checks fail." />
+  <Card title="Playbooks" href="/docs/configuration/playbooks" description="Where max_repair_attempts is configured." />
+</Cards>

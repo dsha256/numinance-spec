@@ -1,0 +1,60 @@
+---
+title: Context first
+description: How Numinance retrieves context under authorization, resolves conflicts, handles staleness and trust, and knows when to stop.
+---
+
+<FeatureStatus kind="designed">The context resolver is part of the proprietary runtime. The knowledge port and the context kinds are public-spec.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/kinds/v1/autonomy_policy.proto"]} note="TrustClass is defined in the shared types." />
+
+<ShortProductTruth>
+Give it context. Let it engineer. Context is produced by a resolver under policy, not pasted in by hand.
+</ShortProductTruth>
+
+## Why context comes before the plan
+
+Most failures of an automated change are failures of understanding: the wrong module, a superseded decision, an unwritten convention. Numinance therefore puts a context step in front of planning and makes it a governed operation, not a prompt convention. The first stage of the [change lifecycle](/docs/concepts/change-lifecycle) is Understand, and nothing is planned until it ends.
+
+## Authorized retrieval
+
+Context comes from sources: the repository, tickets, documentation, knowledge systems. Each source is reached through a plugin that declares what it reads. The resolver may only retrieve what the change's grant allows, and the retrieval itself is a recorded action. A document the change is not authorized to see is not quietly included "for helpfulness". It is absent, and the denial is on the record.
+
+## A ContextBundle is produced, not authored
+
+A `ContextBundle` is the resolver's output: the selected material for this change, each item with its origin and trust class. You do not write bundles by hand. You configure which sources exist and how they are scoped, and the resolver assembles a bundle per change. This keeps context reproducible: the bundle for a change can be named by digest and later compared with what the agent was actually given.
+
+There is no universal vector database in this design. Retrieval is a port, so a source can be a code index, a ticket system, or a knowledge MCP server, each behind the same typed contract. Numinance does not require you to move your knowledge into a store it owns.
+
+## Conflicts, staleness and trust
+
+Retrieved material disagrees and ages. The resolver treats these as first-class cases:
+
+| Situation | Behavior |
+| --- | --- |
+| Two sources conflict | Both are kept with provenance. A conflict that affects the plan is surfaced, not silently resolved by recency. |
+| An item is stale | Staleness is recorded against the item. Stale context can inform, but it cannot be the sole basis for a high-risk step. |
+| Content is untrusted | It is labeled by `TrustClass`, ranging from `TRUST_CLASS_UNTRUSTED_RETRIEVED` through `TRUST_CLASS_REPOSITORY_AUTHORED`, `TRUST_CLASS_SIGNED_SKILL` and `TRUST_CLASS_SIGNED_POLICY` to `TRUST_CLASS_KERNEL`. |
+
+Trust class matters because retrieved text can contain instructions. Content labeled `TRUST_CLASS_UNTRUSTED_RETRIEVED` is data to reason about. It is never a source of authority, and it cannot alter policy, grants or the plan gate.
+
+## Stopping conditions
+
+Retrieval has to end. The resolver stops when the required questions are answered, when the budget is spent, or when what it needs is unreachable or denied. If a stopping condition leaves a gap that matters, the change escalates for a human instead of proceeding on a guess. "Needs more context" is a legitimate outcome and is recorded as one.
+
+<Callout type="info" title="Orchestration carries references">
+Context content does not travel through orchestration payloads. Workflows pass references and digests; the content stays in the customer-side artifact store.
+</Callout>
+
+## Failure modes
+
+- A source is unavailable: the bundle is marked incomplete and the plan gate sees that.
+- A retrieved page contains injected instructions: it is labeled untrusted and cannot change authority.
+- A bundle is too large: the resolver selects under a budget and records what was left out.
+
+## Next steps
+
+<Cards>
+  <Card title="Context resolver" href="/docs/architecture/context-resolver" description="Architecture of the resolver." />
+  <Card title="Knowledge connection" href="/docs/configuration/knowledge-connection" description="Configure what sources exist." />
+  <Card title="Connect knowledge" href="/docs/guides/connect-knowledge" description="A guided setup." />
+</Cards>

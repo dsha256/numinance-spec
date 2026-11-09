@@ -1,0 +1,62 @@
+---
+title: Open versus proprietary
+description: The three distinct objects - the open numi CLI, the numinance-spec repository and the proprietary runtime - and where the Apache-2.0 boundary sits.
+---
+
+<FeatureStatus kind="public-spec">The contract, CLI, SDK sources and verifier are open. The runtime is private.</FeatureStatus>
+
+<SourceReference paths={["README.md", "GOVERNANCE.md", "LICENSE"]} />
+
+<ShortProductTruth>
+The brain is private. The contract is open. Build once against the contract. Bring your own capabilities.
+</ShortProductTruth>
+
+## Three objects, not one
+
+People often merge these. Keep them apart.
+
+| Object | What it is | Availability |
+| --- | --- | --- |
+| The `numi` CLI | A command-line tool in the spec repository. Its open build validates configuration and verifies evidence. | Open, Apache-2.0. Build from source. |
+| The `numinance-spec` repository | Protocol definitions, schemas, SDK sources, conformance kits, sample and official plugins, evidence format and verifier, governance. | Open, Apache-2.0. |
+| The Numinance runtime | The autonomous engineering engine: context resolution, planning, orchestration, policy enforcement. | Proprietary, private, not generally available. |
+
+Installing `numi` does not install an autonomous engineer. Several commands (run, evidence export, plan, approve and breaker) are designed for the runtime and are not in the open build.
+
+## What is under Apache-2.0
+
+- Protobuf definitions, capability ports and governance annotations.
+- Configuration kinds and their JSON Schemas.
+- Go packages and generated client stubs. Python and TypeScript stubs are pre-alpha, and Rust and Java are coming soon.
+- Conformance kits for ports such as knowledge, scm, ticketing and verifier.
+- The sample plugin and the official plugins.
+- The `evidence/v1` specification and the offline verifier.
+- Governance, versioning and RFC process.
+
+Presence in the tree is not a readiness claim. See the [status page](/docs/status).
+
+## What stays private
+
+The runtime's algorithms, planning and context-selection logic, orchestration implementation, infrastructure details and the specifics of its threat model are not published. The contract tells you what must be true of a conforming component. It does not tell you how the engine achieves it.
+
+## Why the boundary is here
+
+Authority has to be inspectable by the people who grant it. Opening the contract lets you read exactly what a privileged action is, write adapters and plugins that the same governance covers, validate your own configuration, and verify results without asking the vendor. Keeping the brain private means the open surface does not promise behavior that only the engine can supply.
+
+## What you can do today
+
+```bash title="Build the open CLI"
+git clone https://github.com/dsha256/numinance-spec.git
+cd numinance-spec
+go build -o ./bin/numi ./cli/numi
+```
+
+Prebuilt releases and package-manager installs are planned, not available.
+
+## Next steps
+
+<Cards>
+  <Card title="License" href="/docs/project/license" description="The exact scope of Apache-2.0." />
+  <Card title="Numinance and the spec" href="/docs/numinance-and-spec" description="How the two relate." />
+  <Card title="Install" href="/docs/get-started/install" description="Build the CLI from source." />
+</Cards>

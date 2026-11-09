@@ -1,0 +1,148 @@
+---
+title: Export format
+description: The files in an evidence/v1 export directory, what each one binds, how absent parts are declared, and the rules a verifier applies when it reads the directory as untrusted input.
+---
+
+<FeatureStatus kind="public-spec">The export layout and its schemas are public (spec 1.0.0). Writing an export is done by the proprietary runtime; the open `numi` build verifies exports and does not produce them.</FeatureStatus>
+
+<SourceReference paths={["docs/evidence/bundle-layout.md", "docs/evidence/attestation-and-manifest.md", "docs/evidence/derivations.md", "schemas/evidence/v1", "conformance/evidence/v1/exports/closed-author"]} />
+
+<ShortProductTruth>
+An export is a flat directory of canonical JSON files. Everything a verifier can re-derive from the chain, it re-derives. Everything else is signed, listed or declared absent.
+</ShortProductTruth>
+
+## What an export is
+
+An export is the portable form of one change's evidence. The producer writes it all or not at all, into a directory that did not exist before, never following a link and never overwriting. Before writing, it checks its own bytes as a verifier would, so an export that would not verify is not written.
+
+The directory is then handed to someone else. That person treats it as hostile: it may have been edited, truncated, swapped or padded since it was written. The format is designed so each such change is a named finding.
+
+## A real export, file by file
+
+The conformance fixture `closed-author` is a Closed change with an author run, a plan gate, a repair cycle and a verifier report. It is a generated golden export with fixed test keys.
+
+<Files>
+  <File name="records.ndjson" />
+  <File name="summary.json" />
+  <File name="export-index.json" />
+  <File name="change.json" />
+  <File name="diff.digest" />
+  <File name="tool-events.ndjson" />
+  <File name="attestation.json" />
+  <File name="attestation-checkpoint.json" />
+  <File name="bundle-manifest.json" />
+  <File name="head-checkpoint.json" />
+  <File name="head-inclusion-proof.json" />
+  <Folder name="provenance" defaultOpen>
+    <File name="signers.json" />
+    <File name="provenance.json" />
+    <File name="executor-manifest.json" />
+  </Folder>
+  <Folder name="review" defaultOpen>
+    <File name="review.json" />
+  </Folder>
+  <Folder name="verification" defaultOpen>
+    <File name="verdicts.json" />
+  </Folder>
+</Files>
+
+Only three subdirectories exist: `provenance/`, `review/` and `verification/`. No other directory, no deeper nesting and no other file name is part of `evidence/v1`.
+
+## What each file is for
+
+| File | Role | How it is checked |
+| --- | --- | --- |
+| `records.ndjson` | The chain, one canonical record per line | Strict decode, hash links, signatures; see [Record chain](/docs/evidence/record-chain) |
+| `summary.json` | Counts and heads: `records`, `last_sequence`, `head_record_hash`, `denied`, `ended`, `terminal_state`, `sealed` | Re-derived from the records; any difference is `summary_mismatch` |
+| `export-index.json` | Every other file with `sha256` and `size`, plus every absent part | Compared with the directory file by file. It is unsigned |
+| `bundle-manifest.json` | Signed list of every file in the directory except itself | Runner signature, exact entries, binding to the chain and attestation |
+| `attestation.json` | Runner-signed summary of the change, made at Close | Runner signature, then every re-derivable field recomputed from the chain |
+| `attestation-checkpoint.json` | The per-change log checkpoint the attestation names | Digest equals `checkpoint_ref`; proof under the pinned log |
+| `attestation-gap.json` | Instead of the attestation, when it was not made for a Closed change | Must name the same change; never beside an attestation |
+| `head-checkpoint.json`, `head-inclusion-proof.json` | The log's signed checkpoint and the proof that the head is in it | Verified under the caller's pinned log key and origin; see [Anchoring and receipts](/docs/evidence/anchoring-and-receipts) |
+| `change.json` | The change as the chain vouches for it: author, plan digest, repair counts, state, ticket | Compared with the records and the attestation's ticket |
+| `diff.digest` | The digest of the `execution.diff` record, then a line feed | Must equal the derivation exactly; absent exactly when the chain has no such record |
+| `tool-events.ndjson` | The executor event streams the chain cites, concatenated | Must be the concatenation of those streams; empty when none are cited |
+| `verification/verdicts.json`, `review/review.json`, `provenance/provenance.json` | Derived views: verdicts and verifier reports, gate decisions and reviewer records, runs and executors | Recomputed byte for byte from the records; a difference is `view_mismatch` |
+| `provenance/signers.json` | The keys and log the exporter says signed | A claim only. Used as trust only in `--trust-bundle-keys` mode |
+| `provenance/executor-manifest.json` | The ExecutorManifest the `executor_id` names after `@` | Its sha256 must equal the named digest, and its `name` the name before `@` |
+
+Every read has a limit: 1 MiB for documents, 256 MiB for `records.ndjson` and `tool-events.ndjson`, with smaller bounds on checkpoints (4096 bytes), inclusion proofs (8192) and records (3 MiB each).
+
+## The summary, the index and the manifest
+
+Three files describe the directory, and they differ in how far you can trust them. All three below are the real files of `closed-author`.
+
+```json title="summary.json"
+{"change_id":"chg_01010101010101010101010101010101","denied":0,"ended":true,"export_version":1,"first_sequence":1,"head_record_hash":"sha256:8dec4e3d5cf4bd7650ef6010671298793c05493cb20c3dd946bc3ef805689e48","last_sequence":12,"records":12,"sealed":false,"terminal_state":"Closed"}
+```
+
+The **summary** is not a trust source. A verifier re-derives it from the records, so an edited summary disagrees with the chain.
+
+The **index** (`export-index.json`) lists each file with its digest and size, in the form `{"path":"records.ndjson","sha256":"sha256:74a3...","size":13461}`, and lists the absent parts. It detects a swapped, edited, added or removed file, but only against what the same directory says. An attacker who can rewrite the directory rewrites the index. It is unsigned.
+
+The **manifest** (`bundle-manifest.json`) is what resists that. It is signed by the runner key, lists every file but itself, and carries first and last sequence, the head hash and the inclusion proofs for the head leaf and the attestation leaf. A truncated Closed export whose summary and index were rewritten to agree still disagrees with the manifest, and no log key is needed to see it. Only a Closed change has a manifest. A change that ended Abandoned or RolledBack has none, and its level is `unsigned`.
+
+## The attestation
+
+The attestation is the runner's signed statement made at Close. Some fields are re-derived from the chain (`change_id`, `executor_id`, `model_id`, `sandbox_image_digest`, `policy_bundle_digest`, `profile_digest`, `actors`, `verifier_results`, `approval_ev_ids`, the sequence range and `head_record_hash`), and a difference is `attestation_mismatch`. Others are leaf fields that no record can source: `ticket`, `repository`, `base_commit`, `toolchain_digest`, `ci_run_ids`, `deployment_ids`, `credential_scopes`, `network_policy` and `postgres_transport`. The signature binds them and the verifier checks their form, not their truth.
+
+An empty leaf field is bound by the signature as empty and never invented. The verifier reports it as a note, as in the verified run on [Offline verification](/docs/evidence/offline-verification): `credential_scopes: unsourced`. It never lowers the level.
+
+## Parts, absent parts and `--complete`
+
+The format has a design list of parts: `change.json`, `attestation.json`, `records.ndjson`, `tool-events.ndjson`, `diff.digest`, `verification/`, `review/`, `provenance/`, `deployment.json`, `observation.json`, `rollback.json` (only for a change that ended RolledBack) and `summary.json`. For every part that applies, the directory must hold it or declare it absent in the index with a `reason` and an `owner`. An export never fakes a part.
+
+| Situation | Outcome |
+| --- | --- |
+| Part is held | Checked as above |
+| Part is declared absent with reason and owner | Listed in the report's `absent`; the result line says `PARTIAL`; level unchanged |
+| Part is neither held nor declared | `part_missing` |
+| Part is both held and declared absent | `part_contradiction` |
+| `deployment.json` or `observation.json` declared `not_applicable` | Accepted only when the chain shows the change closed at pull-request level (the last `ChangeClosed.v1` has `lifecycle.from` of `merging`); never counted as absent |
+| `--complete` and any part absent and not applicable | `parts_absent` |
+
+The simpler fixture `closed-basic` shows the difference. It verifies, and it declares five parts absent. Run with `--complete` it fails:
+
+<VerifiedSnippet what="closed-basic with --complete (output filtered to the level, FAIL and result lines)" exit="3">
+```text
+$ numi evidence verify --runner-key keys/runner.pub --log-key keys/log.pub --log-origin numinance.test/log --complete exports/closed-basic
+level: failed
+FAIL parts_absent: a part is absent and --complete was given
+FAIL parts_absent: a part is absent and --complete was given
+FAIL parts_absent: a part is absent and --complete was given
+FAIL parts_absent: a part is absent and --complete was given
+FAIL parts_absent: a part is absent and --complete was given
+result: failed
+```
+</VerifiedSnippet>
+
+The same export without `--complete` reports `level` of `verified` with `weakened_by_flags` of `[]` and an `absent` list of `change.json`, `verification/`, `review/`, `deployment.json` and `observation.json`. This is why automation that needs every part must read `absent` or pass `--complete`, not only the level.
+
+## Reading the directory safely
+
+A verifier reads the directory as follows, and a failure is a finding or a refused path, never a guess:
+
+- It lists regular files only. A symbolic link, an unexpected directory, a device or a FIFO is `directory_refused`. A link is never followed.
+- At most 64 entries per directory and 64 files overall. Names are plain file names with no separators, colon or control characters.
+- A file over its limit is refused before the first read.
+- A name that is not a known file is `unknown_file`. A verifier refuses a file it would ignore, so an ignored file cannot hide a claim.
+- The export path itself must be a directory and not a link. A link or a path that changed while it was opened exits 3 with no report. A missing path exits 4. An empty path is a usage error.
+
+`deployment.json`, `observation.json` and `rollback.json` are not files of `evidence/v1`. They are always declared absent and a file with such a name is `unknown_file`.
+
+## Failure modes
+
+| You see | Cause |
+| --- | --- |
+| `digest_mismatch` | A file differs from its index entry, or cannot be read to be hashed |
+| `file_missing`, `file_unlisted` | The index and the directory disagree about which files exist |
+| `manifest_mismatch` | A file changed after the manifest was signed, or the directory holds a file the manifest does not cover |
+| `index_invalid`, `summary_invalid` | The file is missing, unreadable or does not decode |
+| `attestation_missing`, `manifest_missing` | A Closed change without its signed documents and without a stated gap |
+
+<Cards>
+  <Card title="Offline verification" href="/docs/evidence/offline-verification" description="Run the verifier on this directory and read every output line." />
+  <Card title="Anchoring and receipts" href="/docs/evidence/anchoring-and-receipts" description="What the checkpoint and inclusion-proof files prove." />
+  <Card title="Conformance vectors" href="/docs/evidence/conformance-vectors" description="Golden exports and the tampered variants built from them." />
+</Cards>

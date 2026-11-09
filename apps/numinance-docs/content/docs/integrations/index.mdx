@@ -1,0 +1,90 @@
+---
+title: Integrations
+description: How Numinance reaches external systems through plugins that implement typed ports, and which providers, kits and trust mechanisms exist today.
+---
+
+<FeatureStatus kind="public-spec">
+The plugin protocol, the Go plugin SDK, one sample provider, four official providers and the conformance kits are in the public tree and build today. The plugin host that launches providers, the registry and the governed install are part of the proprietary runtime and are not generally available.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/plugin/v1/plugin.proto", "proto/numinance/plugin/v1/manifest.proto", "proto/numinance/ports/", "sdk/go/plugin/", "plugins/", "conformance/"]} />
+
+<ShortProductTruth>Build once against the contract. Bring your own capabilities: a plugin is a signed subprocess that implements one or more typed ports, declares what it intends to do, and acts only when the host has already made a policy decision.</ShortProductTruth>
+
+Numinance does not reach into GitHub, a CI system, a knowledge base or a ticket tracker with built-in code. It reaches them through providers. A provider is a separate executable that implements a **port**: a versioned gRPC service in `proto/numinance/ports/` with a small set of verbs, each carrying governance annotations (risk class, execution mode, idempotency, dry run, declared evidence). The host launches the provider, reads its manifest, and dispatches one approved action at a time.
+
+This section documents that model end to end: how a plugin is launched and talks to the host, what its manifest declares, how to write one in Go, which providers ship in the public tree, how MCP-backed knowledge fits, how distribution and trust are designed, and how conformance is proven.
+
+## The model in one picture
+
+<PluginInvocationSequence />
+
+The diagram is interactive. It walks one invocation through the host, the provider process, the egress proxy and the evidence writer, with an allowed, a denied and an undeclared-action scenario. The [plugin lifecycle](/docs/integrations/plugin-lifecycle) page explains each step against the protocol files.
+
+## Provider families and ports
+
+Each port is one family of providers. A port is a contract, not an implementation: any system that has the concepts the port names can implement every core verb, and a vendor feature beyond the core is a capability negotiated at handshake, never an escape hatch.
+
+| Port package | Verbs (core) | Provider in the public tree | Conformance kit |
+| --- | --- | --- | --- |
+| `numinance.ports.scm.v1` | `GetRepository`, `GetTree`, `GetFile`, `ListBranches`, `CreateBranch`, `GetBranchProtection`, `OpenPullRequest`, `UpdatePullRequest`, `CommentOnPullRequest`, `GetPullRequestStatus`, `MergePullRequest`, `SearchCode` | `plugins/official/scm-github` (all twelve core verbs registered; no `VendorCall`) | `conformance/scm/v1` (runnable, CORE-001 to CORE-010) |
+| `numinance.ports.ciexecutor.v1` | `StartOperation`, `GetOperation`, `CancelOperation`, `ListArtifacts`, `GetLogReference` | `plugins/official/ci-github-actions` | `conformance/ciexecutor/v1` (runnable, CORE-001 to CORE-008) |
+| `numinance.ports.verifier.v1` | `Run` | `plugins/official/verifier-python`, `plugins/official/verifier-repo` | `conformance/verifier/v1` (runnable subset) |
+| `numinance.ports.knowledge.v1` | `Search`, `Fetch`, `Resolve` | `plugins/examples/sample-knowledge` (a sample, not a connector) | `conformance/knowledge/v1` (runnable subset) |
+| `numinance.ports.ticketing.v1` | `GetIssue`, `SearchIssues`, `CommentOnIssue`, `TransitionIssue`, `LinkIssue` | none in the tree | `conformance/ticketing/v1` (replay kit, proven against an in-memory fake) |
+| `numinance.ports.authorexecutor.v1` | `Capabilities`, `Execute`, `Plan` | none in `plugins/`; stream rules in `sdk/go/ports/authorexecutor` | `conformance/authorexecutor/v1` (case list only) |
+| `numinance.ports.sandboxprovider.v1` | `Create`, `Exec`, `Wait`, `Snapshot`, `Destroy` | none | `conformance/sandboxprovider/v1` (case list only) |
+| `numinance.ports.evidencestore.v1` | `AppendLocked`, `GetRecord`, `ListRange`, `Head` | none | `conformance/evidencestore/v1` (case list only) |
+| `numinance.ports.transparencylog.v1` | `Append`, `Checkpoint`, `Prove`, `Lookup` | none | `conformance/transparencylog/v1` (case list only) |
+
+Two things stand out. First, the **ticketing port** is part of the public contract and has a kit, but no provider for any tracker is in the tree; the kit is proven against a small in-memory fake and a provider's own test is expected to call it. Second, the ports that sit on the trust boundary (sandbox provider, evidence store, transparency log) are bound to a deployment, not installed from a registry: the sandbox provider kit states that a registry-installed sandbox provider is refused.
+
+<Callout type="warn" title="Presence is not readiness">
+A directory under `plugins/` is a statement that the code builds against the public SDK, not that it is ready for production. Every official provider README lists work that is not done, and the SBOM and provenance references in the manifests are placeholders that governed install would refuse. See [Official providers](/docs/integrations/official-providers).
+</Callout>
+
+## How ports relate to kinds
+
+Two vocabularies meet here and they are easy to confuse.
+
+| | Port | Kind |
+| --- | --- | --- |
+| What it is | A gRPC service a plugin implements | A YAML document a person writes (`apiVersion: numinance.dev/v1`) |
+| Where it lives | `proto/numinance/ports/*/v1/*.proto` | `proto/numinance/kinds/v1/*.proto`, `schemas/examples/` |
+| Who consumes it | The host, at dispatch time | `numi validate --files` and the engine's loader |
+| Example link between them | `numinance.ports.knowledge.v1` | `KnowledgeConnection.spec.provider` names the extension id of a knowledge provider that must resolve to a lockfile entry |
+
+A kind configures *which* provider to use and *within what bounds* (for example a `KnowledgeConnection` with `read_only: true`, a `scope`, pinned tools and budgets). A port defines *what the provider can be asked to do*. Neither grants authority: grants are evaluated by policy outside the model.
+
+## Extension classes
+
+The manifest field `kind` is an `ExtensionClass`, and it bounds what an extension can ever be.
+
+| Class | What it is | Authority |
+| --- | --- | --- |
+| `EXTENSION_CLASS_SKILL` | Knowledge rendered into guidance | None |
+| `EXTENSION_CLASS_PLAYBOOK` | A declarative procedure | Shapes grants, never widens them |
+| `EXTENSION_CLASS_CONTROL_PACK` | Checks and constraints | Can only restrict |
+| `EXTENSION_CLASS_CAPABILITY_PROVIDER` | An executable plugin implementing ports | Declared intents, enforced by the host |
+
+Only a capability provider may declare `ports` and `capabilities`, and therefore intents. This page and the rest of the section are about capability providers.
+
+## Invariants that hold for every provider
+
+- **Policy decides before the provider runs.** The host dispatches `Invoke` only after a policy decision and a grant check, and the provider cannot change the `ActionContext` the host built. Your policy decides. Not the model.
+- **Ports are never model tools.** The port files state that no verb is exposed to a model and that only named contexts call them, under named identities.
+- **The plugin describes; the host authorises and enforces.** A manifest is a declaration to be compared against grants, not a permission.
+- **No credential material crosses the boundary.** A provider asks for a handle and sends it to the egress proxy, which applies the credential.
+- **Evidence is appended by the host.** A provider submits evidence items; it never appends to the chain.
+- **Everything a provider returns is a claim.** Responses are bounded, strictly decoded and checked; unknown fields and over-limit values are rejected, never repaired.
+
+## Where each topic lives
+
+<Cards>
+  <Card title="Plugin lifecycle" href="/docs/integrations/plugin-lifecycle" description="Launch, magic cookie, handshake, manifest, descriptors, Invoke stream, host callbacks, health and shutdown, with failure semantics." />
+  <Card title="Manifest and capabilities" href="/docs/integrations/manifest-and-capabilities" description="What a plugin declares: side effects, credential, network and filesystem intents, digest, provenance and permission changes." />
+  <Card title="Write a plugin in Go" href="/docs/integrations/custom-plugin-go" description="The sample knowledge provider, line by line, with the build result and the conformance kit it runs against." />
+  <Card title="Official providers" href="/docs/integrations/official-providers" description="GitHub source control, GitHub Actions, and two verifiers: what each does, what is tested, what is not done." />
+  <Card title="Knowledge through MCP" href="/docs/integrations/knowledge-mcp" description="The read-only knowledge port, the KnowledgeConnection kind, and the designed MCP bridge." />
+  <Card title="Registry and trust" href="/docs/integrations/registry-and-trust" description="Designed distribution: signed, digest-pinned, permission-declared extensions, and approved capability-gap synthesis." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="Every kit under conformance/, its modes, how to run it and what a pass does not mean." />
+</Cards>

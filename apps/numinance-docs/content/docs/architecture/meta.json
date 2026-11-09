@@ -1,0 +1,1 @@
+{ "title": "Architecture", "pages": ["index", "data-and-control-planes", "trust-kernel", "temporal-orchestration", "context-resolver", "agent-harnesses", "plugin-host", "authority-and-policy", "verification-recovery", "deployment-modes"] }

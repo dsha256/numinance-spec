@@ -1,0 +1,176 @@
+---
+title: Kinds and JSON Schema
+description: How the sixteen configuration kinds map to protobuf messages, the strict JSON Schemas generated from them, and what numi validate --files does and does not check.
+---
+
+<FeatureStatus kind="public-spec">The kinds, generated schemas and the Go loader are in numinance-spec. The open <code>numi validate --files</code> checks schema and loader only; profile resolution and floors need the proprietary engine.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/kinds/v1/", "schemas/README.md", "schemas/gen/", "schemas/examples/", "buf.gen.yaml"]} />
+
+<ShortProductTruth>
+Configuration is typed. Each YAML kind is a protobuf message, its JSON Schema is generated from that message, and an unknown field is an error, not a silent ignore.
+</ShortProductTruth>
+
+## When to use this page
+
+Use it to understand why a YAML file under `.numinance/` is valid or not, to find the generated schema for a kind, or to wire the schemas into an editor or CI. For how to write each kind, go to the [configuration section](/docs/configuration); for the error messages you will see, see [Validation and errors](/docs/configuration/validation-and-errors).
+
+## The envelope
+
+Every kind is one message with the same envelope: `api_version`, `kind`, `metadata`, `spec` and `extensions`. In YAML the envelope key is spelled `apiVersion` and every other key is proto snake_case.
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {environment: production}, max_level: AUTONOMY_LEVEL_MERGE}
+```
+
+| Envelope field | Role |
+|---|---|
+| `apiVersion` | Version of the kind. `numinance.dev/v1` for all kinds except `EvalSet`, which is `numinance.dev/v1alpha1`. |
+| `kind` | Which kind the resource is. |
+| `metadata` | `name` (required, unique per kind and scope) and `scope` (required, not `SCOPE_UNSPECIFIED`). |
+| `spec` | The kind-specific body. |
+| `extensions` | Extension data under reverse-DNS keys. Unknown fields anywhere else are schema errors. |
+
+Enum values are spelled by their full proto name (`SCOPE_ORG`, `RISK_CLASS_LOW`); durations use the protobuf JSON form (`7200s`). Per the schemas README, this key spelling is pending ratification and may change before the first tag.
+
+`ContextBundle` is produced by Numinance and never authored, so its envelope is `apiVersion`, `kind` and `spec` with no `metadata` and no `extensions`; the loader refuses it. `EvalSet` is alpha and off by default.
+
+## The sixteen kinds
+
+| Kind | Proto file | `apiVersion` | Written by | Configuration page |
+|---|---|---|---|---|
+| `AdapterSelector` | `adapter_selector.proto` | `numinance.dev/v1` | You | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `ArchitecturePack` | `architecture_pack.proto` | `numinance.dev/v1` | You | [Toolchains and packs](/docs/configuration/toolchains-and-packs) |
+| `AutonomyPolicy` | `autonomy_policy.proto` | `numinance.dev/v1` | You | [Autonomy policy](/docs/configuration/autonomy-policy) |
+| `BudgetPolicy` | `budget_policy.proto` | `numinance.dev/v1` | You | [Governance kinds](/docs/configuration/governance-kinds) |
+| `ContextBundle` | `context_bundle.proto` | `numinance.dev/v1` | Produced | [Evals and context bundle](/docs/configuration/evals-and-context-bundle) |
+| `ControlPack` | `control_pack.proto` | `numinance.dev/v1` | You | [Governance kinds](/docs/configuration/governance-kinds) |
+| `EnvironmentProvider` | `environment_provider.proto` | `numinance.dev/v1` | You | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `EvalSet` | `eval_set.proto` | `numinance.dev/v1alpha1` | You (alpha) | [Evals and context bundle](/docs/configuration/evals-and-context-bundle) |
+| `ExecutorManifest` | `executor_manifest.proto` | `numinance.dev/v1` | You | [Adapters and environments](/docs/configuration/adapters-and-environments) |
+| `IndexerPlugin` | `indexer_plugin.proto` | `numinance.dev/v1` | You | [Toolchains and packs](/docs/configuration/toolchains-and-packs) |
+| `KnowledgeConnection` | `knowledge_connection.proto` | `numinance.dev/v1` | You | [Knowledge connection](/docs/configuration/knowledge-connection) |
+| `LanguageToolchain` | `language_toolchain.proto` | `numinance.dev/v1` | You | [Toolchains and packs](/docs/configuration/toolchains-and-packs) |
+| `Playbook` | `playbook.proto` | `numinance.dev/v1` | You | [Playbooks](/docs/configuration/playbooks) |
+| `ResidencyPolicy` | `residency_policy.proto` | `numinance.dev/v1` | You | [Governance kinds](/docs/configuration/governance-kinds) |
+| `SDLCProfile` | `sdlc_profile.proto` | `numinance.dev/v1` | You | [SDLC profile](/docs/configuration/sdlc-profile) |
+| `StageRegistry` | `stage_registry.proto` | `numinance.dev/v1` | You | [Stage registry](/docs/configuration/stage-registry) |
+
+Proto files are under `proto/numinance/kinds/v1/`. Each authored kind has at least one example under `schemas/examples/KIND/`.
+
+## How the schemas are generated
+
+`buf.gen.yaml` runs a JSON Schema plugin over the `numinance.kinds.v1` package only:
+
+```yaml title="buf.gen.yaml (excerpt)"
+  - local: ["go", "-C", "../tools", "tool", "protoc-gen-jsonschema"]
+    out: schemas/gen
+    opt: target=json-strict-bundle
+    types:
+      - numinance.kinds.v1
+```
+
+The `json-strict-bundle` target produces JSON Schema 2020-12 with JSON names (`apiVersion`; multi-word kind fields set `json_name` to their snake_case name), no aliases or string numbers, and a self-contained file per message: dependencies sit under `$defs` and every `$ref` is local.
+
+- The schema of a kind is `schemas/gen/numinance.kinds.v1.KIND.jsonschema.strict.bundle.json`, for example `numinance.kinds.v1.AutonomyPolicy.jsonschema.strict.bundle.json`.
+- The generator also writes a file for every other message it sees (specs, `Metadata`, the annotation options). A loader does not use those.
+- Generated files are never edited by hand. The spec repository's `just gen` regenerates them (it also runs the Go, Python and TypeScript generators from the same `buf.gen.yaml`; see [Generating clients](/docs/sdk/generating-clients)).
+- 64-bit integers are avoided in kinds, because protojson writes them as strings and the strict schema rejects strings there.
+- Merge directives are declared with a field option and are not carried by the JSON Schema.
+
+## Two gates
+
+1. **The schema is the first gate.** It rejects unknown fields (`additionalProperties`), wrong types and wrong enum spellings.
+2. **The loader is the second.** `sdk/go/kindyaml` also checks what a schema cannot: `metadata` and `spec` present, `apiVersion` and `kind` equal to their constants, no zero enum value, required lists non-empty, and reverse-DNS `extensions` keys. Each kind adds checks, listed in `sdk/go/kindyaml/README.md`.
+
+`numi validate --files PATH` runs both. It is strict schema plus loader only: no profile resolution, no floors. A pass means the resource is well-formed, not that your configuration is resolved or ready. Ordinary open `numi validate` schema-passes and then exits 7 because profile resolution needs the Numinance engine build.
+
+<VerifiedSnippet what="Real run against the spec checkout (revision 3c74d59); the valid example above" exit="0">
+```text
+$ numi validate --files --json schemas/examples/AutonomyPolicy
+{"status":"ok","revision":"files","documents":[{"scope":"file","path":"org-ladder.yaml","kind":"AutonomyPolicy","name":"org-ladder","status":"ok"}]}
+```
+</VerifiedSnippet>
+
+A file with an unknown field under `spec` fails the first gate. This YAML is deliberately invalid:
+
+```yaml title="bad.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  not_a_field: true
+```
+
+<VerifiedSnippet what="Real run of numi validate --files on the invalid file above" exit="3">
+```text
+$ numi validate --files bad
+revision: "files"
+invalid  file "bad.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/not_a_field\": additionalProperties
+```
+</VerifiedSnippet>
+
+Exit codes and more real error messages are on [Validation and errors](/docs/configuration/validation-and-errors) and [numi validate](/docs/cli/validate).
+
+## Scope and merge directives
+
+Resolution loads org, then repo, then component. These two enums are in `kinds/v1/meta.proto`.
+
+### MergeDirective
+
+
+MergeDirective says how profile resolution merges a field across org, repo and component scope; it is declared with the merge field option, only on fields reached from spec through singular messages. This enum may grow: a resolver that does not know a value refuses the profile.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `MERGE_DIRECTIVE_UNSPECIFIED` | The default of a field without the option: a singular numinance message merges field by field, and any other field (scalar, enum, list, map, well-known type) is replaced; a oneof is replaced as a unit. |
+| 1 | `MERGE_DIRECTIVE_REPLACE` | Replaces the whole value, a message included, with the narrower scope's value. |
+| 2 | `MERGE_DIRECTIVE_APPEND` | Keeps the wider scope's names, then adds the narrower scope's names not already present; only on repeated string fields. |
+| 3 | `MERGE_DIRECTIVE_FORBID` | Marks a floor: only a kind loaded from the org scope (not its own metadata.scope) or a control pack may set it; a narrower scope fails validation. Only on a field with presence (never a list, map or oneof member) and never below a REPLACE parent. |
+
+### Scope
+
+Scope is the level a kind applies at; resolution loads org, then repo, then component.
+
+| Number | Value | Meaning |
+|---:|---|---|
+| 0 | `SCOPE_UNSPECIFIED` | The zero value; a loader rejects it. |
+| 1 | `SCOPE_ORG` | Applies to every repository of the organisation; only org-scoped kinds may set floors. |
+| 2 | `SCOPE_REPO` | Applies to one repository. |
+| 3 | `SCOPE_COMPONENT` | Applies to one component of a repository. |
+
+
+`SCOPE_ORG` kinds may set floors. A merge directive of `MERGE_DIRECTIVE_FORBID` marks a floor: only a kind loaded from the org scope or a control pack may set it, and a narrower scope fails validation. The directive is the field option `numinance.kinds.v1.merge`, extension number 50003. A resolver that does not know a directive value refuses the profile. Resolution itself is outside the open build.
+
+## Using the schemas in your editor or CI
+
+The schema files are plain JSON Schema 2020-12 documents, so any validator that supports 2020-12 and local `$ref` can use them. The Go loader embeds the kind schemas (`schemas/embed.go`), so `numi validate --files` needs no network. For repository CI, running `numi validate --files .numinance` is the supported check in the open build.
+
+## Failure modes and safeguards
+
+| Situation | Result |
+|---|---|
+| Unknown field outside `extensions` | Schema error, for example `additionalProperties` at a path. |
+| `scope` missing or `SCOPE_UNSPECIFIED` | Loader error. |
+| Enum written in short form (`PR` rather than `AUTONOMY_LEVEL_PR`) | Schema error. |
+| `ContextBundle` authored by hand | Loader refuses it. |
+| `EvalSet` with a default loader | Refused; the alpha loader option is enabled for `numi validate --files`. |
+| Profile resolution requested in the open build | Exit 7. |
+
+## Next steps
+
+<Cards>
+  <Card title="Configuration overview" href="/docs/configuration" description="Every kind, its scope and the page that documents it." />
+  <Card title="numi validate" href="/docs/cli/validate" description="Flags, exit codes and what the open build checks." />
+  <Card title="Generating clients" href="/docs/sdk/generating-clients" description="Generate protobuf clients from the same buf configuration." />
+</Cards>

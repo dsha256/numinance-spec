@@ -1,0 +1,129 @@
+---
+title: Choose an autonomy level
+description: Decide defaults, rules, floors and scope caps for an AutonomyPolicy, with a worked resolution of the organization example.
+---
+
+<FeatureStatus kind="public-spec">
+The AutonomyPolicy document and its schema are public and validate with the open CLI. Resolving a level for a live change is performed by the proprietary engine, which is not generally available.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/autonomy_policy.proto", "proto/numinance/types/v1/types.proto", "schemas/examples/AutonomyPolicy/org-ladder.yaml"]} />
+
+<ShortProductTruth>Autonomy is a level you choose per kind of change, and a ceiling you set per kind of risk. The highest configured level never bypasses a matching floor.</ShortProductTruth>
+
+## When to use this
+
+Use this guide before you raise any repository above the pull-request level, and again when you add a new playbook. The decision is policy, written as a reviewed document. "Your policy decides. Not the model."
+
+## The ladder
+
+`AutonomyLevel` has eight values, in this order:
+
+| Level | What the contract says |
+| --- | --- |
+| `AUTONOMY_LEVEL_OBSERVE` | Reads only. |
+| `AUTONOMY_LEVEL_SUGGEST` | Proposes and writes nothing. |
+| `AUTONOMY_LEVEL_IMPLEMENT` | Writes in a sandbox. |
+| `AUTONOMY_LEVEL_PR` | Opens pull requests. |
+| `AUTONOMY_LEVEL_MERGE` | Merges when policy allows. |
+| `AUTONOMY_LEVEL_STAGE` | Deploys to pre-production. |
+| `AUTONOMY_LEVEL_RELEASE` | Deploys to production. |
+| `AUTONOMY_LEVEL_OPERATE` | Runs operations against production. |
+
+A level is a ceiling on what a change may do. It is not a grant on its own: a grant is derived per step from the profile, the playbook step, the risk class and the level, and an agent cannot widen it. See [Autonomy levels](/docs/concepts/autonomy-levels).
+
+## Defaults, rules and floors
+
+An `AutonomyPolicy` spec has three parts, and they play different roles.
+
+<TypeTable
+  type={{
+    defaults: { type: 'AutonomyDefaults', description: 'The level when no rule matches. Absent everywhere means PR for READ, LOW and MEDIUM risk and Suggest for HIGH and PRIVILEGED.' },
+    rules: { type: 'AutonomyRule[]', description: 'Each has a match and a level. A narrower scope list replaces the wider one.' },
+    floors: { type: 'AutonomyFloors', description: 'Caps with match and max_level. Only an org-scoped kind or a control pack may set them.' },
+  }}
+/>
+
+A match has three optional keys: `playbook`, `risk` and `environment`. An absent key matches every value. The semantics differ between the two uses:
+
+- In a **rule**, `risk` matches exactly, and a key the change has no value for does not match.
+- In a **floor**, `risk` matches that class and every higher one, and a key the change has no value for counts as a match.
+
+Resolution is two steps. The level is the lowest level among the matching rules, else the default. Then no level may exceed the lowest `max_level` among the matching floors. That ordering is the whole safety argument: the highest configured level never bypasses a matching floor.
+
+## Org, repository and component scope
+
+Resolution loads org, then repository, then component. Two properties follow from the contract.
+
+- **Rules narrow or replace.** A narrower scope's rule list replaces the wider one. A repository can therefore lower its own level, or choose a different level than the org rule, for its own changes.
+- **Floors only come from above.** A floor set below the org scope is refused. No rule of any scope, including a component, resolves a change above the org floors or any control pack's floors. If the org sets none, the engine's shipped floor applies: Suggest for HIGH and PRIVILEGED, PR for the rest. Pack floors only add caps.
+
+The practical rule: put ceilings in the organization policy repository, put aspirations in repository or component rules, and let the floors arbitrate.
+
+## Validate the organization example
+
+The spec ships an organization-scoped ladder. Validate it with the open CLI:
+
+```bash title="validate the example"
+go run ./cli/numi validate --files schemas/examples/AutonomyPolicy
+```
+
+<VerifiedSnippet what="numi validate --files on the AutonomyPolicy example" exit="0">
+```text
+revision: "files"
+ok       file "org-ladder.yaml" AutonomyPolicy "org-ladder"
+```
+</VerifiedSnippet>
+
+```yaml title="schemas/examples/AutonomyPolicy/org-ladder.yaml"
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: org-ladder, scope: SCOPE_ORG}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  rules:
+    - {match: {playbook: dependency-upgrade, risk: RISK_CLASS_LOW}, level: AUTONOMY_LEVEL_MERGE}
+  floors:
+    rules:
+      - {match: {risk: RISK_CLASS_HIGH}, max_level: AUTONOMY_LEVEL_SUGGEST}
+      - {match: {environment: production}, max_level: AUTONOMY_LEVEL_MERGE}
+```
+
+`--files` checks the schema and the loader only. It does not resolve levels for a change, so the table below is derived by reading the rules above under the match semantics, not by running a resolver.
+
+### Worked resolution
+
+| Change | Matching rules | After rules | Matching floors | Result |
+| --- | --- | --- | --- | --- |
+| Low-risk `dependency-upgrade` | The `MERGE` rule | `MERGE` | The production floor (a change with no environment value counts as a match in a floor) caps at `MERGE` | `MERGE` |
+| Medium-risk `dependency-upgrade` | None, risk is not LOW | Default `PR` | Production floor caps at `MERGE` | `PR` |
+| Low-risk `bugfix` | None | Default `PR` | Production floor caps at `MERGE` | `PR` |
+| High-risk change of any playbook | None | Default `PR` | High-risk floor caps at `SUGGEST` | `SUGGEST` |
+
+Low-risk examples are reversible, narrowly scoped changes with strong automated checks: a lockfile bump, a documentation fix. High-risk examples affect production or are hard to reverse. The ladder lets you be generous in the first group and strict in the second without writing exceptions into agent behavior.
+
+## Explore the policy
+
+<AutonomyPolicyExplorer />
+
+## Promotion is human-accepted
+
+Raising a playbook's level is a promotion. The design is that qualification statistics from past runs propose it, thresholds come from the playbook's `qualification` block, and a human accepts it by approving a policy change. An agent cannot promote its own autonomy, cannot edit `.numinance/policy/`, and cannot lower a floor. See [Qualify autonomy](/docs/guides/qualify-autonomy).
+
+<DesignNote title="Engine behavior">
+Computing qualification statistics and proposing a promotion are engine features. The thresholds themselves (`min_runs`, `max_rework_rate`, `max_regression_rate`, `max_rollback_rate`, `zero_security_escapes`) are public fields of the Playbook, and a narrower scope may only tighten them.
+</DesignNote>
+
+## Failure modes and safeguards
+
+- **A floor in a repository document.** Refused at load. Move it to the org policy repository.
+- **A rule above the floor.** Not an error: the rule is simply capped. Check the floors when a level is lower than expected.
+- **An empty floor match.** A floor match may not be empty, so to cap everything name the lowest risk class, as the generated org policy does with `RISK_CLASS_READ`.
+- **Level versus breaker.** `PR_ONLY` is a breaker position, not a ladder level. See [Circuit breaker](/docs/operations/circuit-breaker).
+
+## Next steps
+
+<Cards>
+  <Card title="AutonomyPolicy reference" href="/docs/configuration/autonomy-policy" description="Every field, merge rule and error." />
+  <Card title="Risk and approval" href="/docs/operations/risk-and-approval" description="Risk classes and who approves what." />
+  <Card title="Qualify autonomy" href="/docs/guides/qualify-autonomy" description="Evidence for promotion." />
+</Cards>

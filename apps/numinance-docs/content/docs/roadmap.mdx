@@ -1,0 +1,70 @@
+---
+title: Roadmap
+description: What is available now, under development, next, and coming soon across the Numinance public tree, with no dates and no package names promised.
+---
+
+<FeatureStatus kind="designed">The roadmap states direction, not commitments. It carries no dates, versions, package names or commands for anything that is not already in the public tree.</FeatureStatus>
+
+<ShortProductTruth>This page sorts work by how close it is to something you can run. The source-backed detail per capability is on the Status page.</ShortProductTruth>
+
+## Available
+
+These exist in the public `numinance-spec` tree at revision 3c74d59 and can be exercised from a source build. Pre-alpha still applies.
+
+- The open `numi` build: `version`, `init`, `validate`, `validate --files`, `evidence verify`. See [Install](/docs/get-started/install).
+- The protobuf contracts, generated JSON Schemas and kind examples. See [Protocol](/docs/protocol).
+- The `evidence/v1` specification, the offline Go verifier and the conformance vectors. See [Evidence](/docs/evidence).
+- The Go SDK, with handwritten packages and generated stubs. See [Go SDK](/docs/sdk/go).
+- The sample knowledge plugin and the conformance kits (authorexecutor, ciexecutor, evidence, evidencestore, knowledge, sandboxprovider, scm, ticketing, transparencylog, verifier).
+
+## Under development
+
+Part of the designed architecture. Interfaces may change, and none of it is installable from the public tree.
+
+- The Numinance engine, the proprietary autonomous runtime. See [Architecture](/docs/architecture).
+- Managed and sovereign deployment with a customer-controlled data plane. See [Deployment modes](/docs/architecture/deployment-modes).
+- The unified `numi` command surface beyond the open build (`run`, `connect`, `plan`, `approve`, `doctor`) and `numi evidence export`.
+- Live verification of the official providers. Presence under `plugins/official/` is not a readiness claim.
+
+## Next
+
+Direction that follows from the current state of the tree. No order or date is implied.
+
+- A first tagged release of the public repository, after which [versioning](/docs/project/versioning) rules apply to tagged packages.
+- Verified, published packaging for the generated Python and TypeScript stubs, and an ergonomic plugin SDK for each.
+- Additional languages and source-control providers for `numi init`, which today scaffolds Python and GitHub only.
+- Wiring the sample knowledge plugin into the conformance replay.
+
+## Coming soon
+
+<ComingSoon title="Rust SDK">
+  A Rust SDK is on the roadmap. There is no crate, version, import path or date. Until it exists, generate clients from the `.proto` files with your own toolchain.
+</ComingSoon>
+
+<ComingSoon title="Java SDK">
+  A Java SDK is on the roadmap. There are no Maven coordinates, version, import or date. Until it exists, generate clients from the `.proto` files with your own toolchain.
+</ComingSoon>
+
+<ComingSoon title="Air-gapped deployment">
+  Air-gapped operation is a later design milestone that follows managed and sovereign deployment. It is not available and is not scheduled.
+</ComingSoon>
+
+## Planned distribution
+
+Two install channels are intended and neither is published. These docs give no command for either, and will not until the artifacts are published and verified.
+
+<AvailabilityMatrix ids={["dist-releases", "dist-brew"]} />
+
+Until then the only supported way to get `numi` is a source build. See [Install](/docs/get-started/install).
+
+## How items move
+
+An item moves up this page only when the public tree supports it: a source file, a schema, a conformance vector or a verifier run. A change of state is a change to the capability table that backs the [Status](/docs/status) matrix, so the two pages cannot disagree.
+
+## Next steps
+
+<Cards>
+  <Card title="Status" href="/docs/status" description="The dated matrix of what is shipped and what is not claimed." />
+  <Card title="Versioning" href="/docs/project/versioning" description="How the public contract changes before and after a first tag." />
+  <Card title="Contributing" href="/docs/project/contributing" description="How to propose changes to the public contract." />
+</Cards>

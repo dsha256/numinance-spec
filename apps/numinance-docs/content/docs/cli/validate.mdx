@@ -1,0 +1,227 @@
+---
+title: numi validate
+description: Schema-check kind documents with the open build. The difference between --files and repository mode, why exit 7 is not a pass, JSON output, limits and refusals.
+---
+
+<FeatureStatus kind="pre-alpha">
+  The open build checks schemas and loader rules. Profile resolution and floors need the private engine build.
+</FeatureStatus>
+
+<SourceReference paths={["cli/README.md", "sdk/go/cli/validate.go", "sdk/go/kindyaml/README.md", "schemas/examples/"]} />
+
+<ShortProductTruth>
+  A schema pass tells you a document is well formed. It does not tell you the profile resolves, that floors hold, or that the system is ready to do work.
+</ShortProductTruth>
+
+## Three checks that are easy to confuse
+
+| Check | What it tells you | Where it happens |
+| --- | --- | --- |
+| Schema and loader validation | Each document is well formed against the generated kind schema and the loader rules | Open `numi validate` (both modes) |
+| Profile resolution | The profile resolves across org, repo and component scopes under floors, with provenance per field | The engine build's `numi validate` |
+| Readiness | The system can safely perform work with this configuration | Not claimed by any public check |
+
+## Synopsis
+
+```text
+numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
+numi validate --files [--json] path
+```
+
+`path` is the repository (default `.`) in repository mode. `--org` is the organization policy repository. `--component` is a repository-relative component root such as `svc/api`. Flags may come before or after the path. `--` ends flag parsing; everything after it is a path.
+
+## Mode 1: --files (example validator)
+
+`--files PATH` checks kind documents that are not a repository. `PATH` is one YAML file or a directory, and every `.yaml` or `.yml` file below it is a document. Each is checked against its generated kind schema (unknown fields are errors unless under `extensions:`) plus the loader checks. No resolver runs. This is how the repository's `just schema-check` validates every shipped example.
+
+<VerifiedSnippet what="numi validate --files schemas/examples/SDLCProfile, from the checkout root" exit="0">
+```text
+revision: "files"
+ok       file "org-baseline.yaml" SDLCProfile "org-baseline"
+ok       file "payments-api.yaml" SDLCProfile "payments-api"
+```
+</VerifiedSnippet>
+
+JSON output is one object:
+
+<VerifiedSnippet what="numi validate --files --json schemas/examples/AutonomyPolicy" exit="0">
+```text
+{"status":"ok","revision":"files","documents":[{"scope":"file","path":"org-ladder.yaml","kind":"AutonomyPolicy","name":"org-ladder","status":"ok"}]}
+```
+</VerifiedSnippet>
+
+A schema failure names a path and a keyword and never a value:
+
+<VerifiedSnippet what="a file with an unknown field spec.bogus, human output" exit="3">
+```text
+revision: "files"
+invalid  file "x.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/bogus\": additionalProperties
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="the same file with --json" exit="3">
+```text
+{"status":"invalid","revision":"files","documents":[{"scope":"file","path":"x.yaml","status":"invalid","error":"kind: does not match the kind schema: schema: value does not match (violations: 1): \\\"/spec/bogus\\\": additionalProperties"}]}
+```
+</VerifiedSnippet>
+
+An unknown kind is also exit 3:
+
+<VerifiedSnippet what="a file containing apiVersion and kind: Nope" exit="3">
+```text
+revision: "files"
+invalid  file "k.yaml": kind: unknown kind
+```
+</VerifiedSnippet>
+
+### Exit codes in --files mode
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Every document passes the schema and loader checks |
+| 3 | At least one document is invalid, or a refused file name or file type |
+| 4 | The path is missing, or holds no kind document |
+| 2 | Usage: no path, more than one, or combined with `--rev`, `--org` or `--component` |
+
+<VerifiedSnippet what="numi validate --files on a path that does not exist" exit="4">
+```text
+numi validate: path not found
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="numi validate --files --rev x schemas/examples" exit="2">
+```text
+numi validate: --files excludes --rev, --org and --component
+usage: numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
+       numi validate --files [--json] path
+  ...
+```
+</VerifiedSnippet>
+
+(The usage block continues with the flag list; it is elided here.)
+
+## Mode 2: repository mode, ending in exit 7
+
+Without `--files`, the open build reads `.numinance/` of the directories given, so uncommitted edits are seen. It schema-validates every kind document of the org, repo and component trees, then exits 7 with a message that profile resolution needs the engine build.
+
+<VerifiedSnippet what="numi validate on a repository scaffolded by numi init" exit="7">
+```text
+revision: "working tree (uncommitted changes included)"
+ok       repo ".numinance/policy/autonomy.yaml" AutonomyPolicy "pr-only"
+ok       repo ".numinance/policy/playbook-bugfix-bounded.yaml" Playbook "bugfix-bounded"
+ok       repo ".numinance/policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+ok       repo ".numinance/policy/stage-registry.yaml" StageRegistry "pr-only"
+ok       repo ".numinance/policy/toolchain-python.yaml" LanguageToolchain "python-3.12"
+numi validate: profile resolution needs the Numinance engine build
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="the same repository with --json" exit="7">
+```text
+{"status":"unavailable","revision":"working tree (uncommitted changes included)","documents":[{"scope":"repo","path":".numinance/policy/autonomy.yaml","kind":"AutonomyPolicy","name":"pr-only","status":"ok"}, ... ],"error":"profile resolution needs the Numinance engine build"}
+```
+</VerifiedSnippet>
+
+(Four further `documents` entries are elided.) Exit 7 is deliberate: a CI that uses the open build cannot mistake a schema pass for a full one. In the open build, 7 has exactly one meaning: the schema pass succeeded and profile resolution is not available. A cancel (SIGINT, SIGTERM) exits 1, never 7. The `--files` mode of the same documents exits 0, which is why it is not a substitute for repository validation.
+
+With an organization directory, the output labels each tree:
+
+<VerifiedSnippet what="numi validate --org ../org ." exit="7">
+```text
+revision: "working tree (uncommitted changes included)"
+ok       org ".numinance/policy/autonomy.yaml" AutonomyPolicy "pr-only"
+ok       org ".numinance/policy/ci-jenkins.yaml" AdapterSelector "ci-jenkins"
+...
+ok       repo ".numinance/policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+numi validate: profile resolution needs the Numinance engine build
+```
+</VerifiedSnippet>
+
+### --rev is refused
+
+<VerifiedSnippet what="numi validate --rev HEAD ." exit="2">
+```text
+numi validate: the open build reads the working tree; --rev needs the engine build
+```
+</VerifiedSnippet>
+
+The open build cannot read a commit. `--rev ""` is the default. This keeps `--rev` from silently meaning something else.
+
+## What the engine build adds
+
+| | Open | Engine |
+| --- | --- | --- |
+| Source | Working tree, uncommitted edits included | A private copy of `HEAD`, refs and objects; never the working tree |
+| Output | Document list, then exit 7 | Resolved profile digest and the provenance of each field, with the reason when a contribution was ignored |
+| `--files` | Supported | Not available; exit 2 |
+| Exit 7 | Schema pass, no resolution | A dependency was unavailable |
+| Other exits | | 3 for a revision expression or option, a link, an object failing fsck or a repository over 1 GiB or 200000 files; 4 for an unknown revision; 8 when the 60 s run expires |
+
+## Refusals and limits
+
+Reads use `os.Root`, so no path escapes the directory. These are refused, with exit 3:
+
+<VerifiedSnippet what="a directory containing a symbolic link to a valid example" exit="3">
+```text
+numi validate: file tree has a file that is not regular (a link or special file)
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="a path that is itself a symbolic link" exit="3">
+```text
+numi validate: path is not a regular file or a directory (a link is refused)
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="a directory containing a named pipe called p.yaml (completed without blocking)" exit="3">
+```text
+numi validate: file tree has a file that is not regular (a link or special file)
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="a file named y.YAML in --files mode" exit="3">
+```text
+numi validate: y.YAML: a file name mentioning .yaml or .yml must end in lowercase .yaml or .yml
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="repository mode where .numinance is a symbolic link" exit="3">
+```text
+numi validate: repo tree: a link or non-directory on the path to .numinance
+```
+</VerifiedSnippet>
+
+Also refused: a symbolic link on the `--component` path, and any file that is not regular, checked on the open descriptor so a FIFO cannot block the run. In `--files` mode a name mentioning `.yaml` or `.yml` in any letter case but not ending exactly in lowercase `.yaml` or `.yml` (`.YAML`, `.Yml`, `.yaml.bak`, a trailing space) is invalid. Other names such as `README.md~` are ignored. Repository mode ignores such files; `--files` refuses them.
+
+Bounds across all trees: 4096 entries, 256 documents, 16 MiB total, and `kindyaml.MaxBytes` (128 KiB) per document. Names, paths and messages from documents are cut and escaped before printing: control, bidi and zero-width characters become `\u` escapes, so a name cannot pass for another. A panic or an error of no kind exits 1, never 0. An empty directory is exit 4:
+
+<VerifiedSnippet what="numi validate --files on an empty directory" exit="4">
+```text
+revision: "files"
+numi validate: no kind documents found
+```
+</VerifiedSnippet>
+
+## What a pass means
+
+A `--files` pass means the input conforms to its schema and loads. A repository-mode schema pass followed by exit 7 means the same thing for every tree, and that nothing more ran. Neither checks floors, nor that a provider is installed, nor that the configuration is safe. A produced kind (`ContextBundle`) is never loaded as configuration; `--files` checks it against its own strict schema instead, and leaves its other constraints to the producer.
+
+The open CLI does not claim to detect every misconfiguration, and it does not run the engine.
+
+## Troubleshooting
+
+| Message | Cause |
+| --- | --- |
+| `--files needs exactly one path` | No path, or several |
+| `no kind documents found` | Empty directory, or no `.yaml`/`.yml` file |
+| `kind: unknown kind` | `kind` is not a known kind |
+| `additionalProperties` at a path | An unknown field outside `extensions:` |
+| Exit 7 in CI | Expected in the open build; gate on the engine build for full validation |
+
+## Next steps
+
+<Cards>
+  <Card title="Validation and errors" href="/docs/configuration/validation-and-errors" description="Loader rules and error shapes for configuration." />
+  <Card title="numi init" href="/docs/cli/init" description="Generate documents that pass this check." />
+  <Card title="Commands and exit codes" href="/docs/cli/commands-and-exit-codes" description="The stable exit-code table." />
+</Cards>

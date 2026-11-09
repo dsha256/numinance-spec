@@ -1,0 +1,261 @@
+---
+title: numi init
+description: Scaffold a .numinance policy tree for a Python repository, with every flag, real runs and exit codes, and the files it writes.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Available in the open build and the engine build. Writes documents; resolves nothing.
+</FeatureStatus>
+
+<SourceReference paths={["cli/README.md", "sdk/go/cli/init.go", "sdk/go/cli/initdata/"]} />
+
+<ShortProductTruth>
+  `numi init` writes a starter `.numinance/` tree whose autonomy level is PR only: the agent may open pull requests and may never merge. It names a CI system only because you pass `--ci`.
+</ShortProductTruth>
+
+## When to use
+
+You have a Python repository on GitHub and want a first set of kind documents that pass schema validation. Python and GitHub are the only language and source-control provider the template supports today.
+
+## Synopsis
+
+```text
+numi init --ci github-actions|jenkins|both [--org-dir DIR] [--package-manager uv|pip|poetry]
+          [--python-version 3.N] [--verifiers LIST] [--language python] [--scm github]
+          [--tickets file] [--force] [path]
+```
+
+`path` is the repository and defaults to `.`.
+
+## Flags
+
+| Flag | Meaning |
+| --- | --- |
+| `--ci SYSTEM` | `github-actions`, `jenkins` or `both`. Required. Absent is a usage error, because a default would wire a system the repository may not have. |
+| `--org-dir DIR` | Also write the org-scoped documents into this organization policy repository. |
+| `--package-manager NAME` | `uv`, `pip` or `poetry`. Default: detected from `uv.lock`, `poetry.lock`, `pyproject.toml` (`[tool.poetry]`, `[tool.uv]`) or `requirements.txt`, in that order; `uv` when nothing is found. Two conflicting hints are a usage error until the flag decides. |
+| `--python-version 3.N` | Default: the first line of `.python-version` when it is a plain `3.N` or `3.N.P`, else `3.12`. |
+| `--verifiers LIST` | Comma-separated subset of `unit-tests`, `lint`, `typecheck` (pytest, ruff, mypy of the verifier provider). Default: all three. |
+| `--language python` | Optional. Python is the only accepted value and the default. |
+| `--scm github` | Optional. GitHub is the only accepted value and the default. |
+| `--tickets file` | Optional. `file` is the only accepted value. Writes no ticketing binding; adds one README line saying tickets come from the ticket file a run is given. |
+| `--force` | Overwrite the files init writes in an existing `.numinance`. Other files are never touched. |
+
+## Run it
+
+The examples below were run with the open build against empty scratch directories. Paths shown are the ones init prints.
+
+### Package manager and verifiers
+
+<VerifiedSnippet what="numi init --ci github-actions --package-manager poetry --verifiers lint,typecheck ." exit="0">
+```text
+numi init: repository "."
+chose: package manager poetry (flag)
+chose: python 3.12 (default)
+chose: verifiers lint typecheck (flag)
+chose: ci github-actions (flag)
+chose: language python (default)
+chose: scm github (default)
+chose: tickets none (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/policy/autonomy.yaml"
+wrote ".numinance/policy/stage-registry.yaml"
+wrote ".numinance/policy/playbook-bugfix-bounded.yaml"
+wrote ".numinance/policy/toolchain-python.yaml"
+wrote ".numinance/README.md"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: without --org-dir the stage registry is not selected and floors are the engine's shipped floors (PR; HIGH at SUGGEST)
+next: numi validate "."
+```
+</VerifiedSnippet>
+
+Each `chose:` line names the source of the value: `flag`, `default`, or `detected from <file>`. Leaving `unit-tests` out removes the note about it; see the caution below.
+
+<Callout type="warn" title="Why the supported set is lint,typecheck">
+  The `unit-tests` verifier is pytest, which runs candidate code. In the live verifier provider it is unavailable until a nested sandbox exists, so its layer and verdict come out inconclusive, never a pass. Until then the supported set is `--verifiers lint,typecheck`.
+</Callout>
+
+### CI both, without an organization directory
+
+<VerifiedSnippet what="numi init --ci both . (in an empty directory)" exit="0">
+```text
+numi init: repository "."
+chose: package manager uv (default, no hint in the directory)
+chose: python 3.12 (default)
+chose: verifiers unit-tests lint typecheck (default)
+chose: ci github-actions and jenkins (flag)
+chose: language python (default)
+chose: scm github (default)
+chose: tickets none (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/policy/autonomy.yaml"
+wrote ".numinance/policy/stage-registry.yaml"
+wrote ".numinance/policy/playbook-bugfix-bounded.yaml"
+wrote ".numinance/policy/toolchain-python.yaml"
+wrote ".numinance/ci-jenkins.yaml"
+wrote ".numinance/README.md"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: no Jenkins provider exists yet; the Jenkins binding names a placeholder provider id
+note: one ciexecutor binding takes effect per scope: github-actions; the Jenkins binding is in .numinance/ci-jenkins.yaml and is ignored
+note: unit-tests (pytest) runs candidate code and is UNAVAILABLE in the live verifier provider until its nested sandbox exists
+note: without --org-dir the stage registry is not selected and floors are the engine's shipped floors (PR; HIGH at SUGGEST)
+next: numi validate "."
+```
+</VerifiedSnippet>
+
+`ci-jenkins.yaml` sits outside `policy/`, so it carries no authority. The Jenkins binding names a placeholder provider; no Jenkins provider exists, and `validate` does not check that a provider is installed. A green validate therefore never means Jenkins works.
+
+### CI both, with an organization directory
+
+<VerifiedSnippet what="numi init --ci both --org-dir ../org . (organization policy repository in a sibling directory)" exit="0">
+```text
+numi init: repository "."
+chose: package manager uv (default, no hint in the directory)
+chose: python 3.12 (default)
+chose: verifiers unit-tests lint typecheck (default)
+chose: ci github-actions and jenkins (flag)
+chose: language python (default)
+chose: scm github (default)
+chose: tickets none (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/README.md"
+organization policy repository "<scratch>/org"
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/policy/autonomy.yaml"
+wrote ".numinance/policy/stage-registry.yaml"
+wrote ".numinance/policy/playbook-bugfix-bounded.yaml"
+wrote ".numinance/policy/toolchain-python.yaml"
+wrote ".numinance/policy/ci-jenkins.yaml"
+wrote ".numinance/README.md"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: no Jenkins provider exists yet; the Jenkins binding names a placeholder provider id
+note: one ciexecutor binding takes effect per scope: github-actions; the Jenkins binding is an org grant in .numinance/policy/ci-jenkins.yaml of the organization policy repository and is not bound: the repository profile binds github-actions, and rebinding it to the placeholder is your explicit edit that validate does not check
+note: unit-tests (pytest) runs candidate code and is UNAVAILABLE in the live verifier provider until its nested sandbox exists
+next: numi validate "."
+```
+</VerifiedSnippet>
+
+(`<scratch>` replaces the absolute scratch path that was printed.)
+
+Why the split matters: only the org scope selects the stage registry and grants playbook, toolchain and adapter-binding names to repositories. A repository that asks for a name the org did not grant has it recorded as `ignored: "outside the org-granted set"` and not applied. With `--org-dir`, the repository keeps only its own profile; everything shared moves to the org tree. Without it, the registry is defined but not selected.
+
+### Overwrite with --force
+
+<VerifiedSnippet what="numi init --ci github-actions --force . (in a directory whose pyproject.toml has a [tool.poetry] table, over an earlier init)" exit="0">
+```text
+numi init: repository "."
+chose: package manager poetry (detected from pyproject.toml [tool.poetry])
+chose: python 3.12 (default)
+chose: verifiers unit-tests lint typecheck (default)
+chose: ci github-actions (flag)
+...
+wrote ".numinance/README.md"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+```
+</VerifiedSnippet>
+
+(Middle lines elided; they match the first example.) `--force` replaces only the files init writes.
+
+## Errors and exit codes
+
+Exit codes of `init`: 0 OK, 1 internal, 2 usage, 3 invalid, 4 not found, 5 conflict.
+
+<VerifiedSnippet what="Second run without --force" exit="5">
+```text
+numi init: .numinance already has files; pass --force to overwrite the files init writes (other files are never touched)
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="numi init --ci jenkins on a missing directory" exit="4">
+```text
+numi init: directory "<scratch>/nope" not found
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="numi init --ci jenkins on a regular file" exit="3">
+```text
+numi init: "<scratch>/f" is not a directory that can be opened
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="numi init --ci both --org-dir . ." exit="3">
+```text
+numi init: --org-dir is the repository itself (same directory by another spelling); the organization policy repository is a different directory
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="uv.lock and poetry.lock both present, no --package-manager" exit="2">
+```text
+numi init: conflicting package manager hints (uv.lock, poetry.lock); pass --package-manager
+```
+</VerifiedSnippet>
+
+<VerifiedSnippet what="numi init --ci both --scm gitlab" exit="2">
+```text
+numi init: --scm gitlab: only github has a provider
+```
+</VerifiedSnippet>
+
+A usage error also prints the usage block. Omitting `--ci` is exit 2 with `numi init: --ci is required: github-actions, jenkins or both`. `--language go` and `--tickets jira` are exit 2 with a one-line reason (`only python has a toolchain template`, `no ticketing provider exists yet; use file`). Exit 3 also covers a `.numinance` directory, `policy/` or a document that is a symbolic link or not a regular file.
+
+## What it writes
+
+`.numinance/policy/` is the protected location: a document there carries authority, so protect it with branch protection and CODEOWNERS.
+
+| File | Kind | Content |
+| --- | --- | --- |
+| `policy/sdlc-profile.yaml` | SDLCProfile (repo) | `playbooks`, `toolchains`, `adapters.scm` (`dev.numinance.scm-github`) and the one `adapters.ciexecutor` |
+| `policy/autonomy.yaml` | AutonomyPolicy | `defaults.level: AUTONOMY_LEVEL_PR` |
+| `policy/stage-registry.yaml` | StageRegistry `pr-only` | triage, plan gate, implement, a static verify stage, one CI verify stage per CI system, and a human `pr-gate`. No stage maps to Merging |
+| `policy/playbook-bugfix-bounded.yaml` | Playbook | Three steps, one per identity kind: `fix`, `review`, `pr-status`. No step merges |
+| `policy/toolchain-python.yaml` | LanguageToolchain | Language, version, `package_manager` and the verifiers with provider `dev.numinance.verifier-python` |
+| `ci-jenkins.yaml` | AdapterSelector | Only for `--ci both` without `--org-dir`; outside `policy/`, so no authority |
+| `README.md` | | What the tree is |
+
+Excerpt of the repository profile from the first run above, as written:
+
+```yaml title=".numinance/policy/sdlc-profile.yaml (excerpt)"
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.12]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+```
+
+The playbook's repair bound is `max_repair_attempts: 2`: finite attempts, then escalation. See [Playbooks](/docs/configuration/playbooks).
+
+## PR only, and floors
+
+The ladder level is `AUTONOMY_LEVEL_PR`: the agent opens pull requests and never merges. `PR_ONLY` is a breaker state of the engine, not a ladder level. Floors are a ceiling and only the org scope (and control packs) may set them, so a floors block in a repository is refused by the loader and the resolver. With `--org-dir` the org tree gets an AutonomyPolicy whose floors cap every change at PR and keep HIGH risk at SUGGEST. Without it the engine applies its shipped floor, which is the same cap. Raising autonomy is a human decision made later; see [autonomy policy](/docs/configuration/autonomy-policy).
+
+## Check the output
+
+<VerifiedSnippet what="numi validate . (open build) after init" exit="7">
+```text
+revision: "working tree (uncommitted changes included)"
+ok       repo ".numinance/policy/autonomy.yaml" AutonomyPolicy "pr-only"
+ok       repo ".numinance/policy/playbook-bugfix-bounded.yaml" Playbook "bugfix-bounded"
+ok       repo ".numinance/policy/sdlc-profile.yaml" SDLCProfile "python-repo"
+ok       repo ".numinance/policy/stage-registry.yaml" StageRegistry "pr-only"
+ok       repo ".numinance/policy/toolchain-python.yaml" LanguageToolchain "python-3.12"
+numi validate: profile resolution needs the Numinance engine build
+```
+</VerifiedSnippet>
+
+Exit 7 is the open build telling you profile resolution did not run. `numi validate --files .numinance` exits 0 after the schema check only. Profile resolution reads a committed revision in the engine build. See [validate](/docs/cli/validate).
+
+## How files are written
+
+Files are written through `os.Root` (no path leaves the directory), refusing links, mode 0644 for files and 0755 for directories, each through a temporary name and a rename. What a failed run created is removed again. Without `--force` a document is created by hard link so a file that appeared after the check is never replaced; on a file system without hard links the writer falls back to rename and that small window remains. A leftover `*.numi-init.tmp` is a conflict (exit 5).
+
+## Next steps
+
+<Cards>
+  <Card title="numi validate" href="/docs/cli/validate" description="Schema-check what init wrote." />
+  <Card title="First configuration" href="/docs/get-started/first-configuration" description="Edit the generated documents for your repository." />
+  <Card title="Layout and scopes" href="/docs/configuration/layout-and-scopes" description="Why org and repo documents differ." />
+</Cards>

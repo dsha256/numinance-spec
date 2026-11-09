@@ -1,0 +1,136 @@
+---
+title: Knowledge through MCP
+description: How read-only organisational knowledge reaches the Context Resolver through the knowledge port, what the public tree contains, and which parts of MCP-backed retrieval are designed and not shipped.
+---
+
+<FeatureStatus kind="public-spec">
+The knowledge port (`numinance.ports.knowledge.v1`), the `KnowledgeConnection` kind with its pinned-tool fields, a sample provider and a runnable conformance subset are in the public tree. There is no MCP bridge in the tree.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/ports/knowledge/v1/knowledge.proto", "proto/numinance/kinds/v1/knowledge_connection.proto", "schemas/examples/KnowledgeConnection/confluence-eng.yaml", "plugins/examples/sample-knowledge/provider/server.go", "conformance/knowledge/v1/README.md"]} />
+
+<ShortProductTruth>Knowledge stays where the customer keeps it. Numinance asks the source, through a read-only provider, for what one change needs, and treats every byte that comes back as untrusted data.</ShortProductTruth>
+
+<DesignNote title="What is designed, not shipped">
+An MCP-backed provider that connects to vendor-hosted knowledge servers, pins their tools by hash, and quarantines a connection when the tool inventory drifts is the intended implementation of this port. The provider id `dev.numinance.official/bridge-mcp` appears in the example `KnowledgeConnection` documents as a name, and the fields that carry pins exist in the schema. The bridge itself is not in the public tree, and the open `numi` build neither runs it nor resolves a connection. Treat the behaviors in the "Pinned tools and drift" section as design intent, not as something you can run.
+</DesignNote>
+
+## When to use this
+
+You are deciding how an agent's context from Confluence, Jira, repository docs or a similar source should be fetched, or you are writing a knowledge provider and need its contract. For connecting a source in practice, see [Connect knowledge](/docs/guides/connect-knowledge); for the Context Resolver that consumes this port, see [Context resolver](/docs/architecture/context-resolver).
+
+## What exists in the public tree
+
+| Piece | Status | Where |
+| --- | --- | --- |
+| Knowledge port: `Search`, `Fetch`, `Resolve`, all READ | Public spec | `proto/numinance/ports/knowledge/v1/knowledge.proto` |
+| `KnowledgeConnection` kind: provider, endpoint, auth, pinned tools, read-only, scope, budgets, cache TTL, OAuth client | Public spec; validates under `numi validate --files` | `proto/numinance/kinds/v1/knowledge_connection.proto` |
+| Sample provider over a seeded in-memory source | Pre-alpha, a sample | `plugins/examples/sample-knowledge` |
+| Conformance subset (CORE-001 to 005, 007, 008, 012 to 015) | Runnable | `conformance/knowledge/v1` |
+| MCP bridge provider (`bridge-mcp`) | Designed | none in the tree |
+| REST providers for Confluence or Jira | Designed | none in the tree |
+| Context Resolver, retrieval receipts, authorization cache | Proprietary runtime | not in the tree |
+
+## The port
+
+The port header states the model. Only the knowledge context, the Context Resolver, calls it. Every verb is READ, and the host and the broker refuse any non-READ capability on a knowledge connection. The port has no `VendorCall`, since any escape hatch would be a write path. It is never a model tool.
+
+| Verb | Purpose | Notable bounds |
+| --- | --- | --- |
+| `Search` | Plain-text search within a scope | `query` 1 to 1024 bytes; `scope` 1 to 256 unique entries; `max_results` 1 to 100 |
+| `Fetch` | Content of a ref, optionally at a version | `max_bytes` 1 to 1 MiB, cut at a character boundary by the provider |
+| `Resolve` | Canonical form of a ref | Two forms of one document resolve to one canonical ref |
+
+Authority is the source's, not the provider's: the provider reads with the credential handle the broker issued for the connection's auth, so the source enforces the principal's access at fetch time. The port has no access-check verb. The host builds the authorization context, and the retrieval receipt records `access_basis` from the connection's `spec.auth`, never from a provider claim.
+
+Every request carries a `scope`, and the host checks it against the connection's `spec.scope` before dispatch by comparing whole segments, never raw string prefixes. Fetch and Resolve carry scope too because a ref is opaque to the host. Egress is default-deny: the provider's only destinations are the hosts its connection names that its manifest allow-list also names; IMDS, link-local, loopback and private ranges are denied, including through redirects and unusual address spellings. HTTPS is required on every hop.
+
+Status codes mean something specific: `NOT_FOUND` for a ref that is absent **or that the source hides from the principal**, `PERMISSION_DENIED` when the source refuses openly, `UNAVAILABLE` when it cannot be reached. A provider never invents a result: an outage is an error, never an empty answer.
+
+## The connection document
+
+A `KnowledgeConnection` is a normal kind. This example is copied from `schemas/examples/KnowledgeConnection/confluence-eng.yaml`, and `numi validate --files` accepted it.
+
+```yaml title="schemas/examples/KnowledgeConnection/confluence-eng.yaml"
+apiVersion: numinance.dev/v1
+kind: KnowledgeConnection
+metadata: {name: confluence-eng, scope: SCOPE_ORG}
+spec:
+  provider: dev.numinance.official/bridge-mcp
+  endpoint: https://mcp.example.com/v1/mcp
+  auth: KNOWLEDGE_AUTH_USER_DELEGATED
+  pinned_tools:
+    - {name: searchConfluenceUsingCql, hash: {value: "sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f"}}
+    - {name: getConfluencePage, hash: {value: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"}}
+  read_only: true
+  scope: [ENG, PAY]
+  budgets: {calls_per_stage: 8, bytes_per_call: 65536}
+  cache_ttl: 2592000s
+```
+
+<VerifiedSnippet what="numi validate --files schemas/examples/KnowledgeConnection, run from the spec checkout" exit="0">
+
+```text
+revision: "files"
+ok       file "confluence-eng.yaml" KnowledgeConnection "confluence-eng"
+ok       file "confluence-oauth.yaml" KnowledgeConnection "confluence-oauth"
+```
+
+</VerifiedSnippet>
+
+The loader enforces what the schema says in comments:
+
+| Field | Rule |
+| --- | --- |
+| `provider` | Required; the extension id of a knowledge provider, which must resolve to a lockfile entry |
+| `endpoint` | `https://` only, a lowercase DNS host of at least two labels; no IP literal, user information, query or fragment; the host must also be in the provider manifest's egress allow-list |
+| `auth` | Required. `KNOWLEDGE_AUTH_USER_DELEGATED` uses the grant of the human who triggered the change. `KNOWLEDGE_AUTH_SERVICE_ACCOUNT` is for unattended runs; the broker issues its handle only with an approval record |
+| `read_only` | Required and must be `true`; the loader refuses `false` |
+| `scope` | Required, non-empty, unique; no `*`, `.`, `..`, leading `/`, query or glob characters. A provider passes it as a parameter, never as query text |
+| `budgets` | `calls_per_stage` and `bytes_per_call`; may only lower the stage budgets; an explicit 0 is refused |
+| `oauth.client_id` | Names the client, holds no secret; only the organisation sets it |
+
+## Pinned tools and drift
+
+An MCP server publishes a list of tools with descriptions and schemas, and MCP carries no signed tool metadata. That is the problem pinning addresses. The kind carries it as `pinned_tools`: each entry is a tool `name` and a `hash` of its canonicalised description, schemas and annotations.
+
+The schema comment is explicit about what those fields are: the requested read-only subset. The bridge trusts only the **admin-approved pins in the lockfile**, never the connection document alone. The design is:
+
+1. At approval, an administrator sees each tool's description and approves a read-only subset.
+2. The approved names and hashes are pinned in the lockfile.
+3. On every tool listing, the bridge compares the server's inventory with the pins. Any drift quarantines the connection and raises an inventory-drift event for re-approval.
+4. Read-only is enforced more than once: the server's own read-only mode where it exists, the pinned allow-list, and the broker's refusal of any non-READ capability. A single layer being wrong should not be enough.
+
+Because the bridge is not shipped, steps 3 and 4 are **designed**. Steps 1 and 2 describe lockfile content the proprietary runtime owns. The public kit states that tool pinning, drift quarantine and the broker's refusal of non-READ tools belong to the bridge and the knowledge context and are **not covered** by the knowledge conformance kit.
+
+## Everything returned is untrusted
+
+Titles, snippets, refs, versions and content are untrusted data. The knowledge context sanitizes and redacts them before persistence, wraps them as untrusted content, and retrieved text never alters policy, tool lists, grants or approvals. A provider also strips what it can: the sample replaces control, format and bidi characters with U+FFFD and cuts at character boundaries. Retrieved content never enters the orchestration history; payloads carry references and digests, not content.
+
+## Expected behavior in the public tree
+
+You can exercise the provider side of the contract today:
+
+```bash title="Knowledge kit against the sample provider"
+go test -count=1 -v ./conformance/knowledge/...
+```
+
+The sample passes eleven cases (CORE-001, 002, 003, 004, 005, 007, 008, 012, 013, 014, 015). The output is shown on [Write a plugin in Go](/docs/integrations/custom-plugin-go). That run does not include an MCP server, an OAuth flow, a tool listing or a drift event, because none of that exists in the open tree.
+
+## Failure modes and safeguards
+
+| Failure | Designed safeguard |
+| --- | --- |
+| A search query containing source-language operators | Treated as text; the kit's CORE-005 requires nothing outside scope in the results |
+| A scope or ref that tries to climb (`kit/../other`, encoded dots) | `INVALID_ARGUMENT` at the provider; the host refuses before `Invoke` |
+| A server changes a tool's description | Drift quarantines the connection (designed) |
+| A document the principal cannot see | `NOT_FOUND`, so existence is not leaked |
+| A redirect to a metadata or private address | Denied by the egress proxy on the resolved address |
+| A source outage | An error, never an empty result |
+
+## Next steps
+
+<Cards>
+  <Card title="Connect knowledge" href="/docs/guides/connect-knowledge" description="Point a repository at a source with a KnowledgeConnection." />
+  <Card title="Knowledge connection kind" href="/docs/configuration/knowledge-connection" description="Field-by-field reference and validation behavior." />
+  <Card title="Context resolver" href="/docs/architecture/context-resolver" description="How the resolver turns retrievals into a bounded context bundle." />
+</Cards>

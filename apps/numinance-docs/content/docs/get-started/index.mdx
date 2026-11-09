@@ -1,0 +1,81 @@
+---
+title: Get started
+description: Choose a path by role and run the first three steps against the public numinance-spec tree.
+---
+
+<FeatureStatus kind="public-spec">Everything on this page runs from a source build of the open `numi` CLI. Nothing here installs or starts the Numinance engine.</FeatureStatus>
+
+<ShortProductTruth>Numinance is pre-alpha. The open surface lets you configure, validate, build against and verify; the autonomous runtime is private and not generally available.</ShortProductTruth>
+
+## Before you start
+
+You need Git and a Go toolchain that satisfies the repository's `go.mod`: `go 1.27` with `toolchain go1.27.3`. Every command on these pages runs from the root of a clone of `https://github.com/dsha256/numinance-spec.git`. The [install page](/docs/get-started/install) shows the clone and the build.
+
+Three distinct objects are in play: the open `numi` CLI, the `numinance-spec` repository, and the proprietary runtime. These pages only touch the first two.
+
+## Choose your path
+
+<Tabs items={["Developers", "Platform engineers", "Security", "Compliance", "Evaluators"]}>
+<Tab value="Developers">
+
+You want to build against the contract: a plugin, a client, a configuration.
+
+1. [Build `numi` from source](/docs/get-started/install) and confirm `numi version` prints `0.0.0-dev`.
+2. [Build the sample knowledge plugin](/docs/get-started/first-plugin) and see why it refuses to run by hand.
+3. Read the [Go SDK](/docs/sdk/go) and the [plugin service](/docs/protocol/plugin-service), then follow [Build a custom plugin](/docs/guides/build-custom-plugin).
+
+</Tab>
+<Tab value="Platform engineers">
+
+You want a repository configured so a governed agent can work in it.
+
+1. Run the [quickstart](/docs/get-started/quickstart): validate the shipped examples, then `numi init` on a Python repository.
+2. Walk the [first configuration](/docs/get-started/first-configuration): every generated file, the protected `.numinance/policy/` location, and the autonomy level.
+3. Follow [Onboard a repository](/docs/guides/onboard-repository) and [Connect source control and CI](/docs/guides/connect-source-control-and-ci).
+
+</Tab>
+<Tab value="Security">
+
+You want to know where authority lives and what an agent cannot do.
+
+1. Read [Governed execution](/docs/concepts/governed-execution) and the [trust kernel](/docs/architecture/trust-kernel).
+2. Run the [evidence quickstart](/docs/get-started/evidence-quickstart) and watch a wrong key fail with exit 3.
+3. Read the [threat model and limits](/docs/evidence/threat-model-and-limits) before you decide what `verified` is allowed to mean in your process.
+
+</Tab>
+<Tab value="Compliance">
+
+You want records you can check without trusting the system that wrote them.
+
+1. Run the [evidence quickstart](/docs/get-started/evidence-quickstart) against the conformance export.
+2. Read [Trust levels](/docs/evidence/trust-levels) and [Offline verification](/docs/evidence/offline-verification).
+3. Read [Status](/docs/status) for what is not claimed: no certifications, no third-party audit, no export from the open build.
+
+</Tab>
+<Tab value="Evaluators">
+
+You are deciding whether this is worth your team's time.
+
+1. Read [Status](/docs/status) and the [roadmap](/docs/roadmap) first. They are dated and source-backed.
+2. Spend ten minutes on the [quickstart](/docs/get-started/quickstart). It uses real commands and real output.
+3. Read [Open versus proprietary](/docs/concepts/open-vs-proprietary) to see exactly what the license covers and what stays private.
+
+</Tab>
+</Tabs>
+
+## What you can and cannot do today
+
+| You can | You cannot |
+| --- | --- |
+| Build `numi` from source and run `version`, `init`, `validate`, `evidence verify`. | Download a release binary or install with a package manager. Both are planned, not published. |
+| Scaffold and validate `.numinance/` configuration. | Resolve a profile or run a change. Open `numi validate` exits 7 after the schema pass. |
+| Build and inspect the sample plugin and the conformance kits. | Install a generated Python or TypeScript package, or a Rust or Java SDK. |
+| Verify an `evidence/v1` export offline. | Export evidence with the open build. `numi evidence export` is not in it. |
+
+## Next steps
+
+<Cards>
+  <Card title="Install" href="/docs/get-started/install" description="Clone, build and verify the open numi CLI." />
+  <Card title="Quickstart" href="/docs/get-started/quickstart" description="Validate examples, then scaffold a repository with numi init." />
+  <Card title="Status" href="/docs/status" description="What is shipped, designed and not claimed." />
+</Cards>

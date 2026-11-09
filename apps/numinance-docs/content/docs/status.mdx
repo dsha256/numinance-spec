@@ -1,0 +1,94 @@
+---
+title: Status and supported surface
+description: A source-backed matrix of what the public Numinance tree ships, what is designed, and what is deliberately not claimed. Dated 2026-11-09, spec revision 3c74d59.
+---
+
+<SourceReference paths={["README.md", "cli/README.md", "go.mod", "VERSIONING.md"]} note="Matrix generated from the capability table; verified against revision 3c74d59 on 2026-11-09." />
+
+<ShortProductTruth>Numinance is pre-alpha. The open contract, the open `numi` build and the evidence verifier are in the public tree; the autonomous engine is private and not generally available.</ShortProductTruth>
+
+This page is dated **2026-11-09** and describes `numinance-spec` at revision **3c74d59**. It is a snapshot of one checkout, not a promise about later ones. Every row links to the source that backs it where one exists. Presence in the public tree is never a readiness claim.
+
+## How to read the matrix
+
+Each row has a state, the public surface, how to try it, and the next milestone. The state vocabulary is fixed.
+
+<div className="not-prose my-4 flex flex-wrap gap-2">
+  <StatusBadge kind="public-spec" />
+  <StatusBadge kind="pre-alpha" />
+  <StatusBadge kind="designed" />
+  <StatusBadge kind="planned" />
+  <StatusBadge kind="coming-soon" />
+  <StatusBadge kind="illustrative" />
+</div>
+
+## Open CLI
+
+The open build of `numi` has five working functions: `version`, `init`, `validate`, `validate --files` and `evidence verify`. The earlier version of this page omitted `numi init`; it ships in the open build and writes a `.numinance/` template for a Python repository.
+
+<AvailabilityMatrix group="Open CLI" />
+
+Two details matter more than the table:
+
+- Ordinary `numi validate` in the open build schema-checks every document, then exits 7 with "profile resolution needs the Numinance engine build". A pipeline that uses it cannot mistake a schema pass for a full one.
+- `numi validate --files` exits 0 after the schema and loader check only. It runs no resolver and no floors, so it is not a substitute for validating a repository.
+
+## Evidence
+
+<AvailabilityMatrix group="Evidence" />
+
+`numi evidence verify` reports `verified` only under runner keys, a log key and a log origin that you pin. There is no built-in trust root. `numi evidence export` is not in the open build: it is an unknown subcommand and exits 2.
+
+## Protocol
+
+<AvailabilityMatrix group="Protocol" />
+
+The protobuf contracts are pre-alpha: names and layouts can change before the first tagged release. The generated JSON Schemas and the kind examples are exercised by `numi validate --files schemas/examples` in CI.
+
+## SDKs
+
+<AvailabilityMatrix group="SDKs" />
+
+- **Go** has handwritten packages (plugin, kindyaml, schema, cli, evidenceverify) plus generated stubs.
+- **Python and TypeScript** hold generated stubs only. The Python version is `0.0.0`; the TypeScript package is private at `0.0.0`. Neither is a verified published package, so no install command is given.
+- **Rust and Java** are <StatusBadge kind="coming-soon" />. Until they exist, generate clients from the `.proto` files with your own toolchain.
+
+## Integrations
+
+<AvailabilityMatrix group="Integrations" />
+
+The sample knowledge plugin builds and refuses to run by hand, by design; it has no unit tests (`go test` reports no test files for it). The official providers sit under `plugins/official/`. A live run of the GitHub Actions provider is not yet verified.
+
+## Runtime
+
+<AvailabilityMatrix group="Runtime" />
+
+The engine is proprietary. There is no installer, no download and no hosted trial described anywhere in these docs.
+
+## Distribution
+
+<AvailabilityMatrix group="Distribution" />
+
+The only install path that exists is a source build from a clone. GitHub Releases and Homebrew are planned channels, not published ones, so the install page gives no command for either.
+
+## What is not claimed
+
+- No generally available release and no tagged release of the public repository.
+- No production customers, certifications, benchmarks, uptime or reliability figures.
+- No independent third-party audit.
+- No live demo of the engine, and no claim that the engine runs outside the maintainers' own environments.
+- No provider readiness: a provider being present in `plugins/` does not mean it is verified against a live system.
+- No claim that `verified` evidence proves code correctness. It proves provenance and chain integrity under keys you pinned.
+- No published Python, TypeScript, Rust or Java packages.
+
+## Reading source paths
+
+Pages cite paths such as `proto/numinance/plugin/v1/plugin.proto`. They are relative to the root of the public [numinance-spec](https://github.com/dsha256/numinance-spec) repository, where the normative text lives. The Go module path is `github.com/numinance/numinance-spec`; the clone URL is `https://github.com/dsha256/numinance-spec.git`.
+
+## Next steps
+
+<Cards>
+  <Card title="Roadmap" href="/docs/roadmap" description="What is available, under development, next and coming soon." />
+  <Card title="Install" href="/docs/get-started/install" description="The one install path that exists, and the ones that do not yet." />
+  <Card title="Open versus proprietary" href="/docs/concepts/open-vs-proprietary" description="Where the public contract ends and the private runtime begins." />
+</Cards>

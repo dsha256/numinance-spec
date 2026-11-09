@@ -1,0 +1,187 @@
+---
+title: Connect source control and CI
+description: Bind the GitHub and GitHub Actions providers to a repository, understand how credentials stay out of the plugin, and know what a green validate does and does not prove.
+---
+
+<FeatureStatus kind="pre-alpha">
+The `scm-github` and `ci-github-actions` providers exist in the public spec, with replay and live builds and conformance kits. A live end-to-end run against GitHub is still owed, and the engine that launches these providers is not generally available.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "plugins/official/scm-github/README.md",
+    "plugins/official/ci-github-actions/README.md",
+    "proto/numinance/ports/scm/v1/scm.proto",
+    "proto/numinance/ports/ciexecutor/v1/",
+    "cli/README.md",
+  ]}
+/>
+
+<ShortProductTruth>Source control and CI are ports. A provider implements the port, holds no reusable token, and every call it makes passes policy, a credential handle and the egress proxy first.</ShortProductTruth>
+
+## When to use this
+
+Use this guide when you have run `numi init` for a repository ([Onboard a repository](/docs/guides/onboard-repository)) and want to understand what the two adapter bindings in the generated `SDLCProfile` mean, what the provider needs from your GitHub setup, and what is still unproven. It is also the right page if you are evaluating Jenkins: the honest answer is that a binding exists and a provider does not.
+
+## Prerequisites
+
+- A repository initialised with `numi init --ci github-actions` (or `jenkins`). See [numi init](/docs/cli/init).
+- A GitHub repository whose default branch is protected, and a workflow you already own (see below).
+- Reading knowledge of the [SDLC profile](/docs/configuration/sdlc-profile) and [adapters and environments](/docs/configuration/adapters-and-environments).
+- To run anything beyond validation you need the proprietary Numinance engine, which is not generally available. The open `numi` CLI does not launch providers.
+
+## Understand the mechanism
+
+A repository does not talk to GitHub. It names two adapter bindings, each resolving to a provider that implements a capability port. The host launches the provider as a subprocess, and the provider reaches the outside world only through the host.
+
+| Layer | What it holds | Who enforces it |
+| --- | --- | --- |
+| `SDLCProfile.spec.adapters` | A provider id and an instance name per port | The loader, then the engine's profile resolution |
+| Policy decision | Whether this actor, with this grant, may call this verb on this repository | Policy engine, outside the model, before `Invoke` |
+| Credential handle | An opaque, invocation-bound token for one declared intent | Credential broker, issued through `HostService.RequestCredential` |
+| Egress proxy | The real token, and the allow-list of destinations | The proxy, which injects the credential on the way out |
+
+The provider asks the host for a handle for the intent `scm.github.api`, and sends it in a `Numinance-Handle` header to the egress proxy of the invocation's step. The proxy applies the token it holds and re-originates the request over TLS to `api.github.com:443`. The provider's process never contains a reusable bearer token, redirects are refused, and the manifest declares exactly one network destination. The transport refuses a request with no handle, a handle with no proxy address, and any destination other than the declared one.
+
+<DocsFigure caption="Illustrative: where a GitHub call is checked. The provider sits between two enforcement points and holds no token.">
+
+```text
+actor (author-agent)
+   |  action: OpenPullRequest
+   v
+policy decision (outside the model)  --deny-->  recorded denial, no Invoke
+   | allow + grant
+   v
+host --Invoke--> scm-github provider
+                    |  RequestCredential(intent = scm.github.api)
+                    |<-- opaque handle (no token)
+                    |  http request + Numinance-Handle header
+                    v
+              egress proxy (holds the token, injects it)
+                    |  TLS to api.github.com:443 only
+                    v
+                 GitHub REST API
+```
+
+</DocsFigure>
+
+## What the SDLCProfile adapters block binds
+
+`numi init --ci github-actions` writes this block. It is the real output of the command, not a template written for this page.
+
+```yaml title=".numinance/policy/sdlc-profile.yaml"
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.12]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+```
+
+The adapter schema binds exactly one `ciexecutor` per scope. The `instance` is a name for this binding, not a URL or a credential. Nothing in this file contains a token, and the loader would not accept one in a field that does not exist.
+
+<VerifiedSnippet what="numi init --ci github-actions . then numi validate --files .numinance" exit="exit 0">
+
+```text
+chose: ci github-actions (flag)
+chose: scm github (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+```
+
+</VerifiedSnippet>
+
+The generated autonomy level is `AUTONOMY_LEVEL_PR`. The agent may open pull requests and may never merge. The `bugfix-bounded` playbook has no merge step. Raising that is a separate, human-accepted decision: see [Choose an autonomy level](/docs/guides/choose-autonomy) and [Qualify autonomy](/docs/guides/qualify-autonomy).
+
+## What the SCM provider can do
+
+The provider exposes eleven verbs through `PluginService.Invoke`. `VendorCall` does not exist in 1.0.0, so there is no escape hatch that could become a write path.
+
+- `OpenPullRequest` checks that the head branch points at `head_revision`, finds an open pull request for the same head and base before creating one, and emits one `pr-ref` receipt. It never records the title or body.
+- `MergePullRequest` is `PRIVILEGED`. It merges only at `expected_head_revision`, answers an already-done merge as done, and refuses a closed or moved pull request.
+- `GetPullRequestStatus` counts an approval only from a reviewer who holds write access and is not the pull request's author.
+- `SearchCode` wraps the text in one quoted phrase, so a qualifier such as `repo:other/x` cannot widen the search.
+- `GetBranchProtection` reads state and changes nothing. No verb edits protection, a workflow file or a ruleset.
+
+Answers from GitHub are untrusted: at most 4 MiB, decoded without trust, every field checked and never repaired or truncated. A violation ends the call `UPSTREAM_ERROR`.
+
+## What GitHub Actions needs from your repository
+
+The `ciexecutor` provider starts only a workflow you already define. GitHub starts a `workflow_dispatch` run on a branch, never at a commit, and answers with no run id, so the provider and your workflow cooperate:
+
+1. The provider dispatches on the repository's **default branch**, which should be protected so a candidate can never change the pipeline definition. The inputs are `numinance_revision` (the full commit id to build), `numinance_operation_id` (derived from the host's idempotency key) and any parameters from the profile. Parameter names starting with `numinance_` are refused.
+2. The workflow declares both inputs and names its run `numinance ${{ inputs.numinance_operation_id }} ${{ inputs.numinance_revision }}`. The provider finds the run by that name, before it dispatches (so a retry starts no second run) and after.
+3. The workflow checks out `numinance_revision` itself.
+
+A run is adopted only if it was dispatched on the default branch, its `path` names the workflow file on that branch, and its name carries the requested revision. A run of another ref executes that ref's own copy of the file, which a candidate controls, so it is not an operation of the provider and ends `UPSTREAM_ERROR`. A full page of 100 runs that lacks the operation fails closed with `LIMIT_EXCEEDED` and dispatches nothing.
+
+`StartOperation` is `HIGH` risk with a `DEPLOY` side effect. It emits a `ci-run-ref` receipt; a dry run checks the workflow and the commit and starts nothing. A run's state is the CI's claim, and an unknown ending is `FAILED`, never success.
+
+<Callout type="warn" title="A live run is owed">
+Both providers have replay builds that answer from hand-written cassettes (invented names such as `acme/shop`), not from recordings. The live test covers `GetRepository` and `GetBranchProtection`; the other nine SCM verbs are exercised in replay only. The CI provider's README also lists the live run and a recording tool as not done. Treat these providers as spec-complete and unproven against a real GitHub organisation.
+</Callout>
+
+## Jenkins is a placeholder binding
+
+`numi init --ci jenkins` writes a different adapter line. This is real output of the command:
+
+<VerifiedSnippet what="numi init --ci jenkins . (note line and generated binding)" exit="exit 0">
+
+```text
+note: no Jenkins provider exists yet; the Jenkins binding names a placeholder provider id
+```
+
+```yaml
+    ciexecutor: {provider: dev.numinance.official/jenkins, instance: jenkins-onprem}
+```
+
+</VerifiedSnippet>
+
+The `ciexecutor` port exists. No Jenkins provider does. The id `dev.numinance.official/jenkins` resolves to nothing, and `numi validate` does not check that a provider is installed, so a green validate never means Jenkins works. With `--ci both`, the effective binding stays GitHub Actions; the Jenkins binding is kept as a grant in an organisation tree, or as an inert document without authority in a lone repository. Rebinding to the placeholder is an explicit operator edit.
+
+## What `numi validate` does not check
+
+| It checks | It does not check |
+| --- | --- |
+| Every `.numinance/policy` document passes its schema and loader rules | That a provider with the named id is installed or signed |
+| Names and shapes of the adapter binding | That the workflow exists, declares the two inputs, or names its run correctly |
+| Nothing in the open build resolves the profile | Org grants, floors, or whether the binding is allowed in this scope |
+
+In the open build, `numi validate .` schema-checks then stops with `profile resolution needs the Numinance engine build` and exit 7. `numi validate --files .numinance` is the schema-and-loader check and exits 0. Neither contacts GitHub.
+
+## Prove a provider with the conformance kits
+
+Both ports have runnable Go kits that accept any provider as a target.
+
+```bash title="from a numinance-spec checkout"
+go test ./plugins/official/scm-github/... ./conformance/scm/...
+go test ./plugins/official/ci-github-actions/... ./conformance/ciexecutor/...
+```
+
+The scm kit runs `CORE-001` to `CORE-010` (for example: opening a pull request twice returns the same number with `existing` true, and a branch that does not point at `head_revision` ends `FAILED` with reason `CONFLICT`). It lists host checks such as `HOST-001`, where a `MergePullRequest` from any actor other than the release pipeline is refused before `Invoke`, but those are enforced by the host, not by the kit. See [Conformance](/docs/integrations/conformance).
+
+## Planned: a connector wizard
+
+<DesignNote title="Guided connection">
+A guided flow to discover a repository, propose the adapter bindings, and show an approver the resulting permissions is designed. It is not in the open CLI: today you write or generate the files and review them in a pull request.
+</DesignNote>
+
+## Failure modes and safeguards
+
+| Symptom | Cause | Safeguard |
+| --- | --- | --- |
+| Call ends `UPSTREAM_ERROR` | GitHub answer out of bounds, or a run not following the naming rule | Answers are validated, never repaired |
+| `LIMIT_EXCEEDED` | A full page of reviews, check runs or runs | Fails closed instead of cutting silently |
+| Request has no handle | The host issued none, or the intent is not in the grant | The transport makes no call |
+| Merge refused | Actor is not the release pipeline, or head moved | Refused by the host before `Invoke`, or `CONFLICT` |
+
+## Next steps
+
+<Cards>
+  <Card title="Official providers" href="/docs/integrations/official-providers" description="Every provider in the spec, with scope and maturity." />
+  <Card title="Build a custom plugin" href="/docs/guides/build-custom-plugin" description="Implement a port yourself, from handshake to conformance." />
+  <Card title="Adapters and environments" href="/docs/configuration/adapters-and-environments" description="The adapter binding fields and how scopes resolve." />
+</Cards>

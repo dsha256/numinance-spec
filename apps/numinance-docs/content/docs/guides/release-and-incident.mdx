@@ -1,0 +1,182 @@
+---
+title: Release and incident response
+description: A designed walkthrough of a governed release with a canary window and rollback, event-driven incident response, the four breaker positions, and human-only break-glass.
+---
+
+<FeatureStatus kind="designed">
+This is a storyboard of the Numinance engine, which is proprietary and not generally available. The StageRegistry and AutonomyPolicy documents shown are real and validate with the open CLI. The breaker, canary, rollback and break-glass behavior is designed and cannot be run from the open build.
+</FeatureStatus>
+<SourceReference paths={["schemas/examples/StageRegistry/trunk-with-cab.yaml", "schemas/examples/StageRegistry/two-person-release.yaml", "schemas/examples/AutonomyPolicy/org-ladder.yaml", "proto/numinance/types/v1/types.proto"]} />
+
+<ShortProductTruth>Numinance does not deploy. Your release pipeline deploys, under its own identity, after policy and a human have allowed it, and the same machinery that releases also watches and reverses.</ShortProductTruth>
+
+## When to use this
+
+Read this guide when you want to know who can do what between a merged change and production, how a bad release is detected and reversed, and how you stop everything at once. Use it with [Choose an autonomy level](/docs/guides/choose-autonomy) and [Circuit breaker](/docs/operations/circuit-breaker).
+
+## Who deploys
+
+Four identities exist in the design: author-agent, reviewer-agent, release-pipeline and a human approver. Only the release-pipeline identity may invoke deployment, and only through your customer pipeline. An author or reviewer agent never holds a production-capable grant. Autonomy levels beyond merge (`AUTONOMY_LEVEL_STAGE`, `AUTONOMY_LEVEL_RELEASE`, `AUTONOMY_LEVEL_OPERATE`) are ceilings that the policy must be configured to reach, and the generated default is the pull-request level.
+
+## The release path in configuration
+
+A release gate is a StageRegistry stage mapped to `CHANGE_STATE_RELEASE_GATE`. The spec ships two organization examples. The first routes release through a change advisory board with a timeout:
+
+```yaml title="schemas/examples/StageRegistry/trunk-with-cab.yaml (release gate)"
+    - name: cab
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: change-advisory-board
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        timeout: 86400s
+      requires: [build]
+```
+
+The second names a release-managers role and asks for two approvals:
+
+```yaml title="schemas/examples/StageRegistry/two-person-release.yaml (release gate)"
+    - name: release-approval
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: release-managers
+        required_approvals: 2
+      requires: [build]
+```
+
+<Callout type="warn" title="Approval counts are not enforced yet">
+The spec example notes that `required_approvals` is preserved but nothing enforces the count yet. Do not rely on it for two-person control until the engine documents enforcement.
+</Callout>
+
+A floor can also hold production back. In the organization ladder example, a floor on `environment: production` caps the level at `AUTONOMY_LEVEL_MERGE`, so no rule can resolve a production-environment change to release or operate. Raising that cap is a reviewed org policy change.
+
+## The lifecycle after the gate
+
+<ChangeLifecycleTimeline />
+
+<Steps>
+<Step>
+
+### Release gate
+
+Policy evaluates all evidence: verification results, declared evidence, the plan digest and the autonomy level. A human gate waits for a named approver who is not the author or reviewer. The decision and its reasons are recorded.
+
+</Step>
+<Step>
+
+### Merging and releasing
+
+At the pull-request level the change ends at the PR. Where policy allows, the merge happens, and the release child workflow invokes your pipeline as the release identity. Orchestration payloads carry references and digests, never source or secrets.
+
+</Step>
+<Step>
+
+### Observing: the canary window
+
+After release, the change enters the observing state for a canary window that comes from the playbook. The observability port evaluates service level objectives and declared invariants. If they hold, the change closes and its evidence is sealed.
+
+</Step>
+<Step>
+
+### Recovering: rollback
+
+If the window shows a regression, the change enters the recovering state. Rollback goes through your CD provider under the release identity, and a corrective change is opened. The original change ends as rolled back with its evidence sealed. Rollback rate is also one of the qualification thresholds a playbook must satisfy before promotion.
+
+</Step>
+</Steps>
+
+<IllustrativeNote>
+The log below is hand-written to show order. It is not output from a real run and there is no command that produces it.
+</IllustrativeNote>
+
+```text title="illustrative stage log"
+release-gate     approved             approver_role=release-managers
+releasing        pipeline invoked     identity=release-pipeline
+observing        canary window open   SLOs and invariants evaluated
+observing        regression detected
+recovering       rollback requested   through the CD provider
+rolled-back      evidence sealed      corrective change opened
+```
+
+## Event-driven incident response
+
+Incidents enter as events, not as a person typing a command. An incident detection signal reaches the running change or opens a new one, and the response is the same governed workflow with tighter defaults:
+
+1. The affected runs freeze at the next checkpoint.
+2. Credential handles for the change are revoked.
+3. The component's effective autonomy is lowered, to pull-request-only or read-only.
+4. The sandbox is snapshotted and the evidence sequence is sealed.
+5. An incident change is opened and the paging and security tooling you configured is notified.
+6. Recovery requires an explicit human decision with a reason.
+
+An incident change is still a change: it runs under a grant, passes gates, and emits evidence. Incident status does not buy extra authority.
+
+## Breaker positions
+
+The circuit breaker is customer-local: its state lives in your runtime and it works without any connection to the vendor's control plane. It has four positions.
+
+| Position | Effect |
+| --- | --- |
+| `FULL_AUTO` | Normal operation. Autonomy is whatever policy resolves. |
+| `PR_ONLY` | Effective autonomy is capped at opening pull requests. No merge, no release. |
+| `READ_ONLY` | Effective autonomy is capped at reading. No writes. |
+| `STOPPED` | Runs are halted. |
+
+`PR_ONLY` here is a breaker position. It is not an autonomy ladder level; the ladder level is `AUTONOMY_LEVEL_PR`. The breaker only ever lowers what policy would allow.
+
+A trip comes from a human through the dashboard, the CLI or an API, or from the incident detector, a budget or policy anomaly, an evidence-write failure or provider drift. A trip revokes credential handles, pauses runs at the next checkpoint, caps effective autonomy and records evidence. Paused is an overlay on any active state, so the change remembers where it was. Reset is a human action and needs a reason.
+
+## Break-glass is human-only
+
+Break-glass exists for the moment policy is wrong and production is down. It is a human act:
+
+- It is invoked by a named human principal, not a shared account.
+- A reason is required.
+- Its scope is limited to what the emergency needs.
+- It expires.
+- It is logged separately from ordinary evidence.
+- No agent identity can invoke it, and an agent cannot ask a human to widen its own grant on its behalf.
+- A post-event review is created after use.
+
+Dual control can be configured per control pack.
+
+## What a human approves
+
+- The release gate, with the role your StageRegistry names.
+- Resetting the breaker, with a reason.
+- Any break-glass, with a name and a time box.
+- Raising a cap such as the production floor, through a policy change.
+
+## Failure modes and safeguards
+
+| Failure | Safeguard |
+| --- | --- |
+| Evidence cannot be written | The breaker trips; the design does not proceed without evidence. |
+| Provider behavior drifts | Treated as a trip condition. |
+| Rollback itself fails | The change escalates to a human. |
+| Budget exhausted | The run pauses and escalates. |
+| An approver is also the author | Policy denies it structurally. |
+
+After the fact, the evidence is checkable offline under keys you pin. A `verified` result proves the chain and signatures, not that the release was a good idea. See [Verify a run](/docs/guides/verify-a-run).
+
+## Check the configuration today
+
+<VerifiedSnippet what="numi validate --files on the AutonomyPolicy example" exit="0">
+```text
+revision: "files"
+ok       file "org-ladder.yaml" AutonomyPolicy "org-ladder"
+```
+</VerifiedSnippet>
+
+```bash title="validate the StageRegistry examples"
+go run ./cli/numi validate --files schemas/examples/StageRegistry
+```
+
+## Next steps
+
+<Cards>
+  <Card title="Circuit breaker" href="/docs/operations/circuit-breaker" description="Positions, triggers and reset." />
+  <Card title="Rollback and recovery" href="/docs/operations/rollback-and-recovery" description="Recovery loops and escalation." />
+  <Card title="Stage registry" href="/docs/configuration/stage-registry" description="Gate fields and state mapping." />
+</Cards>

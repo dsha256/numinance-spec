@@ -1,0 +1,62 @@
+---
+title: Harnesses versus the runtime
+description: Why agent harnesses own intelligence while the Numinance runtime owns authority, and what an executor adapter promises.
+---
+
+<FeatureStatus kind="designed">Executor adapters run inside the proprietary runtime. The executor capability enum and the author and CI executor ports are public-spec.</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto"]} note="ExecutorCapability enum." />
+
+<ShortProductTruth>
+The harness owns intelligence. Numinance owns authority.
+</ShortProductTruth>
+
+## Two jobs, two owners
+
+An agent harness is the thing that turns a goal into edits: it manages a model, its tools, its prompts and its loop. That is where intelligence lives, and it improves quickly. The runtime is the thing that decides whether an edit, a command or a network call is allowed, records it, and checks the result. That is where authority lives, and it should change slowly.
+
+Keeping these apart is what allows you to change the model or the harness without renegotiating what the system is permitted to do.
+
+| Concern | Harness | Numinance runtime |
+| --- | --- | --- |
+| Reasoning and code generation | Owns | Does not interfere |
+| Choice of model and prompts | Owns | Does not dictate |
+| Tool permissions | Requests | Decides |
+| Credentials and egress | Never holds raw secrets | Brokers |
+| Policy, grants, approvals | Cannot change | Owns |
+| Evidence | Reports | Writes under the runner identity |
+
+## Executor adapters
+
+A harness is connected through an executor adapter. The adapter declares which `ExecutorCapability` values the harness really has, for example `EXECUTOR_CAPABILITY_FILESYSTEM_WRITE`, `EXECUTOR_CAPABILITY_SHELL`, `EXECUTOR_CAPABILITY_NETWORK`, `EXECUTOR_CAPABILITY_MCP` and `EXECUTOR_CAPABILITY_NATIVE_SANDBOX`. The runtime compares that declaration to what the work unit needs. If the harness has no native sandbox, the runtime supplies isolation. If it asks for network access, the egress proxy sits in the path. If a required capability is missing, the work unit is not routed there.
+
+<HarnessAdapterExplorer />
+
+## What the runtime assumes
+
+The runtime does not trust a harness to enforce its own limits. It assumes:
+
+- the harness may attempt actions outside the grant, and those are denied at the boundary;
+- the harness may report success that did not occur, so independent verifiers re-run the checks;
+- the harness may be replaced, so nothing about authority lives inside it.
+
+## Bring your own
+
+Because the contract is typed and open, a team can write an adapter for a harness the vendor does not ship, and the same governance applies. You are not choosing a model when you adopt Numinance. You are choosing where authority sits.
+
+<Callout type="warn" title="Availability">
+Executor adapters and the runtime that hosts them are designed and not in the open build. The open repository carries the contract and conformance material for author and CI executors.
+</Callout>
+
+## Failure modes
+
+- The adapter overstates its capabilities: conformance checks exist for the port, and the runtime still enforces grants independently.
+- A harness crashes mid-unit: the work unit fails, repair or escalation follows.
+
+## Next steps
+
+<Cards>
+  <Card title="Agent harnesses" href="/docs/architecture/agent-harnesses" description="Architecture of adapters." />
+  <Card title="Extend a harness" href="/docs/guides/extend-harness" description="Add support for another harness." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="The kits that test ports." />
+</Cards>

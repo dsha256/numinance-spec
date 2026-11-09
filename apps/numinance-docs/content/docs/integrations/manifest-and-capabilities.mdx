@@ -1,0 +1,164 @@
+---
+title: Manifest and capabilities
+description: What a plugin declares before it runs, side effects, credential, network and filesystem intents, digest, provenance and permission changes, and how the host treats each declaration.
+---
+
+<FeatureStatus kind="public-spec">
+The manifest schema (`manifest.proto`) and the annotations it is compared against are in the public tree. Install-time verification of signatures, SBOMs, provenance and the lockfile is performed by the proprietary runtime's governed install, which is designed and not generally available.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/plugin/v1/manifest.proto", "proto/numinance/annotations/v1/annotations.proto", "proto/numinance/plugin/v1/envelope.proto"]} />
+
+<ShortProductTruth>The plugin describes. The host authorises and enforces. A manifest is a statement of intent that is compared against grants and descriptors; it is never permission.</ShortProductTruth>
+
+## When to use this
+
+You write or review a manifest when you build a capability provider, when you bump its version, or when you decide whether to approve an upgrade. The manifest is the unit a human reviews: it says what the provider is, which ports it implements, and for each capability exactly what it may touch.
+
+## Mechanism
+
+A manifest travels two ways. It is a `manifest.yaml` in the installed package, and the running provider returns the same message from `PluginService.GetManifest`. The host requires the two to be equal (`proto.Equal`) or it refuses to start the plugin, so the running process cannot widen what was reviewed at install.
+
+Three kinds of check apply to every declaration:
+
+1. **Floors from the host's descriptor copy.** A capability's `risk_floor`, `side_effect`, `idempotency` and `dry_run` are bounded by the annotations on the matching RPC in the host's own copy of the port file. A provider can claim more caution than the port requires, never less.
+2. **Enumerated intents.** Credential, network, filesystem and environment requests are named in advance. A request outside the declared intents is refused at run time.
+3. **Comparison against the lockfile.** When a previous version is pinned, the host recomputes the permission change itself. Any widening needs approval.
+
+## Manifest fields
+
+```proto title="proto/numinance/plugin/v1/manifest.proto"
+message Manifest {
+  string plugin_id = 1;
+  string version = 2;
+  numinance.types.v1.Digest digest = 3;
+  string signer_identity = 4;
+  ExtensionClass kind = 5;
+  repeated string ports = 6;
+  repeated CapabilityDescriptor capabilities = 7;
+  numinance.types.v1.Reference sbom_ref = 8;
+  numinance.types.v1.Reference provenance_ref = 9;
+  PermissionsDelta permissions_delta = 10;
+  google.protobuf.Timestamp deprecated_after = 11;
+}
+```
+
+<TypeTable
+  type={{
+    plugin_id: { type: 'string', required: true, description: 'Reverse-DNS identifier of at least two labels, each a lowercase label of letters, digits and hyphens that starts with a letter and ends with a letter or digit, at most 253 bytes. Immutable across versions.' },
+    version: { type: 'string', required: true, description: 'Strict x.y.z version of the extension.' },
+    digest: { type: 'Digest', required: true, description: 'Declared content digest of the package with manifest.yaml excluded. The host recomputes it at install and pins the recomputed value, never the declared one.' },
+    signer_identity: { type: 'string', required: true, description: 'OIDC issuer plus subject pair compared for an exact match against the verified signature identity. Never used as a pin. A different signer than the locked one is a widening.' },
+    kind: { type: 'ExtensionClass', required: true, description: 'Skill, playbook, control pack or capability provider. Only a capability provider may declare ports and capabilities.' },
+    ports: { type: 'string[]', description: 'Implemented port packages and majors, matching `^numinance\\.ports\\.[a-z][a-z0-9]*\\.v[1-9][0-9]*$`, at most one major per port.' },
+    capabilities: { type: 'CapabilityDescriptor[]', description: 'One entry per verb or capability. An RPC with no entry is not invocable; a side-effecting RPC with no entry is rejected at install.' },
+    sbom_ref: { type: 'Reference', description: 'Software bill of materials. Required for a capability provider and verified at install.' },
+    provenance_ref: { type: 'Reference', description: 'Build provenance attestation. Required for a capability provider and verified at install.' },
+    permissions_delta: { type: 'PermissionsDelta', description: 'Declared change against previous_version. Recomputed by the host and rejected on any mismatch.' },
+    deprecated_after: { type: 'Timestamp', description: 'When the version stops being supported. A version past it installs only under explicit policy.' },
+  }}
+/>
+
+The extension class is a ceiling on authority: a skill carries no authority, a playbook shapes grants and never widens them, and a control pack can only restrict. A manifest of those classes with any `ports` or `capabilities` is rejected.
+
+## Capability descriptors
+
+Each `CapabilityDescriptor` is one verb. Its `name` has the form `<port>.<snake_case_method>` (for example `knowledge.search`) and must match `^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$`.
+
+| Field | Meaning | Host check |
+| --- | --- | --- |
+| `risk_floor` | Worst-case risk class | At least `action.risk` of the host copy; never lowered against the lock |
+| `side_effect` | `NONE`, `READ`, `WRITE`, `DELETE` or `DEPLOY` | Floored by risk: a risk above `READ` means at least `WRITE` |
+| `idempotency` | `NONE`, `KEYED` or `NATURAL` | If the RPC is not idempotent in the host copy, only `NONE` is permitted |
+| `dry_run` | A dry run exists | True only when the RPC sets `supports_dry_run` |
+| `compensation` | Capability that compensates this one | Must have an entry in this manifest and match `compensating_action` |
+| `credential_intents` | Intent names, `^[a-z][a-z0-9._-]{0,127}$` | Resolved only against the broker catalog; a plugin cannot mint one |
+| `network_intents` | Egress destinations (`host`, `port`) | See below |
+| `filesystem_intents` | Sandbox paths and mode | See below |
+| `environment_scope` | Environment names or tags | Non-empty, never "all"; narrows the grant |
+| `evidence_declared` | Evidence record types produced | Must include every entry of `action.evidence`; required above `READ` |
+| `timeout`, `resource_budget` | Requested limits | Effective value is the minimum with the grant budget, under the policy ceiling |
+| `conformance_suite` | `conformance/<port>/<major>/<suite>` | Looked up in the host's kit index, never as a path; the host runs it and never trusts the claim |
+| `llm_description` | Human-readable description | Untrusted, at most 2048 bytes, rendered delimited and labelled, never as instructions |
+
+### Declared side effects
+
+`side_effect` is the worst effect the capability can have. During a call the provider also reports `ObservedSideEffect` entries on the terminal message. One that exceeds the declared `side_effect` fails the call. When `dry_run` is set on the `ActionContext`, any reported effect above `READ` fails the call and is recorded.
+
+### Credential intents
+
+A credential intent names a kind of access, for example the GitHub provider's `scm.github.api`. The provider asks `HostService.RequestCredential` for a handle for an intent in its capability's `credential_intents` that the grant allows. v1 is handle-only: the broker never returns credential material, and the manifest carries none (no field can).
+
+### Network intents
+
+A `NetworkIntent` is a `host` and a `port` (1 to 65535). The host must be an exact lowercase DNS name or a canonical IP literal, with no scheme, port, path or wildcard, ASCII only. The lexical rules reject loopback, link-local, unspecified, multicast, the IANA special-purpose ranges and cloud metadata addresses in any textual form, including numeric spellings such as `2852039166`. The check is necessary, not sufficient: the egress proxy resolves the name at request time, refuses those ranges regardless of policy, and connects to the address it checked without resolving again. Private ranges are reachable only when signed customer policy allows the destination.
+
+For example, the GitHub source-control provider declares one destination, `api.github.com` on port 443, and the replaying build of the same provider declares none.
+
+### Filesystem intents
+
+A `FilesystemIntent` is an absolute path inside the sandbox root with an optional mode, `FILESYSTEM_MODE_READ_ONLY` or `FILESYSTEM_MODE_READ_WRITE`. An absent mode means read-only. Paths are NFC, printable, free of `..`, `.` and empty segments, and the host rejects any path that resolves outside the sandbox root or into a protected mount. Rejected, never repaired. The two official verifiers declare no filesystem intent at all.
+
+## A manifest in code
+
+The public tree has no standalone `manifest.yaml` example. The providers build their manifests in Go. This is the sample knowledge provider's, copied from `plugins/examples/sample-knowledge/provider/server.go`:
+
+```go title="plugins/examples/sample-knowledge/provider/server.go"
+capability := func(verb string) *pluginv1.CapabilityDescriptor {
+	return &pluginv1.CapabilityDescriptor{
+		Name: "knowledge." + verb, RiskFloor: annotationsv1.RiskClass_RISK_CLASS_READ, SideEffect: pluginv1.SideEffect_SIDE_EFFECT_READ,
+		Idempotency: pluginv1.Idempotency_IDEMPOTENCY_NATURAL, EnvironmentScope: []string{"dev", "staging"},
+		ConformanceSuite: "conformance/knowledge/v1/basic", LlmDescription: "Reads documents of a small in-memory sample source.",
+		Timeout: durationpb.New(10_000_000_000),
+	}
+}
+```
+
+A read-only capability needs no declared evidence, so `EvidenceDeclared` is empty. A capability above `READ` without it is rejected. The surrounding `Manifest` sets `PluginId` to `dev.numinance.sample-knowledge`, `Kind` to `EXTENSION_CLASS_CAPABILITY_PROVIDER`, `Ports` to `numinance.ports.knowledge.v1`, and a real `Digest` computed from the running executable. Its `SbomRef` and `ProvenanceRef` are placeholders derived from a string, which the sample's README says governed install would refuse.
+
+## Digest, signer and provenance
+
+- **`digest`** covers the package content with `manifest.yaml` excluded, because that file carries it. The signature and provenance verified at install cover the whole artifact, so the manifest itself is signed. The lockfile pins the digest the host recomputed.
+- **`signer_identity`** must match the verified signature exactly on both issuer and subject. It is a comparison, not a pin.
+- **`sbom_ref`** and **`provenance_ref`** are required for a capability provider; a mismatch fails install.
+
+What verifies these is the runtime's governed install. See [Registry and trust](/docs/integrations/registry-and-trust).
+
+## Permissions delta and widening
+
+`permissions_delta` lists capability changes against `previous_version`. Each `CapabilityChange` has a `name` and a `previous` and `current` descriptor (absent `previous` means added, absent `current` means removed). When the lockfile has an entry for the plugin, `previous_version` must equal the locked version and the host recomputes the delta from the locked manifest. A mismatch fails install.
+
+Against the locked descriptor, each of the following is a **widening** and needs approval:
+
+- a capability added
+- `risk_floor`, `side_effect` or `dry_run` lowered
+- `idempotency` raised toward `NATURAL`
+- `compensation` removed
+- any credential, network, filesystem or environment-scope entry added, or a filesystem mode changed to read-write
+- any `evidence_declared` entry removed
+- `timeout` or any `resource_budget` field raised, compared as effective values (a change from non-zero to zero is a raise)
+- a kind changed, a port major changed, or a different signer
+- a version lower than the locked one (a rollback)
+
+Everything else is a narrowing. With no lock entry, the whole manifest is a widening. A version equal to the locked version with a different recomputed digest is rejected. This is the rule that makes "an upgrade that quietly asks for more" a reviewed event, not a silent one.
+
+## Failure modes and safeguards
+
+| Failure | Result |
+| --- | --- |
+| Manifest returned at run time differs from the installed one | The host refuses to start the plugin |
+| A capability name not in the host descriptor copy, or a side-effecting RPC with no entry | Rejected at install |
+| `risk_floor` or `side_effect` below the port's floor | Rejected |
+| Network host is a metadata address, loopback or numeric spelling of one | Rejected lexically; the proxy refuses again at connect time |
+| Empty `environment_scope` | Rejected at install, never read as "all" |
+| Observed side effect above the declared one | The call fails |
+| Declared evidence not emitted | The host derives `PARTIAL` |
+
+Rejections name an index-based field path such as `capabilities[3].network_intents[0].host` and the violated bound, never the offending value.
+
+## Next steps
+
+<Cards>
+  <Card title="Write a plugin in Go" href="/docs/integrations/custom-plugin-go" description="Declare and serve a manifest from the Go SDK." />
+  <Card title="Governance annotations" href="/docs/protocol/governance-annotations" description="The risk, exec-mode and dry-run annotations the manifest is bounded by." />
+  <Card title="Registry and trust" href="/docs/integrations/registry-and-trust" description="How signed, permission-declared extensions are designed to be distributed and approved." />
+</Cards>

@@ -1,0 +1,89 @@
+---
+title: Installation modes
+description: Where the Numinance runtime is designed to run - managed with a customer data plane, sovereign, and the later air-gapped milestone - and what you provision in each.
+---
+
+<FeatureStatus kind="designed">Deployment modes are design. The runtime is proprietary and not generally available, and this page gives no install commands for it. Air-gapped operation is <StatusBadge kind="coming-soon" /> as a later design milestone.</FeatureStatus>
+
+<ShortProductTruth>
+In every mode the code, credentials and evidence stay on infrastructure you control. The modes differ only in how much of the thin vendor control plane you use. "Your infrastructure. Not our playground."
+</ShortProductTruth>
+
+## The two planes
+
+The runtime is split into a **data plane** and a **control plane**.
+
+- The **data plane** is yours. It runs the orchestrator, the runners that create one sandbox per work unit, the credential broker, the egress proxy, the database, and the artifact and evidence storage. Source code, secrets, model traffic and evidence live here.
+- The **control plane** is thin and holds metadata and references only. It serves the dashboard, fleet view, registry index and licensing. It never receives code, credentials or prompts.
+
+Connections from the data plane to the control plane are outbound only, and orchestration payloads carry references and digests, never content. For the full mechanism see [Data and control planes](/docs/architecture/data-and-control-planes).
+
+<DeploymentBoundary />
+
+## Mode comparison
+
+| | Managed | Sovereign | Air-gapped |
+| --- | --- | --- | --- |
+| Data plane | Customer-owned | Customer-owned | Customer-owned |
+| Vendor control plane | Used for dashboard, fleet, registry index | Not required | None |
+| Outbound connectivity | Outbound to the control plane | Only what you allow | None |
+| Updates | Pulled by runners in your update windows | Pulled from a mirror you operate | Delivered by you out of band |
+| Breaker | Customer-local | Customer-local | Customer-local |
+| Status | Designed | Designed | Coming soon (later design milestone) |
+
+## Managed
+
+Managed is the default shape. You provision the data plane in your cloud account or on your hosts. The vendor operates the thin control plane for the dashboard and fleet view. Runners register outbound with a host attestation and pull signed bundles and release manifests during windows you set.
+
+What you get: less to operate, a ready dashboard for changes, approvals and qualification, and a fleet view of runners and breaker state.
+
+What you accept: the control plane can see metadata such as change states and runner heartbeats. It cannot see your code or reach into your network, and it cannot trip or reset your breaker on your behalf without a human principal.
+
+## Sovereign
+
+Sovereign mode runs the same data plane with no dependency on the vendor control plane. The product is designed to work without it: policy bundles, approvals, evidence and the breaker all function locally. Licensing is verified offline from a signed file, and expiry stops upgrades and support without stopping already authorised work or evidence export.
+
+Choose sovereign when policy forbids any outbound dependency beyond your chosen model endpoints and source control.
+
+## Air-gapped
+
+<ComingSoon title="Air-gapped operation">
+Air-gapped operation, with no network path out of the environment, is a later design milestone. Nothing about it is available or scheduled here. Sovereign mode is the closest designed mode today.
+</ComingSoon>
+
+## Customer targets
+
+The data plane is designed to be provisioned in two shapes. Neither is a command you can run today.
+
+| Target | Intended for | Shape |
+| --- | --- | --- |
+| Customer cloud account | Production | Infrastructure-as-code module that provisions network, runner hosts, database, artifact storage, evidence storage and encryption keys |
+| Compose | Single hosts, laptops, evaluation | A Compose layout of the same services |
+| Kubernetes | Customers whose standard is Kubernetes | Later, after the above |
+
+## What customers provision
+
+<Callout type="info" title="Design inventory">
+Names below are generic. Exact resources depend on the release.
+</Callout>
+
+- A private network with default-deny egress except through the egress proxy, and hosts that do not expose cloud metadata services to sandboxes.
+- Runner hosts with a sandbox isolation profile. The profile the host offers caps the autonomy level any work unit may run at on that host.
+- A relational database for orchestration state, with continuous backup.
+- Artifact storage, and separate evidence storage with immutability (write-once retention) enabled.
+- Encryption keys under your control.
+- An observability backend if you want telemetry in your own tools.
+- Identity: your OIDC provider, so approvers are real, attributable people.
+- Model access: your own endpoints or cloud model services, with residency rules you set.
+
+## Failure modes
+
+- **Control plane outage.** In managed mode you lose the dashboard and fleet view. In-flight authorised work, policy evaluation, the breaker and evidence writes continue locally.
+- **Weak host profile.** A host that offers only a process-level profile cannot run work at high levels, by design. Moving up the ladder may mean moving up the isolation profile.
+- **Unpinned images.** The runner refuses unsigned or unpinned images. A blocked update is the safe outcome.
+
+<Cards>
+  <Card title="Deployment modes (architecture)" href="/docs/architecture/deployment-modes" description="How the planes and modes are specified." />
+  <Card title="Circuit breaker" href="/docs/operations/circuit-breaker" description="Why the breaker never depends on the control plane." />
+  <Card title="Status" href="/docs/status" description="What exists today versus what is designed." />
+</Cards>

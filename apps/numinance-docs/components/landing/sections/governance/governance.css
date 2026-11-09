@@ -1,0 +1,54 @@
+/* Policy-gate machine. Axis = horizontal from md up, vertical below. */
+.gov-rail {
+  position: absolute;
+  pointer-events: none;
+  border: 0 solid var(--lp-line-strong);
+}
+@media (max-width: 767.98px) {
+  .gov-rail { inset-block: 0; left: 50%; width: 12px; translate: -50% 0; border-inline-width: 1px;
+    background: repeating-linear-gradient(0deg, var(--lp-line) 0 2px, transparent 2px 12px); }
+}
+@media (min-width: 768px) {
+  .gov-rail { inset-inline: 0; top: 50%; height: 12px; translate: 0 -50%; border-block-width: 1px;
+    background: repeating-linear-gradient(90deg, var(--lp-line) 0 2px, transparent 2px 12px); }
+}
+
+.gov-arm { transition: translate 900ms cubic-bezier(.6, 0, .2, 1); }
+@media (max-width: 767.98px) { .gov-gate[data-open] .gov-arm { translate: -86% 0; } }
+@media (min-width: 768px) { .gov-gate[data-open] .gov-arm { translate: 0 -86%; } }
+.gov-gate[data-shake] .gov-arm { animation: gov-shake 380ms steps(2) 2; }
+.gov-field { transition: opacity 500ms steps(5); }
+.gov-gate[data-open] .gov-field { opacity: 0; }
+
+.gov-lamp { width: 10px; height: 10px; border: 1px solid var(--lp-ink); border-radius: 99px; background: var(--lp-paper-2); }
+.gov-lamp[data-s='hold'] { background: var(--lp-sun); animation: gov-blink 900ms steps(1) infinite; }
+.gov-lamp[data-s='eval'] { background: var(--lp-yellow); animation: gov-blink 360ms steps(1) infinite; }
+.gov-lamp[data-s='ok'] { background: var(--lp-yellow); }
+
+.gov-line { animation: gov-print 520ms steps(8) both; animation-delay: calc(var(--i, 0) * 340ms); }
+.gov-stamp { transition: opacity 120ms linear, scale 160ms steps(3); }
+.gov-stamp:not([data-on]) { opacity: 0; scale: 1.7; }
+
+.gov-bar > i { display: block; height: 100%; width: 0; background: var(--lp-ink); }
+.gov-bay[data-s='running'] .gov-bar > i { width: 100%; transition: width 1100ms steps(14); }
+.gov-bay[data-s='done'] .gov-bar > i { width: 100%; }
+.gov-sweep { animation: lp-scan 1.1s linear infinite; }
+
+.gov-override[data-nudge] { animation: gov-shake 320ms steps(2) 2; }
+.gov-caret { animation: lp-caret 700ms steps(1, end) infinite; }
+
+@keyframes gov-blink { 50% { opacity: 0.25; } }
+@keyframes gov-print { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes gov-shake { 0% { transform: translate(0); } 50% { transform: translate(2px, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .gov-arm, .gov-field, .gov-stamp, .gov-bar > i { transition: none !important; }
+  .gov-line, .gov-lamp, .gov-sweep, .gov-caret, .gov-override, .gov-gate .gov-arm { animation: none !important; }
+}
+
+.gov-cells > i { transition: background-color 120ms linear; }
+.gov-bay[data-s='done'] .gov-cells > i { background: var(--lp-ink); }
+.gov-bay[data-s='running'] .gov-cells > i { animation: gov-fill 1100ms steps(1) both; animation-delay: calc(var(--i) * 58ms); }
+@keyframes gov-fill { from { background: transparent; } to { background: var(--lp-ink); } }
+.gov-bay[data-s='locked'] .gov-cells > i { border-style: dashed; opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .gov-cells > i { animation: none !important; } }

@@ -1,0 +1,152 @@
+---
+title: Official providers
+description: The four official providers and one sample in the public tree, what each does, how credentials and egress work, and exactly what is tested and what is not done.
+---
+
+<FeatureStatus kind="pre-alpha">
+These providers build and their tests pass against recorded or in-memory fixtures. No live run is claimed: the READMEs list the live end-to-end run as not done. Presence in `plugins/official/` is not a readiness claim.
+</FeatureStatus>
+<SourceReference paths={["plugins/official/scm-github/README.md", "plugins/official/ci-github-actions/README.md", "plugins/official/verifier-python/README.md", "plugins/official/verifier-repo/README.md", "plugins/examples/sample-knowledge/README.md"]} />
+
+<ShortProductTruth>Official providers are written against the public SDK only, hold no credentials of their own, treat every answer from the outside world as untrusted data, and say plainly in their READMEs what is still missing.</ShortProductTruth>
+
+## What is in the tree
+
+| Provider | Directory | Port | Plugin id |
+| --- | --- | --- | --- |
+| GitHub source control | `plugins/official/scm-github` | `numinance.ports.scm.v1` | `dev.numinance.scm-github` |
+| GitHub Actions CI | `plugins/official/ci-github-actions` | `numinance.ports.ciexecutor.v1` | `dev.numinance.ci-github-actions` |
+| Repository static verifier | `plugins/official/verifier-repo` | `numinance.ports.verifier.v1` | `dev.numinance.verifier-repo` |
+| Python verifier | `plugins/official/verifier-python` | `numinance.ports.verifier.v1` | `dev.numinance.verifier-python` |
+| Sample knowledge (example) | `plugins/examples/sample-knowledge` | `numinance.ports.knowledge.v1` | `dev.numinance.sample-knowledge` |
+
+`plugins/official/internal/ghprovider` is the shared skeleton of the two GitHub providers: the `PluginService` implementation, the `HostService` client, a size-limited REST client and the cassette transport. It is internal; providers are expected to use the public SDK directly, as the sample does.
+
+Ports with no provider in the tree: ticketing, authorexecutor, sandboxprovider, evidencestore and transparencylog. A second CI provider is listed as not done in the CI provider's README.
+
+## Credentials and egress, the common pattern
+
+Both GitHub providers share one rule: **no token is ever in the provider process.**
+
+1. The provider calls `HostService.RequestCredential` for an intent its manifest declares (`scm.github.api` or `ci.github.actions`).
+2. The answer carries an opaque handle and the address of the egress proxy listener of the invocation's step.
+3. The provider sends an absolute-form `http://api.github.com:443/...` request to that address with the handle in the `Numinance-Handle` header. The proxy applies the token it holds and re-originates the request over TLS.
+4. The transport refuses a request with no handle, a handle with no proxy address (or an expired one), and any destination other than `api.github.com:443`. It opens no other connection, refuses redirects, and the provider's environment is the three handshake variables with no ambient proxy setting.
+
+The manifest of the live build declares one network destination, `api.github.com` on port 443, one credential intent, and the environments `dev`, `staging` and `prod`. The replaying build of each provider declares no network destination, no credential intent and the `dev` environment only, so it cannot be installed where the live provider runs.
+
+Every answer from GitHub is treated as untrusted: at most 4 MiB, decoded without trust, every field checked against the port grammar (commit ids, branch names, URLs, check names, counts), never repaired or truncated. A violation ends the call `UPSTREAM_ERROR`.
+
+## scm-github
+
+A capability provider of `numinance.ports.scm.v1` over the GitHub REST API (version 2022-11-28). All twelve core verbs are registered in `provider/spec.go`; there is no `VendorCall`. The README text counts eleven; the registered list is authoritative.
+
+| Verb | Declared risk | Notes |
+| --- | --- | --- |
+| Read verbs: `GetRepository`, `GetTree`, `GetFile`, `ListBranches`, `GetBranchProtection`, `GetPullRequestStatus`, `SearchCode` | READ | `SearchCode` wraps the query in one quoted phrase so a qualifier like `repo:other/x` cannot widen the search, and drops hits of other repositories |
+| `CreateBranch`, `UpdatePullRequest`, `CommentOnPullRequest` | LOW, keyed | `CommentOnPullRequest` finds its own earlier comment by a marker derived from the host's idempotency key |
+| `OpenPullRequest` | MEDIUM, keyed, dry run | Checks the head branch points at `head_revision`; finds an open pull request for the same head and base before creating one; emits one `pr-ref` receipt (repository, number, head, base; never title or body) |
+| `MergePullRequest` | PRIVILEGED, keyed, dry run | Merges only at `expected_head_revision` (squash); answers a merge already done as done; refuses a closed or moved pull request |
+
+Behaviors worth knowing:
+
+- Requests are validated against the `scm.proto` grammar before anything is sent. A branch or tag never stands for a revision, and a repository with a `.` or `..` segment never reaches a request path.
+- `GetPullRequestStatus` reads every page of reviews and check runs (at most five pages of 100; a full last page is `LIMIT_EXCEEDED`, never a silent cut) and counts an approval only from a reviewer who holds write access and is not the pull request's author.
+- `GetBranchProtection` reads and changes nothing. No verb edits protection, a workflow file or a ruleset.
+- Who may call which verb is not the provider's decision. The port requires the author-agent identity for opening pull requests and the release-pipeline identity only for merging; the host and policy floors refuse other callers before `Invoke`.
+
+## ci-github-actions
+
+A capability provider of `numinance.ports.ciexecutor.v1`. It holds no credential and starts only a workflow the customer already defines. Its contract with the repository is specific:
+
+- It dispatches `workflow_dispatch` on the repository's **default branch**, which is protected, so a candidate cannot change the pipeline definition. Inputs are `numinance_revision` (the full commit id), `numinance_operation_id` (derived from the host's idempotency key) and profile parameters; names starting with `numinance_` are refused as parameters.
+- The workflow must declare both inputs and name its run `numinance ${{ inputs.numinance_operation_id }} ${{ inputs.numinance_revision }}`. The provider finds the run by that name before dispatching, so a retry starts no second run, and again after. A run that does not follow this is not an operation of the provider (`UPSTREAM_ERROR`).
+- A run is adopted only if it was dispatched on the default branch, its `path` names the workflow file on that branch, and its name carries the requested revision.
+- A full page of 100 runs lacking the operation fails closed (`LIMIT_EXCEEDED`) and dispatches nothing.
+
+`StartOperation` is HIGH with a DEPLOY side effect and declares and emits one `ci-run-ref` receipt. `CancelOperation` is MEDIUM. A run's state is the CI's claim: an unknown ending is `FAILED`, never a success. `GetLogReference` returns the `github.com` run page, never the log.
+
+## verifier-repo
+
+A capability provider of `numinance.ports.verifier.v1` that reads a candidate as data and reports what breaks repository conventions: the **scope** of the change, the **Markdown** of documents it touches, and the **`just` recipes** those documents name. It uses only the standard library plus the public SDK.
+
+**It runs no candidate code and no tool.** The candidate archive is parsed in memory and never extracted to disk. Its manifest asks for no network, credential or filesystem intent. Rule ids are stable (`repo/scope-path`, `repo/scope-protected`, `repo/markdown-link`, `repo/just-recipe`, and others); a rule id never changes meaning and is never reused. Findings are normalised, fingerprinted without the line, merged and bounded at 1024 items. Exactly one `VerifierReport` is emitted through `EmitEvidence`, with the archive size and sha256 and the finding count, never the findings.
+
+The scope configuration is supplied by the binding loader from the protected base revision; no file of the candidate configures the check. The candidate parser refuses zip-slip names, absolute paths, sparse entries, hard links, devices and mismatched manifests.
+
+## verifier-python
+
+A capability provider of the same verifier port that runs ruff, mypy, pytest, Semgrep or import-linter and reports findings. The important boundary is stated in its README: **candidate code is not run unnested.**
+
+- pytest executes the tests, and import-linter imports the candidate's root package, which runs its `__init__` files in the verifier's own process. The port allows that only inside a nested sandbox, which this provider does not build. Both checks are therefore `UNAVAILABLE` in the live build, and only the replaying build serves them.
+- The static checks (ruff, mypy, Semgrep) run from a private working directory outside the candidate, with no `PYTHONPATH` and `PYTHONSAFEPATH=1`, in their own process group that is killed whole at the deadline.
+- Nothing is hidden from a check: ruff runs with `--ignore-noqa`, Semgrep with `--disable-nosem`, and settings come only from the config. Directives the tool cannot ignore (mypy `# type: ignore`, pytest skip and xfail marks, ignore files) are reported as findings with a `numinance.directive/...` rule id.
+- A tool that exits unexpectedly or prints something not in its own format ends the call `FAILED` with no findings. Output over 8 MiB ends the call `FAILED`, never truncated.
+
+This is the same limit the `numi init` output reports when it notes that unit tests run candidate code and are unavailable in the live verifier provider until its nested sandbox exists.
+
+## sample-knowledge
+
+A sample provider of `numinance.ports.knowledge.v1` with three read verbs over a seeded in-memory source. It is the target of the knowledge conformance kit and is annotated line by line in [Write a plugin in Go](/docs/integrations/custom-plugin-go).
+
+## What is tested
+
+The tests were run in the documentation environment against the pinned spec checkout, with the local Go 1.27.2 toolchain, no network and no GitHub credential.
+
+```bash title="Run from the root of numinance-spec"
+go test -count=1 -timeout 280s ./plugins/... ./conformance/... ./sdk/go/plugin/...
+```
+
+<VerifiedSnippet what="go test over the official providers, conformance kits and sdk/go/plugin (official lines shown)" exit="0">
+
+```text
+ok  	github.com/numinance/numinance-spec/plugins/official/ci-github-actions/provider	0.944s
+ok  	github.com/numinance/numinance-spec/plugins/official/internal/ghprovider	0.951s
+ok  	github.com/numinance/numinance-spec/plugins/official/scm-github/provider	0.955s
+ok  	github.com/numinance/numinance-spec/plugins/official/scm-github/replay	0.949s
+ok  	github.com/numinance/numinance-spec/plugins/official/verifier-python/catalog	0.843s
+ok  	github.com/numinance/numinance-spec/plugins/official/verifier-python/provider	4.937s
+ok  	github.com/numinance/numinance-spec/plugins/official/verifier-repo/catalog	0.622s
+ok  	github.com/numinance/numinance-spec/plugins/official/verifier-repo/provider	1.101s
+```
+
+</VerifiedSnippet>
+
+The full command exited 0, and the conformance packages for ciexecutor, knowledge, scm, ticketing and verifier and `sdk/go/plugin` also passed. Packages without tests (the `main` packages, `cmd/replay`, `cmd/record`, the sample) print `[no test files]`.
+
+Caveats on that result:
+
+- The run happened outside the command sandbox because `sdk/go/plugin` tests bind a Unix socket, which the sandbox blocks (inside it that test hung until timeout). It was not a failure of the code.
+- `go.mod` asks for toolchain go1.27.3; the run used the local 1.27.2 with `GOTOOLCHAIN=local`.
+- Replay fixtures, not live systems. The GitHub providers ran over cassettes that the READMEs say are written from the REST documentation with invented names, **not recordings**. The Python verifier ran over recorded tool output; the optional real-ruff test (`NUMINANCE_VERIFIER_TOOLS=1`) was skipped.
+- What each test suite covers is as stated in its README: bounds, untrusted answers, no handle means no call, the handle header and no other credential, the manifest, a wrong request failing against the scenario cassette, and the conformance kit. The host-level acceptance (a real plugin host launching the replay build) belongs to the proprietary runtime and was not run.
+
+## What is not done
+
+These are taken from the READMEs and are not softened here.
+
+| Provider | Not done |
+| --- | --- |
+| scm-github | Committed recordings (the cassette is hand-written). A live test covers only `GetRepository` and `GetBranchProtection`; the other verbs are exercised in replay only. GitHub Enterprise URLs and GraphQL. A public catalog entry for the credential intent |
+| ci-github-actions | A live run and a recording tool; the host gives the provider no egress-proxy address yet. Jenkins and other CI providers. The wait for a dispatched run is five looks; a run that has not appeared fails the call as unavailable and the host's retry finds it by its key |
+| verifier-repo | The "repository CI green" and "pr-ref receipt under the author identity" checks are not this provider's. Exact line counts for modified files (set `allow_modify` false to bound them). Anchors and Justfile `import` or `mod` are not followed |
+| verifier-python | The nested sandbox for candidate code. Tools beyond the five. Python tools pinned by digest in an image |
+| All | SBOM and provenance references in the manifests are placeholders that install-time checks refuse |
+
+<Callout type="warn" title="Presence is not a readiness claim">
+A provider in this tree demonstrates the contract and passes its kit. It does not show that it has been run against a production system, security-reviewed, or distributed through a registry. The distribution mechanism is [designed, not shipped](/docs/integrations/registry-and-trust).
+</Callout>
+
+## Troubleshooting
+
+- **A test hangs in `sdk/go/plugin`.** You are in an environment that forbids binding a Unix socket. Run it where local sockets are allowed.
+- **`unit-tests` is unavailable after `numi init`.** That is the nested-sandbox limit of `verifier-python`, by design, not a misconfiguration.
+- **A request with no recording fails `UPSTREAM_UNAVAILABLE` in replay.** Replay fails closed and never invents an answer.
+
+## Next steps
+
+<Cards>
+  <Card title="Connect source control and CI" href="/docs/guides/connect-source-control-and-ci" description="The task-oriented guide for pointing a repository at these ports." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="The kits these providers run, and the host checks they do not." />
+  <Card title="Manifest and capabilities" href="/docs/integrations/manifest-and-capabilities" description="The declarations behind the credential, network and environment rows above." />
+</Cards>

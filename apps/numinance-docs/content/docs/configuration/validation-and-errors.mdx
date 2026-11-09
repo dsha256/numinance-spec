@@ -1,0 +1,195 @@
+---
+title: Validation and errors
+description: What the open numi validate checks, what it deliberately leaves to the engine, the exit codes, and the real error messages you will see.
+---
+
+<FeatureStatus kind="public-spec">
+  The schemas, the loader and the open `numi validate` build are in the public numinance-spec. Profile resolution, floor evaluation and the commands that run a change are designed and are not in the open build.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "cli/README.md",
+    "sdk/go/kindyaml/README.md",
+    "proto/numinance/kinds/v1/meta.proto",
+    "schemas/gen/numinance.kinds.v1.SDLCProfile.jsonschema.strict.bundle.json",
+  ]}
+/>
+
+<ShortProductTruth>
+  The open validator proves that your YAML has the shape of a Numinance kind. It does not prove that your configuration is allowed, complete or safe. A CI that cannot tell the difference is a CI that lies, so the open build is built to make the difference impossible to miss.
+</ShortProductTruth>
+
+## Two validation modes
+
+| Mode | Command | What it does | Exit on a clean pass |
+| --- | --- | --- | --- |
+| Example validator | `numi validate --files PATH` | Checks each YAML document against the strict schema of its kind, then the loader checks. No resolver, no floors. | 0 |
+| Repository validator | `numi validate [path]` | Schema-checks every kind document under `.numinance/` in the org, repository and component trees (working tree, uncommitted edits included), then stops. | 7 |
+
+A repository run that exits 7 has not failed. Exit 7 in the open build has exactly one meaning: the schema pass succeeded and profile resolution is not available. The final line says so:
+
+```text
+numi validate: profile resolution needs the Numinance engine build
+```
+
+Treat exit 7 in CI as a distinct state, not as success. If you wire the open build into a pipeline, assert the exit code you expect, and do not map 7 to green.
+
+### What is open schema-only, and what is engine-side
+
+| Open `numi` build (checks the shape) | Engine-side resolution (designed, not in the open build) |
+| --- | --- |
+| Valid YAML, one document, size and depth limits | Loading from a pinned commit, not the working tree |
+| Strict kind schema: no unknown fields except under `extensions` | Merging org, repository and component scope into one resolved profile |
+| `apiVersion`, `kind`, `metadata`, `spec` present; scope not unspecified | Checking floors: autonomy, residency, approvals, packs |
+| Enums by full proto name; durations in `7200s` form; digests as `sha256:` plus 64 hex | Resolving names (playbooks, toolchains, verifiers, providers) to real objects and lockfile entries |
+| Org-only kinds and floor fields refused below the org scope | Deciding whether a document has authority (protected path or signed policy bundle) |
+| Per-kind rules such as `read_only` true, `ttl` above zero, sorted EvalSet cases | Printing the profile digest and per-field provenance |
+
+When an authoritative engine build resolves a repository it reads a pinned commit and prints a digest with the provenance of each field. The open build cannot, and does not pretend to.
+
+## Exit codes
+
+The stable table in the spec CLI is shared by all `numi` commands:
+
+| Code | Meaning | Seen in the open validator |
+| --- | --- | --- |
+| 0 | OK | Clean `--files` pass |
+| 1 | Internal, and any unknown kind | A panic or an error of no kind exits 1, never 0 |
+| 2 | Usage: bad flags or arguments, or a non-empty `--rev` in the open build | No path, more than one path, `--files` combined with `--rev`, `--org` or `--component`, a single file not named `*.yaml` or `*.yml` |
+| 3 | Invalid: schema errors, loader errors | Any document that fails |
+| 4 | Not found, including no kind documents found | A missing path, or a directory with no YAML |
+| 5 | Conflict | Not produced by validate in my runs. `numi init` returns 5 when `.numinance` already has files and no `--force`. |
+| 6 | PolicyDenied | Not produced by the open validator |
+| 7 | Unavailable | Repository mode after the schema pass |
+| 8 | Timeout | Not exercised |
+
+A cancel (an interrupt) exits 1, never 7. For the CLI as a whole, see [commands and exit codes](/docs/cli/commands-and-exit-codes) and [numi validate](/docs/cli/validate).
+
+## The loader's four stages
+
+Each document runs through four stages in order and stops at the first failure. Errors name a path or a field and never quote a value from your file, so a rejected document cannot leak its contents into logs.
+
+| Stage | Refuses |
+| --- | --- |
+| Size | A document over 128 KiB |
+| YAML | More than one document, a root that is not a mapping, anchors, aliases, merge keys, explicit tags, non-string keys, duplicate keys, nesting beyond 64 levels, more than 16384 values |
+| Schema | A missing or unknown `kind`; a produced kind (ContextBundle) loaded as configuration; an unknown field; a wrong type or enum; a duration that is not in proto JSON form |
+| Loader checks | `apiVersion` or `kind` not as expected; missing `metadata` or `spec`; an empty `metadata.name`; a zero enum anywhere; required lists left empty; non-reverse-DNS `extensions` keys; then the per-kind rules (org-only, `FORBID` fields, unique keys, value shapes) |
+
+Anchors and aliases are refused on purpose. They are the YAML feature that makes a small file expand into a large one, and a config format that hides expansion from reviewers is a poor place for policy.
+
+## Working examples
+
+Success on the shipped examples. This is the first command to run after installing from a clone; see [install](/docs/get-started/install) and [first configuration](/docs/get-started/first-configuration).
+
+```bash title="From a numinance-spec checkout"
+go run ./cli/numi validate --files schemas/examples/SDLCProfile
+```
+
+The machine-readable form is a single JSON object per run, with a per-document status. For a failing document it carries the same message in an `error` field.
+
+<VerifiedSnippet what="Open numi build run against edited copies and example files; the quoted paths are scratch copies">
+
+```text
+$ numi validate --files schemas/examples/SDLCProfile
+revision: "files"
+ok       file "org-baseline.yaml" SDLCProfile "org-baseline"
+ok       file "payments-api.yaml" SDLCProfile "payments-api"
+(exit 0)
+
+$ numi validate --files --json ok.yaml
+{"status":"ok","revision":"files","documents":[{"scope":"file","path":"ok.yaml","kind":"BudgetPolicy","name":"x","status":"ok"}]}
+(exit 0)
+
+$ numi validate --files --json bad/doc.yaml      # KnowledgeConnection with read_only: false
+{"status":"invalid","revision":"files","documents":[{"scope":"file","path":"doc.yaml","status":"invalid","error":"kind: invalid: a value of numinance.kinds.v1.KnowledgeConnectionSpec.read_only fails its check"}]}
+(exit 3)
+
+$ numi validate .                                # a repository with one LanguageToolchain under .numinance/policy/
+revision: "working tree (uncommitted changes included)"
+ok       repo ".numinance/policy/go-1.27.yaml" LanguageToolchain "go-1.27"
+numi validate: profile resolution needs the Numinance engine build
+(exit 7)
+
+$ numi validate --files missing-dir
+numi validate: path not found
+(exit 4)
+
+$ numi validate --files empty-dir
+revision: "files"
+numi validate: no kind documents found
+(exit 4)
+
+$ numi validate --files
+numi validate: --files needs exactly one path
+usage: numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
+       numi validate --files [--json] path
+  ...
+(exit 2)
+```
+
+</VerifiedSnippet>
+
+(The usage text above is shortened at the dots; the tool prints the full flag list.)
+
+## Common mistakes
+
+Every message below was produced by editing a copy of a real example or a minimal document and running the open build. All exit 3 unless noted.
+
+| Mistake | Message |
+| --- | --- |
+| A misspelt or unknown field | `kind: does not match the kind schema: schema: value does not match (violations: 1): \"/spec/verifier\": additionalProperties` |
+| An enum written short (`HIGH`) or with an invalid member | `... \"/spec/rules/0/severity\": enum` |
+| A missing required field the schema can see | `... \"/spec/counsel_status\": required` |
+| A required list left empty | `kind: invalid: numinance.kinds.v1.LanguageToolchainSpec.verifiers is empty` |
+| A duration as `4h` or `2h` | `kind: does not match the kind schema: a value is not in protobuf JSON form` |
+| An org-only kind at another scope | `kind: invalid: ControlPack is org-scoped only` |
+| A floor set below the org | `kind: invalid: numinance.kinds.v1.ResidencyPolicySpec.floors is set only at the org scope` |
+| `metadata.scope` left unspecified | `kind: invalid: numinance.kinds.v1.Metadata.scope is SCOPE_UNSPECIFIED` |
+| Wrong `apiVersion` (here `numinance.dev/v2`) | `kind: invalid: apiVersion is not numinance.dev/v1` |
+| No `spec` | `kind: invalid: spec is missing` |
+| A kind name that does not exist (`Widget`) | `kind: unknown kind` |
+| A YAML anchor | `kind: unsupported YAML: line 4: anchor` |
+| A duplicated key | `kind: duplicate key: line 6` |
+| A produced kind in the configuration tree | `kind: produced kind: ContextBundle is not configuration` |
+| An alpha kind in repository mode | `kind: alpha kind is not enabled: EvalSet` |
+| A non-reverse-DNS `extensions` key | `kind: invalid: a key of numinance.kinds.v1.IndexerPlugin.extensions is not reverse-DNS` |
+| A single file not named `*.yaml` or `*.yml` (exit 2) | `numi validate: a file must be named *.yaml or *.yml` |
+| A backup such as `ok.yaml.bak` inside a directory | `numi validate: ok.yaml.bak: a file name mentioning .yaml or .yml must end in lowercase .yaml or .yml` |
+| `--files` together with `--rev` (exit 2) | `numi validate: --files excludes --rev, --org and --component` |
+
+The file-name rule is strict by design: in `--files` mode, a stray `config.yaml.bak` or `config.YAML` is an error, not an ignored file, because an ignored policy file is how a reviewed rule quietly stops being checked. Other names, such as `README.md~`, are ignored.
+
+## What a pass does not prove
+
+- That the file is where policy will look for it. Authority comes from a protected path or a signed policy bundle. A document that decodes has no authority by decoding.
+- That a name you wrote exists. `provider`, `verifier`, `playbook` and `knowledge` values are references, resolved later against declared providers and the lockfile.
+- That a floor holds. Cross-document checks such as a pack that tightens an org floor are resolution, not validation.
+- That an extension is installed, signed or allowed. See [registry and trust](/docs/integrations/registry-and-trust).
+- That your change is safe. Verification, policy and evidence do that at run time, in the designed runtime.
+
+## Troubleshooting
+
+<Accordions>
+  <Accordion title="Exit 7 on every repository run">
+    That is the open build working as designed. It validated the schema and stopped because it cannot resolve a profile. Use `numi validate --files .numinance` when you want an exit 0 for a shape-only check, and do not read it as profile validation.
+  </Accordion>
+  <Accordion title="Exit 4 with a path that exists">
+    The directory holds no `.yaml` or `.yml` documents ("no kind documents found"). A symbolic link is a different failure: links are refused, for the path itself and for everything below it, and that exits 3. Reads are bounded: 4096 entries, 256 documents, 16 MiB, and 128 KiB per document.
+  </Accordion>
+  <Accordion title="An EvalSet passes with --files but fails in repository mode">
+    The example validator switches alpha kinds on; the repository validator does not. See the callout in [EvalSet and ContextBundle](/docs/configuration/evals-and-context-bundle).
+  </Accordion>
+  <Accordion title="The message names a field but not my value">
+    Intentional. Messages never quote document values. Find the field in the kind's proto file or in the generated schema under `schemas/gen`.
+  </Accordion>
+</Accordions>
+
+## Next steps
+
+<Cards>
+  <Card title="numi validate" href="/docs/cli/validate" description="The command reference for both validation modes." />
+  <Card title="Kinds and JSON Schema" href="/docs/protocol/kinds-and-jsonschema" description="How the schemas are generated from the proto kinds." />
+  <Card title="Layout and scopes" href="/docs/configuration/layout-and-scopes" description="Where files live and which scope may set which field." />
+</Cards>

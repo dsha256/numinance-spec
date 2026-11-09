@@ -1,0 +1,72 @@
+---
+title: Trust kernel
+description: The small fixed core of enforcement that profiles, packs and plugins can restrict but never change.
+---
+
+<FeatureStatus kind="designed">
+  The kernel is a designed property of the runtime. The public contracts it enforces are covered in the protocol pages.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/types/v1/types.proto", "proto/numinance/plugin/v1/envelope.proto"]} note="PrincipalKind and ActionContext are the public shape of the identities and decisions the kernel enforces." />
+
+<ShortProductTruth>
+  The model is never the security boundary. Even a fully compromised agent can do no more than the grant it was issued.
+</ShortProductTruth>
+
+## Fixed versus configurable
+
+Almost everything about how Numinance behaves is configuration: the SDLC profile, autonomy policy, playbooks, toolchain packs and approval floors. The kernel is the part that configuration cannot reach.
+
+| Configurable (can only restrict or select) | Fixed in the kernel |
+| --- | --- |
+| Autonomy level per scope, within floors | Policy evaluation outside the model before privileged actions |
+| Playbooks, stage registry, verifier sets | Grant immutability and derivation rules |
+| Control packs adding checks and evidence | Four-identity separation and the no-self-approval rule |
+| Approver groups and counts | Evidence written only by the runner, append-only |
+| Residency floors and budgets | Protected paths and plugin signature checks |
+| Plugins and their declared intents | Break-glass limited to named humans |
+
+## Invariants
+
+1. A policy decision is made outside the model, before every privileged action, and its identifier travels with the action.
+2. Authority is capability-based. A grant names what a run may do, is immutable, and can only be narrowed for a sub-step.
+3. Four identities exist for work on a change: author agent, reviewer agent, release pipeline, human approver. An approver is never the author, structurally.
+4. Only the release pipeline deploys, and only where policy allows.
+5. Evidence is append-only, written by the runner identity, and denials are recorded alongside allowed actions.
+6. Protected paths, including policy files, CI definitions and identity configuration, cannot be written by an agent, by mount and by source control protection.
+7. Extensions are signed, digest-pinned and permission-declared. Widening permissions needs approval.
+8. The circuit breaker lives in the customer runtime, needs no control plane, and is reset only by a human with a reason.
+9. Orchestration payloads carry references and digests, never content.
+10. Break-glass is human-only, time-boxed and separately recorded.
+
+Input trust is part of the kernel. Retrieved content, tool output, tickets and comments are untrusted guidance. Only signed policy and the kernel can create enforceable constraints. A signed skill can advise and never widen a grant.
+
+## What packs and profiles cannot change
+
+- They cannot lower an organisation floor. Lower scopes may be stricter, never looser.
+- A control pack can only add restrictions or required evidence.
+- A playbook shapes grants but never widens them.
+- A plugin describes the authority it needs; Numinance decides whether to grant it.
+- The capability-gap resolver may propose new plugins, but may not modify policy evaluation, the broker, evidence integrity, plugin verification, sandbox enforcement, approval floors, trust roots, identity rules, break-glass or the update path.
+
+## Boundary table
+
+| Actor | Can read kernel state | Can change kernel behaviour |
+| --- | --- | --- |
+| Model or harness | No | No |
+| Author agent | No | No; protected paths are absent from its sandbox |
+| Customer administrator | Policy and decisions | Only by signed, reviewed changes that cannot lower floors |
+| Plugin | Only what the host exposes | No |
+| Vendor control plane | Metadata | No |
+
+## Failure cases
+
+- A pack tries to widen an action beyond the floor: the load fails; floors are evaluated first and default to deny.
+- An agent edits `.numinance/policy`: the path is not writable in its sandbox, and source control protection rejects it if it arrives through a pull request.
+- Evidence cannot be written: the failure itself trips the breaker rather than letting work continue unrecorded.
+
+<Cards>
+  <Card title="Authority and policy" href="/docs/architecture/authority-and-policy" description="How the decision point, grants and identities operate." />
+  <Card title="Governed execution" href="/docs/concepts/governed-execution" description="The concept view of these rules." />
+  <Card title="Threat model and limits" href="/docs/evidence/threat-model-and-limits" description="What evidence does and does not prove." />
+</Cards>

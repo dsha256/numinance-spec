@@ -1,0 +1,86 @@
+---
+title: Commands and exit codes
+description: The stable exit-code table of the open numi build, and the designed command surface that is not in the open build.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Exit codes and the open commands are real. The designed command surface further down is not in the open build.
+</FeatureStatus>
+
+<SourceReference paths={["cli/README.md", "sdk/go/cli/exit.go"]} />
+
+<ShortProductTruth>
+  The open build has a handful of commands. The rest of the command surface is designed and needs the private engine and a runtime. Do not script against it.
+</ShortProductTruth>
+
+## Exit codes (stable)
+
+| Code | Name | Meaning |
+| --- | --- | --- |
+| 0 | OK | Success |
+| 1 | Internal | Internal error, and any unknown kind. A panic, an error of no kind, or a cancel (SIGINT, SIGTERM) exits 1, never 0 or 7 |
+| 2 | Usage | Bad flags or arguments. In the open build also any non-empty `--rev` |
+| 3 | Invalid | Schema errors, floor violations, a refused path or file type |
+| 4 | NotFound | Also: no kind documents found |
+| 5 | Conflict | `init` into an existing `.numinance` without `--force`; for `evidence verify`, a consistent export weaker than `verified` |
+| 6 | PolicyDenied | Not produced by `evidence verify` |
+| 7 | Unavailable | In the open build exactly one meaning: the schema pass succeeded and profile resolution is not available. In the engine build, a dependency was unavailable |
+| 8 | Timeout | |
+
+<Callout type="info" title="Observed variations">
+  The README lists unknown kinds under exit 1. The open `numi validate --files` run on a file with an unknown `kind` exited 3 (`kind: unknown kind`), because it is reported as an invalid document. Read the command pages for the code a command actually uses.
+</Callout>
+
+Every command pairs the code with a one-line message on stderr or stdout. `numi validate --help` prints usage and exits 0.
+
+## Open build commands
+
+| Command | Page | Exit codes in use |
+| --- | --- | --- |
+| `numi version` | [Install](/docs/cli/install) | 0 |
+| `numi init` | [numi init](/docs/cli/init) | 0, 1, 2, 3, 4, 5 |
+| `numi validate --files` | [numi validate](/docs/cli/validate) | 0, 2, 3, 4 |
+| `numi validate` | [numi validate](/docs/cli/validate) | 2, 3, 4, 7 (0 never in the open build) |
+| `numi evidence verify` | [numi evidence verify](/docs/cli/evidence-verify) | 0, 1, 2, 3, 4, 5, 7, 8 |
+
+Machine output: `--json` prints one JSON object on `validate` and `evidence verify`. Default output is for people and can change.
+
+## Designed command surface
+
+<DesignNote title="Designed, not in the open build">
+  The commands below describe the intended command line. None is in the open build, and none is available as a runnable command today. Where they reach a runtime they would do so through the runtime's API with the caller's principal, so policy still applies to everything a command does. Nothing in `numi` would bypass policy.
+</DesignNote>
+
+<FeatureStatus kind="designed" />
+
+| Command | Intended purpose |
+| --- | --- |
+| `numi discover` | Read the enforcement artifacts a repository already has, draft configuration documents with confidence annotations, self-test them, and propose the result as a pull request for human review |
+| `numi connect` | Guided connection of a knowledge provider, source control or CI: resolve the provider in a registry, authorize, list its tools, approve a read-only subset and pin hashes, then smoke-test |
+| `numi plan` | A dry run for a ticket: classify, resolve context, show the plan and the grant that would be issued; no execution |
+| `numi run` | Start a change from a ticket at a chosen autonomy level, bounded by the policy ceiling; requires a runtime |
+| `numi status` | Show a change's state, stage, gate decisions, budget use and evidence range |
+| `numi approve` and `reject` | Record a human approval or rejection with a reason; the approver must differ from the author |
+| `numi evidence export` | Export a change's evidence bundle for offline verification; the engine exports today through its own mechanism, and the open build does not have this subcommand |
+| `numi doctor` | Check toolchain versions, runtime connectivity, sandbox availability and canary tests |
+| `numi extension` | Add and verify extensions: signed, digest-pinned and permission-declared |
+| `numi breaker` | Inspect and control the customer-local circuit breaker |
+
+Details of the runtime side of these commands live on the pages for each subsystem, for example [risk and approval](/docs/operations/risk-and-approval) and the [circuit breaker](/docs/operations/circuit-breaker). Whether and when any of them ships is a roadmap matter: see [Roadmap](/docs/roadmap).
+
+### What stays true when they arrive
+
+- Agents cannot approve their own changes or widen their own grants through any command.
+- Break-glass is human only.
+- Exit codes would follow the same stable table above.
+- `evidence verify` would keep working offline against exports from the runtime, with keys you pin.
+
+In the open build, `numi evidence export` is an unknown subcommand and exits 2.
+
+## Next steps
+
+<Cards>
+  <Card title="Status" href="/docs/status" description="What is real, in progress and planned across the project." />
+  <Card title="numi validate" href="/docs/cli/validate" description="The command whose exit 7 people misread." />
+  <Card title="Open vs proprietary" href="/docs/concepts/open-vs-proprietary" description="Where the open CLI ends and the engine begins." />
+</Cards>

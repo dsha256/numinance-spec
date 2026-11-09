@@ -1,0 +1,16 @@
+node_modules
+.next
+.source
+out
+next-env.d.ts
+*.tsbuildinfo
+.env*
+!.env.example
+.DS_Store
+.claude/settings.local.json
+AGENTS.md
+.claude
+NUMINANCE_DOCS_REFACTOR_PACKAGE
+promts
+docs/internal
+docs/website

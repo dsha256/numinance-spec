@@ -1,0 +1,208 @@
+---
+title: EvalSet and ContextBundle
+description: The alpha EvalSet kind for reference-only replay cases, and the produced ContextBundle record, which you read and validate but never author.
+---
+
+<FeatureStatus kind="public-spec">
+  Both schemas are public. EvalSet is an alpha kind (`numinance.dev/v1alpha1`) and the open build reads it only in the example validator. ContextBundle is produced by the proprietary runtime's knowledge context, which is not generally available. The replay and the bundle builder are not in the open build.
+</FeatureStatus>
+
+<SourceReference
+  paths={[
+    "proto/numinance/kinds/v1/eval_set.proto",
+    "proto/numinance/kinds/v1/context_bundle.proto",
+    "schemas/examples/EvalSet/core-replay.yaml",
+    "schemas/examples/ContextBundle/implement-stage.yaml",
+    "sdk/go/kindyaml/README.md",
+    "cli/README.md",
+  ]}
+/>
+
+<ShortProductTruth>
+  These two kinds are different in kind. An EvalSet is something you write: a versioned list of replay cases that name a recorded outcome by digest. A ContextBundle is something Numinance writes: the knowledge selected for one stage, with provenance. The loader rejects a ContextBundle in your configuration tree.
+</ShortProductTruth>
+
+## EvalSet
+
+An EvalSet is a versioned, reference-only set of replay cases. A case names a recorded replay outcome by digest and states what that outcome must show. It holds no free text, ticket, code or person, only tokens, enums, counts and digests. It takes no part in profile resolution and is not an input to the profile digest.
+
+It is how an org checks that a change to an executor, a prompt or a policy did not change measured behaviour on situations it cares about, including adversarial ones. See [evaluations](/docs/operations/evaluations) for the operating practice and [qualify autonomy](/docs/guides/qualify-autonomy) for how evidence of behaviour feeds a human decision to raise a level.
+
+<Callout type="info" title="Alpha kind">
+  `apiVersion` for EvalSet is `numinance.dev/v1alpha1`, not `numinance.dev/v1`, and a loader reads it only when alpha kinds are switched on. Open `numi validate --files` switches them on so examples are checked. Open `numi validate` on a repository does not, and reports `alpha kind is not enabled: EvalSet` (shown below). Expect the shape to change before a stable release.
+</Callout>
+
+### Fields
+
+<TypeTable type={{
+  "apiVersion": { type: "string", description: "Required. Must be numinance.dev/v1alpha1. Every other kind accepts only numinance.dev/v1.", required: true },
+  "spec.version": { type: "string", description: "Required. A strict x.y.z version. Any change to a case is a new version, and a new version is a new bundle digest.", required: true },
+  "spec.cases": { type: "EvalCase[]", description: "Required: 1 to 256 cases, sorted by name without duplicates. The loader enforces count and order.", required: true },
+  "cases[].name": { type: "string", description: "Required. 1 to 64 characters: lowercase letters, digits and . _ -, starting with a letter or digit.", required: true },
+  "cases[].outcome.value": { type: "string (digest)", description: "Required. sha256: plus 64 lowercase hex. The digest of the replay outcome record.", required: true },
+  "cases[].expect.acceptance": { type: "EVAL_ACCEPTANCE_ACCEPTED | _REJECTED | _ABANDONED", description: "Required. The expected human acceptance.", required: true },
+  "cases[].expect.merged": { type: "bool", description: "Required. Whether the change is expected to merge.", required: true },
+  "cases[].expect.severe": { type: "bool", description: "Required. Whether a severity event is expected: an unauthorized action, a critical escape or an evidence gap.", required: true },
+  "cases[].expect.verification_failures": { type: "{layer, count}[]", description: "Expected failures by verifier layer, sorted by layer without duplicates. Empty when none. count is at least 1." },
+  "cases[].category": { type: "EvalCategory", description: "The adversarial situation, absent for an ordinary case. Values: EVAL_CATEGORY_HIDDEN_ACCEPTANCE, _INCOMPLETE_TICKET, _CONFLICTING_TICKET, _POISONED_README, _MALICIOUS_COMMENT, _STALE_DOCUMENTATION, _FLAKY_TEST, _PLANTED_SECURITY_BUG, _MIGRATION_HAZARD, _MISSING_PERMISSION, _ROLLBACK." },
+  "cases[].seeded.defect": { type: "string (token)", description: "Names the defect planted in the case. A seeded case needs a category." },
+  "cases[].seeded.caught_by": { type: "string (token)", description: "The verifier layer expected to catch the defect. It must be among the case's expected failures." },
+}} />
+
+A seeded case has extra rules: a case of category planted security bug or migration hazard must be seeded, and a seeded case must expect the change to be not accepted, not merged and not severe, with its `caught_by` layer among the expected failures. In other words, a planted defect that the checks catch is a pass of the system, and a planted defect that gets through shows up as a mismatch.
+
+```yaml title="schemas/examples/EvalSet/core-replay.yaml"
+apiVersion: numinance.dev/v1alpha1
+kind: EvalSet
+metadata: {name: core-replay, scope: SCOPE_REPO}
+spec:
+  version: 1.0.0
+  cases:
+    - name: bugfix-clean
+      outcome: {value: "sha256:0b2958497ee0c936c59fa8dfb74b43077ad626e5dafd62df6521c4dd1e581242"}
+      expect: {acceptance: EVAL_ACCEPTANCE_ACCEPTED, merged: true, severe: false, verification_failures: []}
+    - name: bugfix-lint-retry
+      outcome: {value: "sha256:70fd102e81fe47531de6d7921cbb496665bfa88fcc83f211129b4e76fe53b8ed"}
+      expect:
+        acceptance: EVAL_ACCEPTANCE_ACCEPTED
+        merged: true
+        severe: false
+        verification_failures:
+          - {layer: lint, count: 1}
+    - name: planted-sql-injection
+      outcome: {value: "sha256:88761b4780b189a6b983d61a91302970697577cad92842f3b1c8c44256d5ce4d"}
+      expect:
+        acceptance: EVAL_ACCEPTANCE_REJECTED
+        merged: false
+        severe: false
+        verification_failures:
+          - {layer: security-scan, count: 1}
+          - {layer: tests, count: 2}
+      category: EVAL_CATEGORY_PLANTED_SECURITY_BUG
+      seeded: {defect: sql-injection, caught_by: security-scan}
+```
+
+The digests point at recorded outcomes. The set stores references, never the content of a replay, so an EvalSet cannot carry a ticket body or a person's name by construction. The case `planted-sql-injection` represents a recorded run on a change that contains the defect; the defect itself is not in the set.
+
+## ContextBundle
+
+A ContextBundle is the knowledge selected for one stage of one work unit. It is produced by the knowledge context, stored by digest and never mutated: a refresh opens a new `context_generation`. It is never configuration, so it has no `metadata` and no `extensions`, and the configuration loader refuses it.
+
+Why you would read one: it is the record of what the context resolver gave a stage, why, from which source version, under whose authority and at what cost. It makes context an auditable input rather than a hidden prompt. For the resolver itself, see [the context resolver](/docs/architecture/context-resolver) and the [context-first concept](/docs/concepts/context-first).
+
+### Key fields
+
+<TypeTable type={{
+  "spec.change_id": { type: "string", description: "Required. The change the bundle was built for.", required: true },
+  "spec.work_unit_id": { type: "string", description: "Required. The work unit the bundle was built for.", required: true },
+  "spec.stage": { type: "string", description: "Required. The stage name the bundle serves.", required: true },
+  "spec.context_generation": { type: "uint32", description: "The resolution generation, from 1. A refresh opens a new one and never changes an earlier bundle." },
+  "spec.authz_context_digest": { type: "Digest", description: "Required. The authorization context digest every search and fetch ran under.", required: true },
+  "spec.resolver": { type: "{model_id, prompt_version}", description: "Required. The model and prompt that planned the queries and selected the sources.", required: true },
+  "spec.query_plan": { type: "BundleQuery[]", description: "The searches run, in order: tool, args_digest (never the arguments), results, truncated." },
+  "spec.sources": { type: "BundleSource[]", description: "Selected sources, unique by ref. Each carries a redacted ref, system, digest, rank, selection_reason, classification, redactions, access_basis, staleness and trust." },
+  "spec.sources[].trust": { type: "TRUST_CLASS_UNTRUSTED_RETRIEVED", description: "Required. A decoder refuses any other value.", required: true },
+  "spec.sources[].staleness": { type: "SOURCE_STALENESS_FRESH | _STALE | _UNKNOWN", description: "Required. Whether the source was current when the bundle was built." },
+  "spec.authored_constraints": { type: "AuthoredConstraint[]", description: "Constraints that come only from the resolved profile's policy and packs, with origin and origin_digest. Their trust is TRUST_CLASS_SIGNED_POLICY or TRUST_CLASS_KERNEL." },
+  "spec.cited_guidance": { type: "CitedGuidance[]", description: "Pointers into sections of the sources. Advisory only and untrusted." },
+  "spec.unresolved_questions": { type: "UnresolvedQuestion[]", description: "What the sources did not answer. A blocking question is posted to the ticket. Written by a model from untrusted input, so untrusted." },
+  "spec.budget_used": { type: "{tokens, calls, ms}", description: "Required. What building the bundle consumed, checked against the stage budget." },
+  "spec.pinned_toolsets": { type: "map<string, Digest>", description: "Each KnowledgeConnection name mapped to the digest of the tool inventory pinned when it was read." },
+  "spec.receipts": { type: "Digest[]", description: "The artifact digest of the retrieval receipt of every search and fetch." },
+  "spec.conflicts": { type: "BundleConflict[]", description: "Sources that disagree. A conflict a pack's precedence resolves is left out; none silently." },
+}} />
+
+```yaml title="schemas/examples/ContextBundle/implement-stage.yaml"
+apiVersion: numinance.dev/v1
+kind: ContextBundle
+spec:
+  change_id: chg_01JB2Q8W3N5M7K9P1R3T5V7X9Z
+  work_unit_id: wu_01JB2Q8Z4P6R8T0V2X4Z6B8D0F
+  stage: implement
+  context_generation: 1
+  authz_context_digest: {value: "sha256:5c2e8a1f3b7d9e0c4a6f8b2d1e3c5a7f9b0d2e4c6a8f1b3d5e7c9a0f2b4d6e8c"}
+  resolver: {model_id: eu.anthropic.claude-haiku-v1:0, prompt_version: resolver-3}
+  query_plan:
+    - {tool: searchConfluenceUsingCql, args_digest: {value: "sha256:7a9c1e3b5d7f9a2c4e6b8d0f1a3c5e7b9d2f4a6c8e0b1d3f5a7c9e2b4d6f8a0c"}, results: 6, truncated: false}
+  sources:
+    - {ref: confluence-eng/ENG/pages/4211, system: confluence-eng, title: Payments retry policy, source_version: "17", fetched_at: "2026-10-18T09:12:44Z",
+       digest: {value: "sha256:1e3c5a7f9b2d4e6c8a0f1b3d5e7c9a2f4b6d8e0c1a3f5b7d9e2c4a6f8b0d1e3c"}, rank: 1, selection_reason: Names the retry limits the task changes.,
+       classification: internal, redactions: 0, access_basis: KNOWLEDGE_AUTH_USER_DELEGATED, staleness: SOURCE_STALENESS_FRESH, trust: TRUST_CLASS_UNTRUSTED_RETRIEVED}
+  authored_constraints:
+    - {origin: ArchitecturePack/layered-service, id: no-domain-io, statement: The domain layer performs no I/O.,
+       origin_digest: {value: "sha256:9d1f3b5e7a9c2e4f6b8d0a1c3e5f7b9d2a4c6e8f0b1d3a5c7e9f2b4d6a8c0e1f"}, trust: TRUST_CLASS_SIGNED_POLICY}
+  cited_guidance:
+    - {ref: confluence-eng/ENG/pages/4211, section: retry-limits}
+  unresolved_questions:
+    - {question: "Does the new limit apply to card refunds?", blocking: false}
+  budget_used: {tokens: 5400, calls: 4, ms: 8200}
+  pinned_toolsets:
+    confluence-eng: {value: "sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f"}
+  receipts:
+    - {value: "sha256:6b8d0f2a4c6e8b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c5e7b9d"}
+  conflicts:
+    - {topic: refund retry limit, claims: [{ref: confluence-eng/ENG/pages/4211, section: retry-limits}, {ref: confluence-eng/ENG/pages/4211, section: refunds}]}
+```
+
+<IllustrativeNote>
+  The identifiers, timestamps, digests and counts in this bundle are sample values from the schema examples. They do not describe a real run, a measured cost or a real Confluence space.
+</IllustrativeNote>
+
+### Trust is part of the record
+
+Notice the two different trust classes in one document. `authored_constraints` came from signed policy, so they are authority-bearing in the sense that a prompt may state them as constraints. But the bundle says plainly that enforcement comes from the grant, not from the text. `sources` are always `TRUST_CLASS_UNTRUSTED_RETRIEVED`, and the decoder refuses a source that claims otherwise. Retrieved content can inform an author agent; it cannot change policy, tool lists or approvals. Every text field in the bundle is untrusted, labelled as such in a prompt, one line of at most 1024 bytes without control or bidi characters.
+
+### Validating a produced kind
+
+`numi validate --files` accepts a ContextBundle because it checks it against its own strict schema rather than loading it as configuration: the `apiVersion`, a `spec`, the required fields of the spec and of each source, digests, enums and the source `trust` pin. The spec CLI notes that other constraints (authored-constraint trust and origin digest, `CitedGuidance.ref` pointing at a bundle source, unique source refs, at least two claims per conflict) are left to the bundle's producer. A file-level pass is therefore weaker than a producer-side check.
+
+## Security implications
+
+- An EvalSet is reference-only on purpose. There is no field for free text, so a replay set cannot be a channel for ticket content, code or personal data.
+- An EvalSet measures; it does not grant. Passing one does not raise an autonomy level. A human accepts promotion, and an agent cannot promote itself.
+- A ContextBundle never holds credentials. Refs are redacted, since a ref can hold a credential, and tool arguments are stored as digests, not values.
+- Do not commit a ContextBundle under `.numinance/`. It is refused there, and a hand-edited bundle would be unverifiable evidence anyway.
+
+## Real failures
+
+<VerifiedSnippet what="Edited copies of the examples, run with the open numi build">
+
+```text
+$ numi validate --files bad/doc.yaml      # EvalSet with apiVersion numinance.dev/v1
+invalid  file "doc.yaml": kind: invalid: apiVersion is not numinance.dev/v1alpha1
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # EvalSet first case renamed so cases are not sorted
+invalid  file "doc.yaml": kind: invalid: EvalSet cases are sorted by name without duplicates
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # seeded case with its category removed
+invalid  file "doc.yaml": kind: invalid: an EvalSet case that plants a defect names a category
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # ContextBundle with a metadata block added
+invalid  file "doc.yaml": kind: does not match the kind schema: schema: value does not match (violations: 1): \"/metadata\": additionalProperties
+(exit 3)
+
+$ numi validate --files bad/doc.yaml      # a source with trust: TRUST_CLASS_SIGNED_POLICY
+invalid  file "doc.yaml": kind: invalid: a value of numinance.kinds.v1.BundleSource.trust fails its check
+(exit 3)
+
+$ numi validate .                         # ContextBundle copied to .numinance/policy/ in a repository
+invalid  repo ".numinance/policy/implement-stage.yaml": kind: produced kind: ContextBundle is not configuration
+(exit 3)
+
+$ numi validate .                         # EvalSet copied to .numinance/policy/ in a repository
+invalid  repo ".numinance/policy/core-replay.yaml": kind: alpha kind is not enabled: EvalSet
+(exit 3)
+```
+
+</VerifiedSnippet>
+
+## Next steps
+
+<Cards>
+  <Card title="Context resolver" href="/docs/architecture/context-resolver" description="How a bundle is built, and why retrieved text stays untrusted." />
+  <Card title="Evaluations" href="/docs/operations/evaluations" description="How replay results inform a human decision about autonomy." />
+  <Card title="Knowledge connection" href="/docs/configuration/knowledge-connection" description="The approved sources a bundle's sources are read through." />
+</Cards>

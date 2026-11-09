@@ -1,0 +1,111 @@
+---
+title: Layout and scopes
+description: Where .numinance/ files live, which path is protected, how the strict schema and the extensions escape hatch work, and the size and symlink limits the loader enforces.
+---
+
+<FeatureStatus kind="public-spec">
+Layout, strict schema and loader limits are public and enforced by the open `numi` build. Authority of the protected path is enforced by the proprietary engine.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/meta.proto", "sdk/go/kindyaml/README.md", "cli/README.md"]} />
+
+<ShortProductTruth>A document has authority because of where it was read from, not because of the scope it claims.</ShortProductTruth>
+
+## When to use this
+
+Read this page before you put the first policy file in a repository, or when you decide which repository holds your organization-wide policy.
+
+## A real tree
+
+`numi init` writes a repository tree. This is the output of `numi init --ci github-actions .` on a Python project (see the [init output](/docs/cli/init)).
+
+<Files>
+  <Folder name=".numinance" defaultOpen>
+    <File name="README.md" />
+    <Folder name="policy" defaultOpen>
+      <File name="sdlc-profile.yaml" />
+      <File name="autonomy.yaml" />
+      <File name="stage-registry.yaml" />
+      <File name="playbook-bugfix-bounded.yaml" />
+      <File name="toolchain-python.yaml" />
+    </Folder>
+  </Folder>
+</Files>
+
+With `numi init --org-dir DIR` the org documents are written to `DIR/.numinance/policy/` (an organization policy repository), and the repository keeps only its own profile.
+
+Names are free: `metadata.name` is what other kinds reference, not the file name. A name must be non-empty, at most 253 bytes, and free of control and bidi characters; names that other kinds reference are further limited to `/`-joined ASCII segments, so `:`, `@`, `*` and whitespace are refused.
+
+## The protected path
+
+`.numinance/policy/` is the protected location. A policy-bearing document (a `SDLCProfile`, an `AutonomyPolicy`, a `ControlPack`, and the other kinds that set rules) carries authority only when it is read from the protected branch of the repository, or from a signed policy bundle. Any other copy, even one that claims `SCOPE_ORG`, is classified `RepositoryAuthored` and has no authority. A document decodes with no authority by decoding: `metadata.scope` is the document's own claim.
+
+So protect the path with branch protection and CODEOWNERS. The generated `.numinance/README.md` says the same: agents cannot change their own gates.
+
+<Callout type="warn" title="Scope is a claim, not a credential">
+Writing `scope: SCOPE_ORG` in a repository file does not make it organization policy. The loader refuses floors in any document that does not claim the org scope, and the engine gives authority only to documents from a protected path or a signed bundle.
+</Callout>
+
+## Scopes in one table
+
+| Scope | Applies to | Can set floors | Can select the stage registry |
+| --- | --- | --- | --- |
+| `SCOPE_ORG` | every repository of the organization | yes | yes |
+| `SCOPE_REPO` | one repository | no | no |
+| `SCOPE_COMPONENT` | one component of a repository | no | no |
+
+Floors and `FORBID` fields are covered in [Configuration](/docs/configuration#scopes-layering-and-precedence). A repository document that asks for a playbook, toolchain or adapter name the org did not grant is ignored for that name.
+
+## The strict schema and `extensions`
+
+Each document is validated against the JSON Schema generated from its proto message. An unknown field is an error, anywhere except under the `extensions:` map. Keys under `extensions` must be reverse-DNS (two or more dot-joined labels, for example `com.example.team`). The engine never reads `extensions`; it exists so your own tooling can annotate a document without forking the schema.
+
+```yaml title="extensions on a document (shape only)"
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: example, scope: SCOPE_REPO}
+spec:
+  change_type: bugfix
+  steps:
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_LOW}
+extensions:
+  com.example.owner: platform-team
+```
+
+Do not put credentials, endpoints, tool mappings or caps in `extensions`.
+
+## Loader limits
+
+The loader refuses, before any schema work:
+
+| Limit | Value |
+| --- | --- |
+| Bytes per document | 128 KiB |
+| YAML nesting | 64 levels |
+| Values per document | 16384 |
+| Not allowed | more than one document, anchors, aliases, merge keys (`<<`), explicit tags, duplicate keys, non-RFC 8259 numbers |
+
+Reading a tree, `numi validate` also bounds the whole walk: 4096 entries, 256 documents, 16 MiB, files read through `os.Root`. It refuses a symbolic link as the config directory, on the `--component` path, or as a document, and any file that is not a regular file. In `--files` mode a name that looks like `.yaml` or `.yml` in any letter case but does not end exactly in lowercase `.yaml` or `.yml` is invalid (exit 3).
+
+## Failure modes
+
+<VerifiedSnippet what="A repo-scoped AutonomyPolicy with floors, edited from the org-ladder example" exit="exit 3">
+```text
+$ numi validate --files floors-repo.yaml
+revision: "files"
+invalid  file "floors-repo.yaml": kind: invalid: numinance.kinds.v1.AutonomyPolicySpec.floors is set only at the org scope
+```
+</VerifiedSnippet>
+
+Other common mistakes: a misspelt key (rejected as `additionalProperties`), `SCOPE_UNSPECIFIED` or a missing scope, and an anchor or alias used to avoid repetition. See [Validation and errors](/docs/configuration/validation-and-errors).
+
+## What this checks, and what it does not
+
+Checked by the open build: strict schema, envelope, size and shape limits, scope-dependent rules (floors at repo scope), name rules. Not checked: that a repository file is actually on the protected branch, that branch protection exists, that a referenced name resolves. Those belong to the engine and to your Git host settings.
+
+## Next steps
+
+<Cards>
+  <Card title="SDLCProfile" href="/docs/configuration/sdlc-profile" description="Bind a component to its playbooks, packs and adapters." />
+  <Card title="Validation and errors" href="/docs/configuration/validation-and-errors" description="Every real error class and its exit code." />
+  <Card title="numi init" href="/docs/cli/init" description="Generate a starting tree." />
+</Cards>

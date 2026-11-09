@@ -1,0 +1,153 @@
+---
+title: StageRegistry
+description: Map your own stage names and gates onto the fixed Change state machine, with human approval, separation of duties and timeouts.
+---
+
+<FeatureStatus kind="public-spec">
+The kind, schema and loader checks are public. Running the state machine is a proprietary engine feature.
+</FeatureStatus>
+<SourceReference paths={["proto/numinance/kinds/v1/stage_registry.proto", "proto/numinance/types/v1/types.proto", "schemas/examples/StageRegistry"]} />
+
+<ShortProductTruth>You name the stages. The states never change, and a gate can only add a decision.</ShortProductTruth>
+
+## Purpose and scopes
+
+Every Change moves through a fixed state machine (opened, understood, classified, planned, plan gate, implementing, integrated, verifying, repairing, rehearsing, release gate, merging, releasing, observing, recovering, escalated, paused, closed, abandoned). A `StageRegistry` lets your organization call those states by its own names, add human gates where it wants them, and say which stage must complete before which.
+
+A registry can be written at any scope, but only the org scope selects one: `SDLCProfile.spec.stages` is FORBID, so a narrower scope cannot pick a registry without the org's gates. A repo-scoped registry, like the one `numi init` writes, is defined but not selected until an org profile names it. See [Change lifecycle](/docs/concepts/change-lifecycle).
+
+## Field reference
+
+<TypeTable type={{
+  "spec.stages": { type: "StageRegistryEntry[]", description: "Required and non-empty.", required: true },
+  "spec.stages[].name": { type: "string", description: "Required. Your stage name, unique in the registry.", required: true },
+  "spec.stages[].maps_to": { type: "ChangeState", description: "Required. The Change state the stage is, written as CHANGE_STATE_*. A stage only names a state; the policy decision of the gate states PLAN_GATE and RELEASE_GATE is made whatever gate the stage declares.", required: true },
+  "spec.stages[].gate": { type: "StageGate", description: "The gate the stage passes through, if any. It only adds a decision; an absent or weaker gate never removes one." },
+  "spec.stages[].gate.kind": { type: "GateKind", description: "Required. GATE_KIND_PLAN (policy on the plan), GATE_KIND_RELEASE (policy on all evidence), GATE_KIND_HUMAN (a human approver) or GATE_KIND_POLICY (policy alone). The enum may grow; a consumer that meets an unknown value denies by default.", required: true },
+  "spec.stages[].gate.approver_role": { type: "string", description: "The customer role whose members may approve." },
+  "spec.stages[].gate.sod": { type: "SeparationOfDuties", description: "Separation of duties the approval needs. The author is always excluded." },
+  "spec.stages[].gate.sod.distinct_from": { type: "string[]", description: "Identities or roles the approver must differ from, beyond the author and the author's run." },
+  "spec.stages[].gate.timeout": { type: "Duration", description: "How long the gate waits before it escalates, in the form 86400s. Absent means it waits without limit. Expiry only escalates; it never approves." },
+  "spec.stages[].gate.required_approvals": { type: "uint32", description: "Distinct principals whose approval the gate needs. The loader refuses 0 and refuses the field on any gate that is not GATE_KIND_HUMAN. Absent means 1." },
+  "spec.stages[].requires": { type: "string[]", description: "Stages that complete before this one. The order must agree with the state machine order." },
+}} />
+
+## Example: trunk with a change advisory board
+
+```yaml title="schemas/examples/StageRegistry/trunk-with-cab.yaml"
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: trunk-with-cab, scope: SCOPE_ORG}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: design-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: build, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [design-review]}
+    - name: cab
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: change-advisory-board
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        timeout: 86400s
+      requires: [build]
+```
+
+`cab` is your name for the release gate. A human from `change-advisory-board`, who is neither the author-agent nor the reviewer-agent, decides. After 86400 seconds an undecided gate escalates; it does not approve.
+
+## Example: two-person release
+
+```yaml title="schemas/examples/StageRegistry/two-person-release.yaml"
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: two-person-release, scope: SCOPE_ORG}
+# required_approvals is only preserved today; nothing enforces the count yet.
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: build, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [triage]}
+    - name: release-approval
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: release-managers
+        required_approvals: 2
+      requires: [build]
+```
+
+<Callout type="warn" title="required_approvals is not enforced yet">
+The proto and the example both say so: the loader and the profile context only preserve the count. The count a gate needs is designed to be the largest of this value, the policy `approvers.count` and any control pack approval floor, so the field can only raise a requirement. Do not rely on it to enforce two-person release today.
+</Callout>
+
+## Example: PR-only registry from `numi init`
+
+The generated registry names no stage for the Merging state, so no stage of it can merge. The last stage is a human gate.
+
+```yaml title=".numinance/policy/stage-registry.yaml (numi init output, comments omitted)"
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: pr-only, scope: SCOPE_REPO}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+    - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+    - name: pr-gate
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: maintainer
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        required_approvals: 1
+      requires: [ci-github-actions]
+```
+
+<VerifiedSnippet what="Both org registries against the strict schema and loader" exit="exit 0">
+```text
+$ numi validate --files schemas/examples/StageRegistry
+revision: "files"
+ok       file "trunk-with-cab.yaml" StageRegistry "trunk-with-cab"
+ok       file "two-person-release.yaml" StageRegistry "two-person-release"
+```
+</VerifiedSnippet>
+
+## Fixed states cannot be removed
+
+Your stages map onto states; they do not define them. The registry cannot delete a state, skip a gate state, or make a weaker gate. A stage mapped to `CHANGE_STATE_PLAN_GATE` or `CHANGE_STATE_RELEASE_GATE` still gets the policy decision for that state even if you declare no gate or a weaker one. `CHANGE_STATE_PAUSED` is an overlay that the circuit breaker sets and a registry cannot use as a stage (the profile context refuses it). Several stages may map to the same state, as the two verifying stages above do.
+
+## Security implications
+
+- Only an org-scoped profile selects the registry, so a repository cannot swap in one with fewer gates.
+- `sod.distinct_from` only adds exclusions. The approver is never the author and the approver's run is never the author's run.
+- A timeout escalates; no gate approves on its own.
+- GATE_KIND_HUMAN approval is a human decision, and agents cannot satisfy it.
+
+## Common misconfigurations
+
+<VerifiedSnippet what="trunk-with-cab with required_approvals on a non-human gate" exit="exit 3">
+```text
+$ numi validate --files bad-approvals.yaml
+revision: "files"
+invalid  file "bad-approvals.yaml": kind: invalid: required_approvals is set on a gate that is not GATE_KIND_HUMAN
+```
+</VerifiedSnippet>
+
+Using a short enum (`HUMAN` instead of `GATE_KIND_HUMAN`) fails with `"/spec/stages/3/gate/kind": enum`, exit 3.
+
+## What validation checks, and what it does not
+
+Checked by the open build: keys, enum names, durations, non-empty `stages`, `required_approvals` only on human gates and never 0. Not checked: a copy where `requires` names a stage that does not exist, and another that maps a stage to `CHANGE_STATE_PAUSED`; both passed `numi validate --files` with exit 0. The proto says the profile context checks the `requires` DAG and refuses PAUSED, which is the engine build. Do not treat a green open validation as proof the registry is sound.
+
+<DesignNote title="Planned runtime meaning">
+The design runs each Change through the fixed states and evaluates policy at the plan gate and release gate whatever you name them. Human gates wait on a signal from an approver identity distinct from the author and the author's run; denials and decisions are recorded as evidence.
+</DesignNote>
+
+## Next steps
+
+<Cards>
+  <Card title="Change lifecycle" href="/docs/concepts/change-lifecycle" description="The fixed state machine your stages map onto." />
+  <Card title="Risk and approval" href="/docs/operations/risk-and-approval" description="How humans approve gates in operation." />
+  <Card title="SDLCProfile" href="/docs/configuration/sdlc-profile" description="How the org profile selects a registry." />
+</Cards>

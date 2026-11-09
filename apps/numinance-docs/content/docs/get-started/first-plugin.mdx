@@ -1,0 +1,141 @@
+---
+title: First plugin
+description: Build the sample knowledge provider from source, see why it refuses to run by hand, and read how a plugin host launches and talks to it.
+---
+
+<FeatureStatus kind="public-spec">The sample plugin and the Go plugin SDK are in the public tree and build today. Both are pre-alpha, and the sample is not a product connector.</FeatureStatus>
+<SourceReference paths={["plugins/examples/sample-knowledge/main.go", "plugins/examples/sample-knowledge/provider/server.go", "sdk/go/plugin/serve.go", "sdk/go/plugin/handshake.go", "conformance/knowledge/v1/README.md"]} />
+
+<ShortProductTruth>A Numinance plugin is a subprocess that a host launches, that proves what it is through a manifest, and that serves typed calls over gRPC. It is not a program you run yourself.</ShortProductTruth>
+
+## Prerequisites
+
+- A clone of `numinance-spec` and the Go toolchain from the [install page](/docs/get-started/install).
+- No engine, and no plugin host. The open tree contains the SDK side of the protocol and conformance kits that exercise it, not a runnable host.
+
+## Build the sample
+
+From the repository root:
+
+```bash title="Build the sample knowledge provider"
+go build -o ./bin/sample-knowledge ./plugins/examples/sample-knowledge
+```
+
+The build succeeds. The provider is a capability provider for the `numinance.ports.knowledge.v1` port with three read verbs, `Search`, `Fetch` and `Resolve`, over a small seeded in-memory source. It uses only the public SDK, in `sdk/go/plugin` and the generated stubs.
+
+## Why it refuses to run by hand
+
+Run the binary directly:
+
+```bash title="Run it yourself"
+./bin/sample-knowledge
+echo $?
+```
+
+<VerifiedSnippet what="the sample provider started from a shell" exit="1">
+
+```text
+sample-knowledge: this binary is a Numinance provider and is started by the plugin host
+```
+
+</VerifiedSnippet>
+
+This is not a crash. A host passes a handshake cookie and protocol list in the environment; without them the SDK returns `ErrNotLaunchedByHost`, which `main` prints before exiting 1. The check exists so that nobody runs a provider by hand and is puzzled by a handshake line on stdout.
+
+## Read main.go
+
+The whole program is short. This is the file exactly as it stands in the repository:
+
+```go title="plugins/examples/sample-knowledge/main.go"
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "sample-knowledge:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	digest, err := provider.ExecutableDigest()
+	if err != nil {
+		return err
+	}
+	return plugin.Serve(ctx, os.Getenv, os.Stdout, func(s *grpc.Server, rt plugin.Runtime) {
+		provider.New(digest, rt.Stop).Register(s)
+	})
+}
+```
+
+- `provider.ExecutableDigest()` computes the sha256 of the running executable. The manifest declares this as the plugin's content digest, which is what lets a host tie the manifest to the exact bytes it launched.
+- `plugin.Serve` does everything protocol-shaped. You pass it the environment, the stdout the handshake line goes to, and a function that registers your service.
+- `provider.New(digest, rt.Stop)` builds the service. `rt.Stop` ends the process after `Shutdown`.
+
+## How the host launches it
+
+`plugin.Serve` implements the provider side of the launch, in `sdk/go/plugin/serve.go` and `handshake.go`:
+
+1. It checks the `NUMINANCE_PLUGIN_COOKIE` environment variable against the magic cookie. A mismatch is the refusal above. The cookie is not a secret.
+2. It reads `NUMINANCE_PLUGIN_PROTOCOLS` and picks the highest app protocol version both sides speak. Version 1 is the only one.
+3. It creates a private directory with mode 0700 and listens on a Unix socket inside it.
+4. It prints one handshake line to stdout: core protocol version, app protocol version, network type, socket address and protocol, separated by `|`. v1 allows only `unix` and `grpc`, and rejects a line that carries a certificate field.
+5. It serves gRPC until the context ends or `Shutdown` is called, then removes the socket directory.
+
+The host dials the address in the handshake line, calls `Handshake`, then `GetManifest` and `GetDescriptors`. It passes `NUMINANCE_HOST_ADDR` so the provider can call back into the host service. The environment variable names and constants live in `sdk/go/plugin/handshake.go`.
+
+## Read the provider package
+
+<Files>
+  <Folder name="plugins/examples/sample-knowledge" defaultOpen>
+    <File name="main.go" />
+    <File name="README.md" />
+    <Folder name="provider" defaultOpen>
+      <File name="server.go" />
+      <File name="source.go" />
+    </Folder>
+  </Folder>
+</Files>
+
+`provider/server.go` is the `PluginService` implementation. Its methods mirror the plugin service: `Handshake`, `GetManifest`, `GetDescriptors`, `Health`, `Shutdown` and `Invoke`. Three things are worth reading closely.
+
+**The manifest** declares the plugin id, version, the executable digest, the port it implements (`numinance.ports.knowledge.v1`), and one capability descriptor per verb. Each descriptor states a risk floor (`RISK_CLASS_READ`), a side effect (`SIDE_EFFECT_READ`), an idempotency class, the environments it may run in, a timeout and a conformance suite. These are the declarations policy is evaluated against.
+
+**`Invoke`** returns exactly one terminal message per call: `INVOKE_STATUS_SUCCEEDED` with a typed result, or `INVOKE_STATUS_FAILED` with one diagnostic reason. It first refuses any envelope that lacks a host-assigned invocation id or policy decision id, so the provider cannot be called outside a policy decision.
+
+**`provider/source.go`** holds the seeded source: scope `kit` with `doc-a` (two versions) and `doc-b`, and scope `other` with `doc-o`. `doc-o` matches the same query as `doc-a` and must never be returned for scope `kit`. The kit tests exactly that scope boundary.
+
+The sample's SBOM and provenance references are placeholders. The extensions context would refuse them at install time, so do not copy them into a real plugin.
+
+## Tests and conformance
+
+```bash title="Run the tests under plugins/examples"
+go test ./plugins/examples/...
+```
+
+<VerifiedSnippet what="the sample has no test files of its own" exit="0">
+
+```text
+?   	github.com/numinance/numinance-spec/plugins/examples/sample-knowledge	[no test files]
+?   	github.com/numinance/numinance-spec/plugins/examples/sample-knowledge/provider	[no test files]
+```
+
+</VerifiedSnippet>
+
+That output is accurate: the sample has no unit tests of its own. Its tests are in the knowledge conformance kit. The Go package `knowledgekit` in `conformance/knowledge/v1` runs the core cases against any target, and `kit_test.go` there runs it against this provider. Run it with `go test ./conformance/knowledge/...`. The full case table is in `conformance/knowledge/v1/README.md`; the skeleton runs a subset and lists the rest as the cases a full kit must hold.
+
+## Failure modes and safeguards
+
+| What goes wrong | Where it is stopped |
+| --- | --- |
+| Binary run by hand | `Serve` returns `ErrNotLaunchedByHost`; exit 1. |
+| Host and provider share no protocol version | `Serve` refuses to start; `Handshake` returns a failed-precondition status. |
+| A call arrives without a host-assigned context | `Invoke` returns invalid-argument before doing any work. |
+| A query reaches another scope's documents | The conformance kit asserts the scope boundary; the provider treats query operators as text. |
+
+## Next steps
+
+<Cards>
+  <Card title="Build a custom plugin" href="/docs/guides/build-custom-plugin" description="From the sample to your own provider, with the manifest and conformance steps." />
+  <Card title="Custom plugin in Go" href="/docs/integrations/custom-plugin-go" description="The Go SDK's plugin package in depth." />
+  <Card title="Conformance" href="/docs/integrations/conformance" description="How a provider is tested against its port." />
+</Cards>

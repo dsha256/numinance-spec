@@ -1,0 +1,82 @@
+---
+title: Agent harnesses
+description: How coding harnesses plug in through the authorexecutor port while Numinance keeps authority over every action.
+---
+
+<FeatureStatus kind="public-spec">
+  The authorexecutor port is a public contract. The adapters that implement it for specific harnesses are designed, not shipped.
+</FeatureStatus>
+
+<SourceReference paths={["proto/numinance/ports/authorexecutor/v1/authorexecutor.proto", "proto/numinance/types/v1/types.proto"]} />
+
+<ShortProductTruth>
+  The harness owns intelligence. Numinance owns authority.
+</ShortProductTruth>
+
+## Executor explorer
+
+<HarnessAdapterExplorer />
+
+## The port
+
+`AuthorExecutorService` in `numinance.ports.authorexecutor.v1` has three RPCs.
+
+| RPC | Shape | Risk | Purpose |
+| --- | --- | --- | --- |
+| `Capabilities` | unary | read | Reports the executor capabilities an adapter claims |
+| `Execute` | server stream of `ExecuteResponse` | medium | Runs a harness for one work unit inside its sandbox |
+| `Plan` | server stream of `PlanResponse` | read | Runs a harness read-only to plan |
+
+`ChangeExecutionRequest` carries identifiers (`change_id`, `work_unit_id`, `run_id`, `grant_id`), digests (`repository_digest`, `environment_digest`, `policy_digest`, `profile_digest`), references (`task_ref`, `plan_ref`, `context_bundle_ref`), path scope (`allowed_paths`, `denied_paths`, `protected_resources`), `allowed_capabilities`, `credential_capabilities`, an `ExecutionBudget`, a `deadline`, and the `executor_id` and `model_id`. Nothing in it is advisory: paths, network and credentials are enforced by the sandbox, proxy and broker whatever the harness does.
+
+`ExecutorCapability` values include filesystem read and write, shell, network, subagents, browser and MCP. Playbooks ask for capabilities by name, never by vendor.
+
+## Event stream
+
+Each `ExecutionEvent` has a `type`, `sequence`, `occurred_at`, `subject` and `references`. The types are `EXECUTION_EVENT_TYPE_` followed by `EXECUTION_STARTED`, `PLAN_ACCEPTED`, `TOOL_INTENT`, `TOOL_ALLOWED`, `TOOL_DENIED`, `TOOL_RESULT`, `FILE_CHANGED`, `COMMAND_EXECUTED`, `NETWORK_REQUEST`, `CREDENTIAL_REQUEST`, `TEST_RESULT`, `CHECKPOINT`, `BUDGET_EVENT`, `EXECUTION_COMPLETED` and `EXECUTION_FAILED`. Events carry references and digests, not file contents or prompt text.
+
+## From intent to result
+
+1. The harness proposes a tool call. The adapter emits `TOOL_INTENT`.
+2. The adapter asks for a policy decision against the run's grant.
+3. An allowed intent emits `TOOL_ALLOWED`, executes through the sandbox, broker and proxy, and ends with `TOOL_RESULT`.
+4. A denied intent emits `TOOL_DENIED`. Hooks inside a harness give feedback, but the denial is enforced by the broker, the egress proxy and the read-only filesystem.
+
+A compromised model gains nothing beyond its grant. It can ask; it cannot be answered with more than the grant allows.
+
+## Adapters
+
+<IllustrativeNote>
+  The table is the designed adapter set. No adapter is generally available.
+</IllustrativeNote>
+
+| Adapter | Design | Status |
+| --- | --- | --- |
+| fake | Deterministic in-process executor for tests | `designed` |
+| claude-cli | Supervises a pinned Claude Code CLI in the sandbox | `designed` |
+| codex-cli | Supervises a pinned Codex CLI in the sandbox | `designed` |
+| Separate-vendor read-only reviewer | A different model vendor, read-only tools, reviewer identity | `designed` |
+| Open-weight executor | For air-gapped use | `planned` |
+
+Each executor and model pair declares where compute and inference run and whether prompts leave the account. A residency class (`RESIDENCY_CLASS_IN_ACCOUNT`, `_PRIVATE_ENDPOINT`, `_VENDOR_ZDR`, `_VENDOR_STANDARD`, `_AIRGAPPED`) is derived from live configuration and checked against the policy floor when a change starts. A mismatch refuses the change.
+
+## Boundary table
+
+| Party | Holds | Does not hold |
+| --- | --- | --- |
+| Harness | Planning, context management, its own tools | Credentials, policy, evidence |
+| Adapter | Translation to the port and the event stream | The decision |
+| Numinance | Grants, decisions, sandbox, broker | The model's reasoning |
+
+## Failure cases
+
+- Budget exhausted: `BUDGET_EVENT` then pause and escalation; the grant is not widened.
+- Harness crash: restart from the last `CHECKPOINT` snapshot.
+- Residency below floor: change refused before execution.
+- Unsupported capability: playbook requirement fails at planning.
+
+<Cards>
+  <Card title="Extend a harness" href="/docs/guides/extend-harness" description="Implement the port for another harness." />
+  <Card title="Harnesses versus runtime" href="/docs/concepts/harnesses-vs-runtime" description="The concept." />
+  <Card title="Capability ports" href="/docs/protocol/capability-ports" description="All public ports." />
+</Cards>

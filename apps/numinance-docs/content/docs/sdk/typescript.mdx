@@ -1,0 +1,87 @@
+---
+title: TypeScript SDK
+description: What sdk/typescript contains today (generated protobuf-es code in a private package at 0.0.0), its Node requirement, and how to generate it yourself.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Generated protobuf-es code only. The package is private at version 0.0.0 and is not a registry package.
+</FeatureStatus>
+
+<SourceReference paths={["sdk/typescript/package.json", "sdk/typescript/src/gen/", "buf.gen.yaml"]} />
+
+<ShortProductTruth>
+  The TypeScript SDK is generated protobuf-es output for the public definitions. It gives you typed messages and service descriptors. It has no handwritten API.
+</ShortProductTruth>
+
+## What is in the tree
+
+```text
+sdk/typescript/
+  package.json
+  pnpm-lock.yaml
+  src/gen/numinance/...   generated *_pb.ts
+```
+
+The generated tree covers `annotations`, `events`, `evidence`, `kinds`, `plugin`, `ports` and `types`, one `*_pb.ts` per `.proto`.
+
+## Package metadata
+
+From `package.json` at the revision this site documents:
+
+| Field | Value |
+| --- | --- |
+| `name` | `@numinance/sdk` |
+| `version` | `0.0.0` |
+| `private` | `true` |
+| `type` | `module` |
+| `engines.node` | `>=24` |
+| `packageManager` | `pnpm@10.28.0` |
+| `devDependencies` | `@bufbuild/protoc-gen-es` `2.16.0` |
+| `license` | Apache-2.0 |
+
+`private: true` means npm refuses to publish it, and it is not installable by name from a registry. The only dependency is the code generator. The generated files import `@bufbuild/protobuf`, which the package does not declare, so a consumer has to add it.
+
+## Generated shape
+
+Files are produced by protoc-gen-es v2.16.0 with `target=ts`. Each file exports a descriptor and, for messages, a TypeScript type and a schema. For example, the plugin file exports `HandshakeRequestSchema` and a `PluginService` descriptor:
+
+```ts title="sdk/typescript/src/gen/numinance/plugin/v1/plugin_pb.ts (names only)"
+export const HandshakeRequestSchema: GenMessage<HandshakeRequest> = ...
+export const PluginService: GenService<{ ... }> = ...
+```
+
+Fields use camelCase in TypeScript (for example `apiVersion` for the `api_version` field). Enum and message types are imported across files by relative path, so keep the `src/gen` tree intact.
+
+## Generate it yourself
+
+The checked-in `buf.gen.yaml` is a maintainer file that runs the generator from `sdk/typescript/node_modules/.bin`. To reproduce it in your own project, install the pinned generator from the lockfile and point a minimal buf template at the public `proto/` module:
+
+```yaml title="buf.gen.ts.yaml"
+version: v2
+plugins:
+  - local: node_modules/.bin/protoc-gen-es
+    out: src/gen
+    opt: target=ts
+```
+
+This exact template was not run for this page, only the Python equivalent (see [Python SDK](/docs/sdk/python)). Treat the TypeScript template as the shape of the repository's own plugin entry, adapted to a path you control, and confirm it in your environment.
+
+## What is tested
+
+The repository has its own generation task, and its Python smoke test checks the Python output; no equivalent TypeScript test is documented here. There are no TypeScript conformance kits, no TypeScript plugin host and no end-to-end test of a TypeScript provider. Nothing here asserts that a TypeScript client has been run against a real host.
+
+## Failure modes
+
+| Symptom | Cause |
+| --- | --- |
+| `Cannot find module '@bufbuild/protobuf'` | The consumer did not add the runtime package the generated code imports |
+| Node version error | `engines.node` is `>=24` |
+| Installing the package by name from a registry fails | Expected: the package is private and unpublished |
+
+## Next steps
+
+<Cards>
+  <Card title="Generating clients" href="/docs/sdk/generating-clients" description="Interoperate from any language with the public .proto files." />
+  <Card title="Plugin service" href="/docs/protocol/plugin-service" description="The service the generated descriptors describe." />
+  <Card title="Python SDK" href="/docs/sdk/python" description="The other generated-stub SDK." />
+</Cards>

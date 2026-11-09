@@ -1,0 +1,105 @@
+---
+title: Python SDK
+description: What sdk/python contains today (generated Protobuf and gRPC stubs at version 0.0.0), its real requirements, and how to generate the stubs yourself.
+---
+
+<FeatureStatus kind="pre-alpha">
+  Generated stubs only, at version 0.0.0. There is no handwritten Python API and no verified package-index publication.
+</FeatureStatus>
+
+<SourceReference paths={["sdk/python/pyproject.toml", "sdk/python/tests/test_import_smoke.py", "buf.gen.yaml"]} />
+
+<ShortProductTruth>
+  The Python SDK is the Protobuf and gRPC output for the public definitions, checked in under `numinance_sdk/gen/`. It lets Python code build and parse Numinance messages and call the services. It adds no behavior on top.
+</ShortProductTruth>
+
+## What is in the tree
+
+```text
+sdk/python/
+  pyproject.toml
+  uv.lock
+  .python-version
+  numinance_sdk/gen/numinance/...   generated *_pb2.py and *_pb2_grpc.py
+  tests/test_import_smoke.py
+```
+
+Generated modules cover `annotations`, `events`, `evidence`, `kinds`, `plugin`, `ports` (authorexecutor, ciexecutor, evidencestore, knowledge, sandboxprovider, scm, ticketing, transparencylog, verifier) and `types`. Each `.proto` has a `<name>_pb2` module and a `<name>_pb2_grpc` module.
+
+## Package metadata
+
+From `pyproject.toml` at the revision this site documents:
+
+| Field | Value |
+| --- | --- |
+| `name` | `numinance-sdk` |
+| `version` | `0.0.0` |
+| `description` | Numinance Python plugin SDK |
+| `license` | Apache-2.0 |
+| `requires-python` | `>=3.14` |
+| `dependencies` | none declared |
+| `dependency-groups.dev` | `grpcio-tools==1.84.0` |
+| `[tool.uv] package` | `false` |
+
+`package = false` means uv treats the directory as a project, not as an installable distribution. A comment in the file states that the generated stubs need `grpcio>=1.84.0` and `protobuf>=7.35.1` at runtime, but the file declares no runtime dependencies, so you install those yourself. The `.python-version` file pins 3.14.4 for the repository's own tooling.
+
+<Callout type="warn" title="Not a published package">
+  No install command is documented here because none is verified. Do not assume a package-index release of `numinance-sdk` exists. Use the generated source from a checkout.
+</Callout>
+
+## Use the generated stubs
+
+The generated modules import each other as top-level `numinance.*`, so the `gen` directory itself must be on `sys.path`. The repository's smoke test does exactly that, then imports every generated module and checks that `PluginService` resolves:
+
+```python title="sdk/python/tests/test_import_smoke.py (excerpt)"
+def setUpModule() -> None:
+    # The generated modules import each other as top-level numinance.*.
+    sys.path.insert(0, str(_GEN))
+
+...
+        pb2 = importlib.import_module("numinance.plugin.v1.plugin_pb2")
+        grpc_pb2 = importlib.import_module("numinance.plugin.v1.plugin_pb2_grpc")
+        req = pb2.HandshakeRequest()
+```
+
+The smoke test is plain `unittest`; the repository runs it from its own `just gen-check` task. This site did not run it.
+
+## Generate the stubs yourself
+
+The checked-in `buf.gen.yaml` is a maintainer file: it runs local generators pinned in files that are not part of the public checkout, so it is not a recipe to copy. A minimal template that uses buf's built-in Python generator works against the public `proto/` module:
+
+```yaml title="buf.gen.demo.yaml"
+version: v2
+plugins:
+  - protoc_builtin: python
+    out: gen-py
+```
+
+<VerifiedSnippet what="buf generate --template buf.gen.demo.yaml, then find gen-py -type f | wc -l, from the repository root with buf 1.46.0 on PATH" exit="0">
+```text
+44
+```
+</VerifiedSnippet>
+
+That output is plain `*_pb2.py` message modules. To get gRPC service stubs as well, use the gRPC Python generator (the repository runs the `protoc` bundled in `grpcio-tools`). See [Generating clients](/docs/sdk/generating-clients) for what is and is not tested.
+
+## What is tested
+
+- The repository's smoke test checks that every `.proto` has an importable `_pb2` and `_pb2_grpc` module and that no generated module lacks a `.proto`.
+- Nothing in the tree tests a Python plugin end to end, and there are no Python conformance kits. The conformance kits are Go.
+
+## Failure modes
+
+| Symptom | Cause |
+| --- | --- |
+| `ModuleNotFoundError: numinance` | `numinance_sdk/gen` is not on `sys.path` |
+| Import error for `grpc` or `google.protobuf` | Runtime dependencies are not declared in `pyproject.toml`; install them |
+| Interpreter older than 3.14 | `requires-python` is `>=3.14` for the repository's tooling |
+
+## Next steps
+
+<Cards>
+  <Card title="Generating clients" href="/docs/sdk/generating-clients" description="Generate from the public .proto files and see what is verified." />
+  <Card title="Plugin service" href="/docs/protocol/plugin-service" description="The service the Python stubs call or implement." />
+  <Card title="TypeScript SDK" href="/docs/sdk/typescript" description="The other generated-stub SDK." />
+</Cards>
