@@ -1,0 +1,10 @@
+# Netlify settings for this app. Set the site's Base directory to apps/numinance-docs.
+# Paths here are relative to that base directory.
+[build]
+  command = "pnpm run build"
+  publish = ".next"
+
+# Next.js on Netlify needs its runtime plugin; without it the .next folder is served as plain
+# static files (no functions) and every route returns 404.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
