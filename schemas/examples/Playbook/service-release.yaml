@@ -1,0 +1,16 @@
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: service-release, scope: SCOPE_ORG}
+spec:
+  change_type: service-release
+  steps:
+    - {name: implement, capability_set: scm-write, risk: RISK_CLASS_MEDIUM, evidence: [diff], verifiers: [unit-tests]}
+    - {name: open-pr, capability_set: scm-pr, risk: RISK_CLASS_MEDIUM, evidence: [pr-ref]}
+  rollout:
+    staging: staging
+    production: production
+    window: 900s
+    stages:
+      - {name: ten-percent, weight: 10}
+      - {name: half, weight: 50}
+      - {name: all, weight: 100}

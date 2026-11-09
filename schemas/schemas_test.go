@@ -175,6 +175,8 @@ func TestSchemas_Required(t *testing.T) {
 		{schema: "Playbook", message: "PlaybookSpec", want: []string{"change_type"}},
 		{schema: "Playbook", message: "PlaybookStep", want: []string{"name", "capability_set", "risk"}},
 		{schema: "Playbook", message: "Qualification", want: nil},
+		{schema: "Playbook", message: "RolloutPlan", want: []string{"staging", "production"}},
+		{schema: "Playbook", message: "CanaryStage", want: []string{"name", "weight"}},
 		{schema: "ArchitecturePack", message: "ArchitecturePackSpec", want: nil},
 		{schema: "ArchitecturePack", message: "ArchitectureRule", want: []string{"id", "statement", "severity"}},
 		{schema: "ArchitecturePack", message: "ArchitectureCheck", want: []string{"verifier", "rule_id"}},
@@ -532,6 +534,7 @@ func TestKinds_MergeDirectives(t *testing.T) {
 		"numinance.kinds.v1.AdapterPorts.cloud":               kindsv1.MergeDirective_MERGE_DIRECTIVE_REPLACE,
 		"numinance.kinds.v1.AdapterPorts.database":            kindsv1.MergeDirective_MERGE_DIRECTIVE_REPLACE,
 		"numinance.kinds.v1.AdapterPorts.observability":       kindsv1.MergeDirective_MERGE_DIRECTIVE_REPLACE,
+		"numinance.kinds.v1.PlaybookSpec.rollout":             kindsv1.MergeDirective_MERGE_DIRECTIVE_REPLACE,
 		"numinance.kinds.v1.AutonomyPolicySpec.floors":        kindsv1.MergeDirective_MERGE_DIRECTIVE_FORBID,
 		"numinance.kinds.v1.ResidencyPolicySpec.floors":       kindsv1.MergeDirective_MERGE_DIRECTIVE_FORBID,
 		// Interim until a tighten-only directive.

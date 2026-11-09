@@ -6,8 +6,8 @@
 
 import type { GenFile, GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc } from "@bufbuild/protobuf/codegenv2";
-import type { Value } from "@bufbuild/protobuf/wkt";
-import { file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
+import type { Duration, Value } from "@bufbuild/protobuf/wkt";
+import { file_google_protobuf_duration, file_google_protobuf_struct } from "@bufbuild/protobuf/wkt";
 import type { RiskClass } from "../../annotations/v1/annotations_pb";
 import { file_numinance_annotations_v1_annotations } from "../../annotations/v1/annotations_pb";
 import type { Metadata } from "./meta_pb";
@@ -18,7 +18,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file numinance/kinds/v1/playbook.proto.
  */
 export const file_numinance_kinds_v1_playbook: GenFile = /*@__PURE__*/
-  fileDesc("CiFudW1pbmFuY2Uva2luZHMvdjEvcGxheWJvb2sucHJvdG8SEm51bWluYW5jZS5raW5kcy52MSLbAgoIUGxheWJvb2sSIAoLYXBpX3ZlcnNpb24YASABKAlCC5K1GAcKBTEuMC4wEhkKBGtpbmQYAiABKAlCC5K1GAcKBTEuMC4wEjsKCG1ldGFkYXRhGAMgASgLMhwubnVtaW5hbmNlLmtpbmRzLnYxLk1ldGFkYXRhQguStRgHCgUxLjAuMBI7CgRzcGVjGAQgASgLMiAubnVtaW5hbmNlLmtpbmRzLnYxLlBsYXlib29rU3BlY0ILkrUYBwoFMS4wLjASTQoKZXh0ZW5zaW9ucxgFIAMoCzIsLm51bWluYW5jZS5raW5kcy52MS5QbGF5Ym9vay5FeHRlbnNpb25zRW50cnlCC5K1GAcKBTEuMC4wGkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIp4CCgxQbGF5Ym9va1NwZWMSLQoLY2hhbmdlX3R5cGUYASABKAlCC5K1GAcKBTEuMC4wUgtjaGFuZ2VfdHlwZRI8CgVzdGVwcxgCIAMoCzIgLm51bWluYW5jZS5raW5kcy52MS5QbGF5Ym9va1N0ZXBCC5K1GAcKBTEuMC4wEkIKE21heF9yZXBhaXJfYXR0ZW1wdHMYAyABKA1CC5K1GAcKBTEuMC4wSABSE21heF9yZXBhaXJfYXR0ZW1wdHOIAQESRQoNcXVhbGlmaWNhdGlvbhgEIAEoCzIhLm51bWluYW5jZS5raW5kcy52MS5RdWFsaWZpY2F0aW9uQguStRgHCgUxLjAuMEIWChRfbWF4X3JlcGFpcl9hdHRlbXB0cyKOAgoMUGxheWJvb2tTdGVwEhkKBG5hbWUYASABKAlCC5K1GAcKBTEuMC4wEjMKDmNhcGFiaWxpdHlfc2V0GAIgASgJQguStRgHCgUxLjAuMFIOY2FwYWJpbGl0eV9zZXQSPgoEcmlzaxgDIAEoDjIjLm51bWluYW5jZS5hbm5vdGF0aW9ucy52MS5SaXNrQ2xhc3NCC5K1GAcKBTEuMC4wEh0KCGV2aWRlbmNlGAQgAygJQguStRgHCgUxLjAuMBIeCgl2ZXJpZmllcnMYBSADKAlCC5K1GAcKBTEuMC4wEiIKCHJlaGVhcnNlGAYgASgIQguStRgHCgUxLjAuMEgAiAEBQgsKCV9yZWhlYXJzZSKuAwoNUXVhbGlmaWNhdGlvbhIsCghtaW5fcnVucxgBIAEoDUILkrUYBwoFMS4wLjBIAFIIbWluX3J1bnOIAQESOgoPbWF4X3Jld29ya19yYXRlGAIgASgNQguStRgHCgUxLjAuMEgBUg9tYXhfcmV3b3JrX3JhdGWIAQESQgoTbWF4X3JlZ3Jlc3Npb25fcmF0ZRgDIAEoDUILkrUYBwoFMS4wLjBIAlITbWF4X3JlZ3Jlc3Npb25fcmF0ZYgBARI+ChFtYXhfcm9sbGJhY2tfcmF0ZRgEIAEoDUILkrUYBwoFMS4wLjBIA1IRbWF4X3JvbGxiYWNrX3JhdGWIAQESRgoVemVyb19zZWN1cml0eV9lc2NhcGVzGAUgASgIQguStRgHCgUxLjAuMEgEUhV6ZXJvX3NlY3VyaXR5X2VzY2FwZXOIAQFCCwoJX21pbl9ydW5zQhIKEF9tYXhfcmV3b3JrX3JhdGVCFgoUX21heF9yZWdyZXNzaW9uX3JhdGVCFAoSX21heF9yb2xsYmFja19yYXRlQhgKFl96ZXJvX3NlY3VyaXR5X2VzY2FwZXNC3AEKFmNvbS5udW1pbmFuY2Uua2luZHMudjFCDVBsYXlib29rUHJvdG9QAVpJZ2l0aHViLmNvbS9udW1pbmFuY2UvbnVtaW5hbmNlLXNwZWMvc2RrL2dvL2dlbi9udW1pbmFuY2Uva2luZHMvdjE7a2luZHN2MaICA05LWKoCEk51bWluYW5jZS5LaW5kcy5WMcoCEk51bWluYW5jZVxLaW5kc1xWMeICHk51bWluYW5jZVxLaW5kc1xWMVxHUEJNZXRhZGF0YeoCFE51bWluYW5jZTo6S2luZHM6OlYxYgZwcm90bzM", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta]);
+  fileDesc("CiFudW1pbmFuY2Uva2luZHMvdjEvcGxheWJvb2sucHJvdG8SEm51bWluYW5jZS5raW5kcy52MSLbAgoIUGxheWJvb2sSIAoLYXBpX3ZlcnNpb24YASABKAlCC5K1GAcKBTEuMC4wEhkKBGtpbmQYAiABKAlCC5K1GAcKBTEuMC4wEjsKCG1ldGFkYXRhGAMgASgLMhwubnVtaW5hbmNlLmtpbmRzLnYxLk1ldGFkYXRhQguStRgHCgUxLjAuMBI7CgRzcGVjGAQgASgLMiAubnVtaW5hbmNlLmtpbmRzLnYxLlBsYXlib29rU3BlY0ILkrUYBwoFMS4wLjASTQoKZXh0ZW5zaW9ucxgFIAMoCzIsLm51bWluYW5jZS5raW5kcy52MS5QbGF5Ym9vay5FeHRlbnNpb25zRW50cnlCC5K1GAcKBTEuMC4wGkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIuECCgxQbGF5Ym9va1NwZWMSLQoLY2hhbmdlX3R5cGUYASABKAlCC5K1GAcKBTEuMC4wUgtjaGFuZ2VfdHlwZRI8CgVzdGVwcxgCIAMoCzIgLm51bWluYW5jZS5raW5kcy52MS5QbGF5Ym9va1N0ZXBCC5K1GAcKBTEuMC4wEkIKE21heF9yZXBhaXJfYXR0ZW1wdHMYAyABKA1CC5K1GAcKBTEuMC4wSABSE21heF9yZXBhaXJfYXR0ZW1wdHOIAQESRQoNcXVhbGlmaWNhdGlvbhgEIAEoCzIhLm51bWluYW5jZS5raW5kcy52MS5RdWFsaWZpY2F0aW9uQguStRgHCgUxLjAuMBJBCgdyb2xsb3V0GAUgASgLMh8ubnVtaW5hbmNlLmtpbmRzLnYxLlJvbGxvdXRQbGFuQg+StRgHCgUxLjIuMJi1GAFCFgoUX21heF9yZXBhaXJfYXR0ZW1wdHMiwgEKC1JvbGxvdXRQbGFuEhwKB3N0YWdpbmcYASABKAlCC5K1GAcKBTEuMi4wEh8KCnByb2R1Y3Rpb24YAiABKAlCC5K1GAcKBTEuMi4wEjwKBnN0YWdlcxgDIAMoCzIfLm51bWluYW5jZS5raW5kcy52MS5DYW5hcnlTdGFnZUILkrUYBwoFMS4yLjASNgoGd2luZG93GAQgASgLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uQguStRgHCgUxLjIuMCJFCgtDYW5hcnlTdGFnZRIZCgRuYW1lGAEgASgJQguStRgHCgUxLjIuMBIbCgZ3ZWlnaHQYAiABKA1CC5K1GAcKBTEuMi4wIo4CCgxQbGF5Ym9va1N0ZXASGQoEbmFtZRgBIAEoCUILkrUYBwoFMS4wLjASMwoOY2FwYWJpbGl0eV9zZXQYAiABKAlCC5K1GAcKBTEuMC4wUg5jYXBhYmlsaXR5X3NldBI+CgRyaXNrGAMgASgOMiMubnVtaW5hbmNlLmFubm90YXRpb25zLnYxLlJpc2tDbGFzc0ILkrUYBwoFMS4wLjASHQoIZXZpZGVuY2UYBCADKAlCC5K1GAcKBTEuMC4wEh4KCXZlcmlmaWVycxgFIAMoCUILkrUYBwoFMS4wLjASIgoIcmVoZWFyc2UYBiABKAhCC5K1GAcKBTEuMC4wSACIAQFCCwoJX3JlaGVhcnNlIq4DCg1RdWFsaWZpY2F0aW9uEiwKCG1pbl9ydW5zGAEgASgNQguStRgHCgUxLjAuMEgAUghtaW5fcnVuc4gBARI6Cg9tYXhfcmV3b3JrX3JhdGUYAiABKA1CC5K1GAcKBTEuMC4wSAFSD21heF9yZXdvcmtfcmF0ZYgBARJCChNtYXhfcmVncmVzc2lvbl9yYXRlGAMgASgNQguStRgHCgUxLjAuMEgCUhNtYXhfcmVncmVzc2lvbl9yYXRliAEBEj4KEW1heF9yb2xsYmFja19yYXRlGAQgASgNQguStRgHCgUxLjAuMEgDUhFtYXhfcm9sbGJhY2tfcmF0ZYgBARJGChV6ZXJvX3NlY3VyaXR5X2VzY2FwZXMYBSABKAhCC5K1GAcKBTEuMC4wSARSFXplcm9fc2VjdXJpdHlfZXNjYXBlc4gBAUILCglfbWluX3J1bnNCEgoQX21heF9yZXdvcmtfcmF0ZUIWChRfbWF4X3JlZ3Jlc3Npb25fcmF0ZUIUChJfbWF4X3JvbGxiYWNrX3JhdGVCGAoWX3plcm9fc2VjdXJpdHlfZXNjYXBlc0LcAQoWY29tLm51bWluYW5jZS5raW5kcy52MUINUGxheWJvb2tQcm90b1ABWklnaXRodWIuY29tL251bWluYW5jZS9udW1pbmFuY2Utc3BlYy9zZGsvZ28vZ2VuL251bWluYW5jZS9raW5kcy92MTtraW5kc3YxogIDTktYqgISTnVtaW5hbmNlLktpbmRzLlYxygISTnVtaW5hbmNlXEtpbmRzXFYx4gIeTnVtaW5hbmNlXEtpbmRzXFYxXEdQQk1ldGFkYXRh6gIUTnVtaW5hbmNlOjpLaW5kczo6VjFiBnByb3RvMw", [file_google_protobuf_duration, file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta]);
 
 /**
  * Playbook is the procedure for one change type; it shapes grants and never widens them.
@@ -103,6 +103,14 @@ export type PlaybookSpec = Message<"numinance.kinds.v1.PlaybookSpec"> & {
    * @generated from field: numinance.kinds.v1.Qualification qualification = 4;
    */
   qualification?: Qualification | undefined;
+
+  /**
+   * rollout is how a released change is staged and canaried. Absent means the playbook defines no rollout: the release
+   * stops at Releasing for a human and never promotes on silence. A narrower scope's rollout replaces the wider one whole.
+   *
+   * @generated from field: numinance.kinds.v1.RolloutPlan rollout = 5;
+   */
+  rollout?: RolloutPlan | undefined;
 };
 
 /**
@@ -111,6 +119,78 @@ export type PlaybookSpec = Message<"numinance.kinds.v1.PlaybookSpec"> & {
  */
 export const PlaybookSpecSchema: GenMessage<PlaybookSpec> = /*@__PURE__*/
   messageDesc(file_numinance_kinds_v1_playbook, 1);
+
+/**
+ * RolloutPlan is the staged rollout of a released change: it is verified in the staging environment, then it takes
+ * rising shares of production traffic, each observed for the window. The deployment targets (the cdprovider and the
+ * observability provider) come from the AdapterSelector binding, never from this message.
+ *
+ * @generated from message numinance.kinds.v1.RolloutPlan
+ */
+export type RolloutPlan = Message<"numinance.kinds.v1.RolloutPlan"> & {
+  /**
+   * staging is required: the customer-named staging environment (lower-case letters, digits and hyphens, 1 to 63 bytes).
+   *
+   * @generated from field: string staging = 1;
+   */
+  staging: string;
+
+  /**
+   * production is required: the customer-named production environment, different from staging.
+   *
+   * @generated from field: string production = 2;
+   */
+  production: string;
+
+  /**
+   * stages is required: 1 to 8 canary stages in order, with unique names and strictly rising weights that end at 100.
+   *
+   * @generated from field: repeated numinance.kinds.v1.CanaryStage stages = 3;
+   */
+  stages: CanaryStage[];
+
+  /**
+   * window is required: how long the staging deployment and each stage are observed; at least 1 minute, at most 24 hours.
+   *
+   * @generated from field: google.protobuf.Duration window = 4;
+   */
+  window?: Duration | undefined;
+};
+
+/**
+ * Describes the message numinance.kinds.v1.RolloutPlan.
+ * Use `create(RolloutPlanSchema)` to create a new message.
+ */
+export const RolloutPlanSchema: GenMessage<RolloutPlan> = /*@__PURE__*/
+  messageDesc(file_numinance_kinds_v1_playbook, 2);
+
+/**
+ * CanaryStage is one step of a canary rollout.
+ *
+ * @generated from message numinance.kinds.v1.CanaryStage
+ */
+export type CanaryStage = Message<"numinance.kinds.v1.CanaryStage"> & {
+  /**
+   * name is required: a lower-case token (letters, digits and hyphens, starting with a letter), unique in the plan.
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * weight is required: the share of production traffic, in percent, the new revision takes during the stage, 1 to 100.
+   *
+   * @generated from field: uint32 weight = 2;
+   */
+  weight: number;
+};
+
+/**
+ * Describes the message numinance.kinds.v1.CanaryStage.
+ * Use `create(CanaryStageSchema)` to create a new message.
+ */
+export const CanaryStageSchema: GenMessage<CanaryStage> = /*@__PURE__*/
+  messageDesc(file_numinance_kinds_v1_playbook, 3);
 
 /**
  * PlaybookStep is one step of a playbook. A Change's risk class is the maximum over its steps.
@@ -167,7 +247,7 @@ export type PlaybookStep = Message<"numinance.kinds.v1.PlaybookStep"> & {
  * Use `create(PlaybookStepSchema)` to create a new message.
  */
 export const PlaybookStepSchema: GenMessage<PlaybookStep> = /*@__PURE__*/
-  messageDesc(file_numinance_kinds_v1_playbook, 2);
+  messageDesc(file_numinance_kinds_v1_playbook, 4);
 
 /**
  * Qualification is the record a playbook needs before its autonomy is
@@ -220,5 +300,5 @@ export type Qualification = Message<"numinance.kinds.v1.Qualification"> & {
  * Use `create(QualificationSchema)` to create a new message.
  */
 export const QualificationSchema: GenMessage<Qualification> = /*@__PURE__*/
-  messageDesc(file_numinance_kinds_v1_playbook, 3);
+  messageDesc(file_numinance_kinds_v1_playbook, 5);
 

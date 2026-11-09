@@ -22,12 +22,13 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
 from google.protobuf import struct_pb2 as google_dot_protobuf_dot_struct__pb2
 from numinance.annotations.v1 import annotations_pb2 as numinance_dot_annotations_dot_v1_dot_annotations__pb2
 from numinance.kinds.v1 import meta_pb2 as numinance_dot_kinds_dot_v1_dot_meta__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n!numinance/kinds/v1/playbook.proto\x12\x12numinance.kinds.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\"\x95\x03\n\x08Playbook\x12,\n\x0b\x61pi_version\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\napiVersion\x12\x1f\n\x04kind\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04kind\x12\x45\n\x08metadata\x18\x03 \x01(\x0b\x32\x1c.numinance.kinds.v1.MetadataB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08metadata\x12\x41\n\x04spec\x18\x04 \x01(\x0b\x32 .numinance.kinds.v1.PlaybookSpecB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04spec\x12Y\n\nextensions\x18\x05 \x03(\x0b\x32,.numinance.kinds.v1.Playbook.ExtensionsEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\nextensions\x1aU\n\x0f\x45xtensionsEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.ValueR\x05value:\x02\x38\x01\"\xb4\x02\n\x0cPlaybookSpec\x12-\n\x0b\x63hange_type\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0b\x63hange_type\x12\x43\n\x05steps\x18\x02 \x03(\x0b\x32 .numinance.kinds.v1.PlaybookStepB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x05steps\x12\x42\n\x13max_repair_attempts\x18\x03 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x00R\x13max_repair_attempts\x88\x01\x01\x12T\n\rqualification\x18\x04 \x01(\x0b\x32!.numinance.kinds.v1.QualificationB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\rqualificationB\x16\n\x14_max_repair_attempts\"\xb9\x02\n\x0cPlaybookStep\x12\x1f\n\x04name\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04name\x12\x33\n\x0e\x63\x61pability_set\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0e\x63\x61pability_set\x12\x44\n\x04risk\x18\x03 \x01(\x0e\x32#.numinance.annotations.v1.RiskClassB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04risk\x12\'\n\x08\x65vidence\x18\x04 \x03(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08\x65vidence\x12)\n\tverifiers\x18\x05 \x03(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\tverifiers\x12,\n\x08rehearse\x18\x06 \x01(\x08\x42\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x00R\x08rehearse\x88\x01\x01\x42\x0b\n\t_rehearse\"\xae\x03\n\rQualification\x12,\n\x08min_runs\x18\x01 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x00R\x08min_runs\x88\x01\x01\x12:\n\x0fmax_rework_rate\x18\x02 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x01R\x0fmax_rework_rate\x88\x01\x01\x12\x42\n\x13max_regression_rate\x18\x03 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x02R\x13max_regression_rate\x88\x01\x01\x12>\n\x11max_rollback_rate\x18\x04 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x03R\x11max_rollback_rate\x88\x01\x01\x12\x46\n\x15zero_security_escapes\x18\x05 \x01(\x08\x42\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x04R\x15zero_security_escapes\x88\x01\x01\x42\x0b\n\t_min_runsB\x12\n\x10_max_rework_rateB\x16\n\x14_max_regression_rateB\x14\n\x12_max_rollback_rateB\x18\n\x16_zero_security_escapesB\xdc\x01\n\x16\x63om.numinance.kinds.v1B\rPlaybookProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n!numinance/kinds/v1/playbook.proto\x12\x12numinance.kinds.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\"\x95\x03\n\x08Playbook\x12,\n\x0b\x61pi_version\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\napiVersion\x12\x1f\n\x04kind\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04kind\x12\x45\n\x08metadata\x18\x03 \x01(\x0b\x32\x1c.numinance.kinds.v1.MetadataB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08metadata\x12\x41\n\x04spec\x18\x04 \x01(\x0b\x32 .numinance.kinds.v1.PlaybookSpecB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04spec\x12Y\n\nextensions\x18\x05 \x03(\x0b\x32,.numinance.kinds.v1.Playbook.ExtensionsEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\nextensions\x1aU\n\x0f\x45xtensionsEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.ValueR\x05value:\x02\x38\x01\"\x80\x03\n\x0cPlaybookSpec\x12-\n\x0b\x63hange_type\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0b\x63hange_type\x12\x43\n\x05steps\x18\x02 \x03(\x0b\x32 .numinance.kinds.v1.PlaybookStepB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x05steps\x12\x42\n\x13max_repair_attempts\x18\x03 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x00R\x13max_repair_attempts\x88\x01\x01\x12T\n\rqualification\x18\x04 \x01(\x0b\x32!.numinance.kinds.v1.QualificationB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\rqualification\x12J\n\x07rollout\x18\x05 \x01(\x0b\x32\x1f.numinance.kinds.v1.RolloutPlanB\x0f\x92\xb5\x18\x07\n\x05\x31.2.0\x98\xb5\x18\x01R\x07rolloutB\x16\n\x14_max_repair_attempts\"\xe7\x01\n\x0bRolloutPlan\x12%\n\x07staging\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.2.0R\x07staging\x12+\n\nproduction\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.2.0R\nproduction\x12\x44\n\x06stages\x18\x03 \x03(\x0b\x32\x1f.numinance.kinds.v1.CanaryStageB\x0b\x92\xb5\x18\x07\n\x05\x31.2.0R\x06stages\x12>\n\x06window\x18\x04 \x01(\x0b\x32\x19.google.protobuf.DurationB\x0b\x92\xb5\x18\x07\n\x05\x31.2.0R\x06window\"S\n\x0b\x43\x61naryStage\x12\x1f\n\x04name\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.2.0R\x04name\x12#\n\x06weight\x18\x02 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.2.0R\x06weight\"\xb9\x02\n\x0cPlaybookStep\x12\x1f\n\x04name\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04name\x12\x33\n\x0e\x63\x61pability_set\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0e\x63\x61pability_set\x12\x44\n\x04risk\x18\x03 \x01(\x0e\x32#.numinance.annotations.v1.RiskClassB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04risk\x12\'\n\x08\x65vidence\x18\x04 \x03(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08\x65vidence\x12)\n\tverifiers\x18\x05 \x03(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\tverifiers\x12,\n\x08rehearse\x18\x06 \x01(\x08\x42\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x00R\x08rehearse\x88\x01\x01\x42\x0b\n\t_rehearse\"\xae\x03\n\rQualification\x12,\n\x08min_runs\x18\x01 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x00R\x08min_runs\x88\x01\x01\x12:\n\x0fmax_rework_rate\x18\x02 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x01R\x0fmax_rework_rate\x88\x01\x01\x12\x42\n\x13max_regression_rate\x18\x03 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x02R\x13max_regression_rate\x88\x01\x01\x12>\n\x11max_rollback_rate\x18\x04 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x03R\x11max_rollback_rate\x88\x01\x01\x12\x46\n\x15zero_security_escapes\x18\x05 \x01(\x08\x42\x0b\x92\xb5\x18\x07\n\x05\x31.0.0H\x04R\x15zero_security_escapes\x88\x01\x01\x42\x0b\n\t_min_runsB\x12\n\x10_max_rework_rateB\x16\n\x14_max_regression_rateB\x14\n\x12_max_rollback_rateB\x18\n\x16_zero_security_escapesB\xdc\x01\n\x16\x63om.numinance.kinds.v1B\rPlaybookProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -55,6 +56,20 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PLAYBOOKSPEC'].fields_by_name['max_repair_attempts']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_PLAYBOOKSPEC'].fields_by_name['qualification']._loaded_options = None
   _globals['_PLAYBOOKSPEC'].fields_by_name['qualification']._serialized_options = b'\222\265\030\007\n\0051.0.0'
+  _globals['_PLAYBOOKSPEC'].fields_by_name['rollout']._loaded_options = None
+  _globals['_PLAYBOOKSPEC'].fields_by_name['rollout']._serialized_options = b'\222\265\030\007\n\0051.2.0\230\265\030\001'
+  _globals['_ROLLOUTPLAN'].fields_by_name['staging']._loaded_options = None
+  _globals['_ROLLOUTPLAN'].fields_by_name['staging']._serialized_options = b'\222\265\030\007\n\0051.2.0'
+  _globals['_ROLLOUTPLAN'].fields_by_name['production']._loaded_options = None
+  _globals['_ROLLOUTPLAN'].fields_by_name['production']._serialized_options = b'\222\265\030\007\n\0051.2.0'
+  _globals['_ROLLOUTPLAN'].fields_by_name['stages']._loaded_options = None
+  _globals['_ROLLOUTPLAN'].fields_by_name['stages']._serialized_options = b'\222\265\030\007\n\0051.2.0'
+  _globals['_ROLLOUTPLAN'].fields_by_name['window']._loaded_options = None
+  _globals['_ROLLOUTPLAN'].fields_by_name['window']._serialized_options = b'\222\265\030\007\n\0051.2.0'
+  _globals['_CANARYSTAGE'].fields_by_name['name']._loaded_options = None
+  _globals['_CANARYSTAGE'].fields_by_name['name']._serialized_options = b'\222\265\030\007\n\0051.2.0'
+  _globals['_CANARYSTAGE'].fields_by_name['weight']._loaded_options = None
+  _globals['_CANARYSTAGE'].fields_by_name['weight']._serialized_options = b'\222\265\030\007\n\0051.2.0'
   _globals['_PLAYBOOKSTEP'].fields_by_name['name']._loaded_options = None
   _globals['_PLAYBOOKSTEP'].fields_by_name['name']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_PLAYBOOKSTEP'].fields_by_name['capability_set']._loaded_options = None
@@ -77,14 +92,18 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_QUALIFICATION'].fields_by_name['max_rollback_rate']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_QUALIFICATION'].fields_by_name['zero_security_escapes']._loaded_options = None
   _globals['_QUALIFICATION'].fields_by_name['zero_security_escapes']._serialized_options = b'\222\265\030\007\n\0051.0.0'
-  _globals['_PLAYBOOK']._serialized_start=163
-  _globals['_PLAYBOOK']._serialized_end=568
-  _globals['_PLAYBOOK_EXTENSIONSENTRY']._serialized_start=483
-  _globals['_PLAYBOOK_EXTENSIONSENTRY']._serialized_end=568
-  _globals['_PLAYBOOKSPEC']._serialized_start=571
-  _globals['_PLAYBOOKSPEC']._serialized_end=879
-  _globals['_PLAYBOOKSTEP']._serialized_start=882
-  _globals['_PLAYBOOKSTEP']._serialized_end=1195
-  _globals['_QUALIFICATION']._serialized_start=1198
-  _globals['_QUALIFICATION']._serialized_end=1628
+  _globals['_PLAYBOOK']._serialized_start=195
+  _globals['_PLAYBOOK']._serialized_end=600
+  _globals['_PLAYBOOK_EXTENSIONSENTRY']._serialized_start=515
+  _globals['_PLAYBOOK_EXTENSIONSENTRY']._serialized_end=600
+  _globals['_PLAYBOOKSPEC']._serialized_start=603
+  _globals['_PLAYBOOKSPEC']._serialized_end=987
+  _globals['_ROLLOUTPLAN']._serialized_start=990
+  _globals['_ROLLOUTPLAN']._serialized_end=1221
+  _globals['_CANARYSTAGE']._serialized_start=1223
+  _globals['_CANARYSTAGE']._serialized_end=1306
+  _globals['_PLAYBOOKSTEP']._serialized_start=1309
+  _globals['_PLAYBOOKSTEP']._serialized_end=1622
+  _globals['_QUALIFICATION']._serialized_start=1625
+  _globals['_QUALIFICATION']._serialized_end=2055
 # @@protoc_insertion_point(module_scope)

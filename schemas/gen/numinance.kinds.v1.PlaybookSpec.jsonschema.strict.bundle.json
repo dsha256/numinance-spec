@@ -1,5 +1,34 @@
 {
   "$defs": {
+    "google.protobuf.Duration.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "format": "duration",
+      "title": "Duration",
+      "type": "string"
+    },
+    "numinance.kinds.v1.CanaryStage.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "CanaryStage is one step of a canary rollout.",
+      "properties": {
+        "name": {
+          "description": "name is required: a lower-case token (letters, digits and hyphens, starting with a letter), unique in the plan.",
+          "type": "string"
+        },
+        "weight": {
+          "description": "weight is required: the share of production traffic, in percent, the new revision takes during the stage, 1 to 100.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "weight"
+      ],
+      "title": "Canary Stage",
+      "type": "object"
+    },
     "numinance.kinds.v1.PlaybookSpec.jsonschema.strict.json": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -18,6 +47,10 @@
         "qualification": {
           "$ref": "#/$defs/numinance.kinds.v1.Qualification.jsonschema.strict.json",
           "description": "qualification is what the playbook must show before autonomy is promoted. Absent means the playbook is not\n promotable unless the AutonomyPolicy floor qualifies it; it merges field by field, and a narrower scope may only tighten it."
+        },
+        "rollout": {
+          "$ref": "#/$defs/numinance.kinds.v1.RolloutPlan.jsonschema.strict.json",
+          "description": "rollout is how a released change is staged and canaried. Absent means the playbook defines no rollout: the release\n stops at Releasing for a human and never promotes on silence. A narrower scope's rollout replaces the wider one whole."
         },
         "steps": {
           "description": "steps is required and non-empty; the loader enforces it, the schema cannot.",
@@ -121,6 +154,38 @@
         }
       },
       "title": "Qualification",
+      "type": "object"
+    },
+    "numinance.kinds.v1.RolloutPlan.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "RolloutPlan is the staged rollout of a released change: it is verified in the staging environment, then it takes\n rising shares of production traffic, each observed for the window. The deployment targets (the cdprovider and the\n observability provider) come from the AdapterSelector binding, never from this message.",
+      "properties": {
+        "production": {
+          "description": "production is required: the customer-named production environment, different from staging.",
+          "type": "string"
+        },
+        "stages": {
+          "description": "stages is required: 1 to 8 canary stages in order, with unique names and strictly rising weights that end at 100.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.CanaryStage.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "staging": {
+          "description": "staging is required: the customer-named staging environment (lower-case letters, digits and hyphens, 1 to 63 bytes).",
+          "type": "string"
+        },
+        "window": {
+          "$ref": "#/$defs/google.protobuf.Duration.jsonschema.strict.json",
+          "description": "window is required: how long the staging deployment and each stage are observed; at least 1 minute, at most 24 hours."
+        }
+      },
+      "required": [
+        "staging",
+        "production"
+      ],
+      "title": "Rollout Plan",
       "type": "object"
     }
   },

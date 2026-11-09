@@ -3,6 +3,7 @@ syntax = "proto3";
 
 package numinance.kinds.v1;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "numinance/annotations/v1/annotations.proto";
 import "numinance/kinds/v1/meta.proto";
@@ -32,6 +33,31 @@ message PlaybookSpec {
   // qualification is what the playbook must show before autonomy is promoted. Absent means the playbook is not
   // promotable unless the AutonomyPolicy floor qualifies it; it merges field by field, and a narrower scope may only tighten it.
   Qualification qualification = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // rollout is how a released change is staged and canaried. Absent means the playbook defines no rollout: the release
+  // stops at Releasing for a human and never promotes on silence. A narrower scope's rollout replaces the wider one whole.
+  RolloutPlan rollout = 5 [(merge) = MERGE_DIRECTIVE_REPLACE, (numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// RolloutPlan is the staged rollout of a released change: it is verified in the staging environment, then it takes
+// rising shares of production traffic, each observed for the window. The deployment targets (the cdprovider and the
+// observability provider) come from the AdapterSelector binding, never from this message.
+message RolloutPlan {
+  // staging is required: the customer-named staging environment (lower-case letters, digits and hyphens, 1 to 63 bytes).
+  string staging = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // production is required: the customer-named production environment, different from staging.
+  string production = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // stages is required: 1 to 8 canary stages in order, with unique names and strictly rising weights that end at 100.
+  repeated CanaryStage stages = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // window is required: how long the staging deployment and each stage are observed; at least 1 minute, at most 24 hours.
+  google.protobuf.Duration window = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// CanaryStage is one step of a canary rollout.
+message CanaryStage {
+  // name is required: a lower-case token (letters, digits and hyphens, starting with a letter), unique in the plan.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // weight is required: the share of production traffic, in percent, the new revision takes during the stage, 1 to 100.
+  uint32 weight = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
 }
 
 // PlaybookStep is one step of a playbook. A Change's risk class is the maximum over its steps.

@@ -114,6 +114,12 @@ func requiredFields() []protoreflect.FullName {
 		"numinance.kinds.v1.PlaybookSpec.steps",
 		"numinance.kinds.v1.PlaybookStep.name",
 		"numinance.kinds.v1.PlaybookStep.capability_set",
+		"numinance.kinds.v1.RolloutPlan.staging",
+		"numinance.kinds.v1.RolloutPlan.production",
+		"numinance.kinds.v1.RolloutPlan.stages",
+		"numinance.kinds.v1.RolloutPlan.window",
+		"numinance.kinds.v1.CanaryStage.name",
+		"numinance.kinds.v1.CanaryStage.weight",
 		"numinance.kinds.v1.ArchitecturePackSpec.rules",
 		"numinance.kinds.v1.ArchitectureRule.id",
 		"numinance.kinds.v1.ArchitectureRule.statement",
@@ -218,6 +224,7 @@ func uniqueKeys() map[protoreflect.FullName]func(protoreflect.Value) string {
 		"numinance.kinds.v1.SDLCProfileSpec.architecture_packs": str,
 		"numinance.kinds.v1.SDLCProfileSpec.toolchains":         str,
 		"numinance.kinds.v1.ControlPackSpec.sources":            str,
+		"numinance.kinds.v1.RolloutPlan.stages":                 field("name"),
 		"numinance.kinds.v1.ControlPackSpec.controls":           field("id"),
 		"numinance.kinds.v1.ControlPackSpec.export_views":       field("name"),
 		"numinance.kinds.v1.Control.requires_evidence":          str,
@@ -247,6 +254,11 @@ func valueChecks() map[protoreflect.FullName]func(protoreflect.Value) bool {
 	m := map[protoreflect.FullName]func(protoreflect.Value) bool{
 		"numinance.kinds.v1.EnvironmentProviderSpec.ttl":       func(v protoreflect.Value) bool { return durationSign(v) > 0 },
 		"numinance.kinds.v1.ResidencyPolicySpec.retention_max": func(v protoreflect.Value) bool { return durationSign(v) >= 0 },
+		"numinance.kinds.v1.RolloutPlan.staging":               func(v protoreflect.Value) bool { return isRolloutName(v.String()) },
+		"numinance.kinds.v1.RolloutPlan.production":            func(v protoreflect.Value) bool { return isRolloutName(v.String()) },
+		"numinance.kinds.v1.RolloutPlan.window":                isRolloutWindow,
+		"numinance.kinds.v1.CanaryStage.name":                  func(v protoreflect.Value) bool { return isRolloutName(v.String()) },
+		"numinance.kinds.v1.CanaryStage.weight":                isRolloutWeight,
 		"numinance.kinds.v1.EnvironmentBudget.max_concurrent":  func(v protoreflect.Value) bool { return v.Uint() > 0 },
 		"numinance.kinds.v1.StageGate.required_approvals":      func(v protoreflect.Value) bool { return v.Uint() > 0 },
 		"numinance.kinds.v1.KnowledgeConnectionSpec.endpoint":  func(v protoreflect.Value) bool { return isEndpoint(v.String()) },
@@ -703,6 +715,13 @@ func (l *Loader) check(m protoreflect.Message) error {
 			return fmt.Errorf("%w: the EvalSet does not round-trip", ErrInvalid)
 		}
 		return checkEvalSet(e.GetSpec())
+	}
+	if m.Descriptor().FullName() == "numinance.kinds.v1.Playbook" {
+		p := &kindsv1.Playbook{}
+		if b, err := proto.Marshal(m.Interface()); err != nil || proto.Unmarshal(b, p) != nil {
+			return fmt.Errorf("%w: the Playbook does not round-trip", ErrInvalid)
+		}
+		return checkPlaybook(p.GetSpec())
 	}
 	if m.Descriptor().FullName() == "numinance.kinds.v1.StageRegistry" {
 		r := &kindsv1.StageRegistry{}

@@ -1,0 +1,30 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.CanaryStage.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "CanaryStage is one step of a canary rollout.",
+      "properties": {
+        "name": {
+          "description": "name is required: a lower-case token (letters, digits and hyphens, starting with a letter), unique in the plan.",
+          "type": "string"
+        },
+        "weight": {
+          "description": "weight is required: the share of production traffic, in percent, the new revision takes during the stage, 1 to 100.",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "weight"
+      ],
+      "title": "Canary Stage",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.CanaryStage.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.CanaryStage.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

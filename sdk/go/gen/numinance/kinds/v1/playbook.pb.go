@@ -12,6 +12,7 @@ import (
 	v1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/annotations/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
@@ -119,6 +120,9 @@ type PlaybookSpec struct {
 	// qualification is what the playbook must show before autonomy is promoted. Absent means the playbook is not
 	// promotable unless the AutonomyPolicy floor qualifies it; it merges field by field, and a narrower scope may only tighten it.
 	Qualification *Qualification `protobuf:"bytes,4,opt,name=qualification,proto3" json:"qualification,omitempty"`
+	// rollout is how a released change is staged and canaried. Absent means the playbook defines no rollout: the release
+	// stops at Releasing for a human and never promotes on silence. A narrower scope's rollout replaces the wider one whole.
+	Rollout       *RolloutPlan `protobuf:"bytes,5,opt,name=rollout,proto3" json:"rollout,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -181,6 +185,143 @@ func (x *PlaybookSpec) GetQualification() *Qualification {
 	return nil
 }
 
+func (x *PlaybookSpec) GetRollout() *RolloutPlan {
+	if x != nil {
+		return x.Rollout
+	}
+	return nil
+}
+
+// RolloutPlan is the staged rollout of a released change: it is verified in the staging environment, then it takes
+// rising shares of production traffic, each observed for the window. The deployment targets (the cdprovider and the
+// observability provider) come from the AdapterSelector binding, never from this message.
+type RolloutPlan struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// staging is required: the customer-named staging environment (lower-case letters, digits and hyphens, 1 to 63 bytes).
+	Staging string `protobuf:"bytes,1,opt,name=staging,proto3" json:"staging,omitempty"`
+	// production is required: the customer-named production environment, different from staging.
+	Production string `protobuf:"bytes,2,opt,name=production,proto3" json:"production,omitempty"`
+	// stages is required: 1 to 8 canary stages in order, with unique names and strictly rising weights that end at 100.
+	Stages []*CanaryStage `protobuf:"bytes,3,rep,name=stages,proto3" json:"stages,omitempty"`
+	// window is required: how long the staging deployment and each stage are observed; at least 1 minute, at most 24 hours.
+	Window        *durationpb.Duration `protobuf:"bytes,4,opt,name=window,proto3" json:"window,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RolloutPlan) Reset() {
+	*x = RolloutPlan{}
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RolloutPlan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RolloutPlan) ProtoMessage() {}
+
+func (x *RolloutPlan) ProtoReflect() protoreflect.Message {
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RolloutPlan.ProtoReflect.Descriptor instead.
+func (*RolloutPlan) Descriptor() ([]byte, []int) {
+	return file_numinance_kinds_v1_playbook_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *RolloutPlan) GetStaging() string {
+	if x != nil {
+		return x.Staging
+	}
+	return ""
+}
+
+func (x *RolloutPlan) GetProduction() string {
+	if x != nil {
+		return x.Production
+	}
+	return ""
+}
+
+func (x *RolloutPlan) GetStages() []*CanaryStage {
+	if x != nil {
+		return x.Stages
+	}
+	return nil
+}
+
+func (x *RolloutPlan) GetWindow() *durationpb.Duration {
+	if x != nil {
+		return x.Window
+	}
+	return nil
+}
+
+// CanaryStage is one step of a canary rollout.
+type CanaryStage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// name is required: a lower-case token (letters, digits and hyphens, starting with a letter), unique in the plan.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// weight is required: the share of production traffic, in percent, the new revision takes during the stage, 1 to 100.
+	Weight        uint32 `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CanaryStage) Reset() {
+	*x = CanaryStage{}
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CanaryStage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CanaryStage) ProtoMessage() {}
+
+func (x *CanaryStage) ProtoReflect() protoreflect.Message {
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CanaryStage.ProtoReflect.Descriptor instead.
+func (*CanaryStage) Descriptor() ([]byte, []int) {
+	return file_numinance_kinds_v1_playbook_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CanaryStage) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CanaryStage) GetWeight() uint32 {
+	if x != nil {
+		return x.Weight
+	}
+	return 0
+}
+
 // PlaybookStep is one step of a playbook. A Change's risk class is the maximum over its steps.
 type PlaybookStep struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -203,7 +344,7 @@ type PlaybookStep struct {
 
 func (x *PlaybookStep) Reset() {
 	*x = PlaybookStep{}
-	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[2]
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -215,7 +356,7 @@ func (x *PlaybookStep) String() string {
 func (*PlaybookStep) ProtoMessage() {}
 
 func (x *PlaybookStep) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[2]
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -228,7 +369,7 @@ func (x *PlaybookStep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlaybookStep.ProtoReflect.Descriptor instead.
 func (*PlaybookStep) Descriptor() ([]byte, []int) {
-	return file_numinance_kinds_v1_playbook_proto_rawDescGZIP(), []int{2}
+	return file_numinance_kinds_v1_playbook_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *PlaybookStep) GetName() string {
@@ -296,7 +437,7 @@ type Qualification struct {
 
 func (x *Qualification) Reset() {
 	*x = Qualification{}
-	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[3]
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -308,7 +449,7 @@ func (x *Qualification) String() string {
 func (*Qualification) ProtoMessage() {}
 
 func (x *Qualification) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[3]
+	mi := &file_numinance_kinds_v1_playbook_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -321,7 +462,7 @@ func (x *Qualification) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Qualification.ProtoReflect.Descriptor instead.
 func (*Qualification) Descriptor() ([]byte, []int) {
-	return file_numinance_kinds_v1_playbook_proto_rawDescGZIP(), []int{3}
+	return file_numinance_kinds_v1_playbook_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *Qualification) GetMinRuns() uint32 {
@@ -363,7 +504,7 @@ var File_numinance_kinds_v1_playbook_proto protoreflect.FileDescriptor
 
 const file_numinance_kinds_v1_playbook_proto_rawDesc = "" +
 	"\n" +
-	"!numinance/kinds/v1/playbook.proto\x12\x12numinance.kinds.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\"\x95\x03\n" +
+	"!numinance/kinds/v1/playbook.proto\x12\x12numinance.kinds.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\"\x95\x03\n" +
 	"\bPlaybook\x12,\n" +
 	"\vapi_version\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\n" +
@@ -380,7 +521,7 @@ const file_numinance_kinds_v1_playbook_proto_rawDesc = "" +
 	"extensions\x1aU\n" +
 	"\x0fExtensionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
-	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xb4\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\x80\x03\n" +
 	"\fPlaybookSpec\x12-\n" +
 	"\vchange_type\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\vchange_type\x12C\n" +
@@ -389,8 +530,26 @@ const file_numinance_kinds_v1_playbook_proto_rawDesc = "" +
 	"\x13max_repair_attempts\x18\x03 \x01(\rB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0H\x00R\x13max_repair_attempts\x88\x01\x01\x12T\n" +
 	"\rqualification\x18\x04 \x01(\v2!.numinance.kinds.v1.QualificationB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\rqualificationB\x16\n" +
-	"\x14_max_repair_attempts\"\xb9\x02\n" +
+	"\x051.0.0R\rqualification\x12J\n" +
+	"\arollout\x18\x05 \x01(\v2\x1f.numinance.kinds.v1.RolloutPlanB\x0f\x92\xb5\x18\a\n" +
+	"\x051.2.0\x98\xb5\x18\x01R\arolloutB\x16\n" +
+	"\x14_max_repair_attempts\"\xe7\x01\n" +
+	"\vRolloutPlan\x12%\n" +
+	"\astaging\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.2.0R\astaging\x12+\n" +
+	"\n" +
+	"production\x18\x02 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.2.0R\n" +
+	"production\x12D\n" +
+	"\x06stages\x18\x03 \x03(\v2\x1f.numinance.kinds.v1.CanaryStageB\v\x92\xb5\x18\a\n" +
+	"\x051.2.0R\x06stages\x12>\n" +
+	"\x06window\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\v\x92\xb5\x18\a\n" +
+	"\x051.2.0R\x06window\"S\n" +
+	"\vCanaryStage\x12\x1f\n" +
+	"\x04name\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.2.0R\x04name\x12#\n" +
+	"\x06weight\x18\x02 \x01(\rB\v\x92\xb5\x18\a\n" +
+	"\x051.2.0R\x06weight\"\xb9\x02\n" +
 	"\fPlaybookStep\x12\x1f\n" +
 	"\x04name\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x04name\x123\n" +
@@ -435,30 +594,36 @@ func file_numinance_kinds_v1_playbook_proto_rawDescGZIP() []byte {
 	return file_numinance_kinds_v1_playbook_proto_rawDescData
 }
 
-var file_numinance_kinds_v1_playbook_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_numinance_kinds_v1_playbook_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_numinance_kinds_v1_playbook_proto_goTypes = []any{
-	(*Playbook)(nil),       // 0: numinance.kinds.v1.Playbook
-	(*PlaybookSpec)(nil),   // 1: numinance.kinds.v1.PlaybookSpec
-	(*PlaybookStep)(nil),   // 2: numinance.kinds.v1.PlaybookStep
-	(*Qualification)(nil),  // 3: numinance.kinds.v1.Qualification
-	nil,                    // 4: numinance.kinds.v1.Playbook.ExtensionsEntry
-	(*Metadata)(nil),       // 5: numinance.kinds.v1.Metadata
-	(v1.RiskClass)(0),      // 6: numinance.annotations.v1.RiskClass
-	(*structpb.Value)(nil), // 7: google.protobuf.Value
+	(*Playbook)(nil),            // 0: numinance.kinds.v1.Playbook
+	(*PlaybookSpec)(nil),        // 1: numinance.kinds.v1.PlaybookSpec
+	(*RolloutPlan)(nil),         // 2: numinance.kinds.v1.RolloutPlan
+	(*CanaryStage)(nil),         // 3: numinance.kinds.v1.CanaryStage
+	(*PlaybookStep)(nil),        // 4: numinance.kinds.v1.PlaybookStep
+	(*Qualification)(nil),       // 5: numinance.kinds.v1.Qualification
+	nil,                         // 6: numinance.kinds.v1.Playbook.ExtensionsEntry
+	(*Metadata)(nil),            // 7: numinance.kinds.v1.Metadata
+	(*durationpb.Duration)(nil), // 8: google.protobuf.Duration
+	(v1.RiskClass)(0),           // 9: numinance.annotations.v1.RiskClass
+	(*structpb.Value)(nil),      // 10: google.protobuf.Value
 }
 var file_numinance_kinds_v1_playbook_proto_depIdxs = []int32{
-	5, // 0: numinance.kinds.v1.Playbook.metadata:type_name -> numinance.kinds.v1.Metadata
-	1, // 1: numinance.kinds.v1.Playbook.spec:type_name -> numinance.kinds.v1.PlaybookSpec
-	4, // 2: numinance.kinds.v1.Playbook.extensions:type_name -> numinance.kinds.v1.Playbook.ExtensionsEntry
-	2, // 3: numinance.kinds.v1.PlaybookSpec.steps:type_name -> numinance.kinds.v1.PlaybookStep
-	3, // 4: numinance.kinds.v1.PlaybookSpec.qualification:type_name -> numinance.kinds.v1.Qualification
-	6, // 5: numinance.kinds.v1.PlaybookStep.risk:type_name -> numinance.annotations.v1.RiskClass
-	7, // 6: numinance.kinds.v1.Playbook.ExtensionsEntry.value:type_name -> google.protobuf.Value
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	7,  // 0: numinance.kinds.v1.Playbook.metadata:type_name -> numinance.kinds.v1.Metadata
+	1,  // 1: numinance.kinds.v1.Playbook.spec:type_name -> numinance.kinds.v1.PlaybookSpec
+	6,  // 2: numinance.kinds.v1.Playbook.extensions:type_name -> numinance.kinds.v1.Playbook.ExtensionsEntry
+	4,  // 3: numinance.kinds.v1.PlaybookSpec.steps:type_name -> numinance.kinds.v1.PlaybookStep
+	5,  // 4: numinance.kinds.v1.PlaybookSpec.qualification:type_name -> numinance.kinds.v1.Qualification
+	2,  // 5: numinance.kinds.v1.PlaybookSpec.rollout:type_name -> numinance.kinds.v1.RolloutPlan
+	3,  // 6: numinance.kinds.v1.RolloutPlan.stages:type_name -> numinance.kinds.v1.CanaryStage
+	8,  // 7: numinance.kinds.v1.RolloutPlan.window:type_name -> google.protobuf.Duration
+	9,  // 8: numinance.kinds.v1.PlaybookStep.risk:type_name -> numinance.annotations.v1.RiskClass
+	10, // 9: numinance.kinds.v1.Playbook.ExtensionsEntry.value:type_name -> google.protobuf.Value
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_numinance_kinds_v1_playbook_proto_init() }
@@ -468,15 +633,15 @@ func file_numinance_kinds_v1_playbook_proto_init() {
 	}
 	file_numinance_kinds_v1_meta_proto_init()
 	file_numinance_kinds_v1_playbook_proto_msgTypes[1].OneofWrappers = []any{}
-	file_numinance_kinds_v1_playbook_proto_msgTypes[2].OneofWrappers = []any{}
-	file_numinance_kinds_v1_playbook_proto_msgTypes[3].OneofWrappers = []any{}
+	file_numinance_kinds_v1_playbook_proto_msgTypes[4].OneofWrappers = []any{}
+	file_numinance_kinds_v1_playbook_proto_msgTypes[5].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numinance_kinds_v1_playbook_proto_rawDesc), len(file_numinance_kinds_v1_playbook_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
