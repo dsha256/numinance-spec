@@ -15,6 +15,7 @@ The Numinance command line. This directory is the open build; the command logic 
 numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
 numi validate --files [--json] path
 numi init --ci github-actions|jenkins|both [--org-dir DIR] [--package-manager uv|pip|poetry] [--python-version 3.N] [--verifiers LIST] [--force] [path]
+numi suggest --out DIR [path]
 numi version
 ```
 
@@ -65,6 +66,25 @@ What it writes (`.numinance/policy/` is the protected location of section 12: a 
 **Validating the output.** The open build schema-checks every document and exits 7 ("profile resolution needs the Numinance engine build"); `numi validate --files .numinance` of the open build exits 0 after the schema check only. The engine build (`numinance/cmd/numi`, reads a committed revision) exits 0 and prints the digest and provenance: commit the files first, then `numi validate .` (or `numi validate --org ORG_DIR .`). The `unit-tests` verifier is pytest, which runs candidate code and is UNAVAILABLE in the live verifier provider until its nested sandbox exists: its layer and the verdict come out inconclusive, never a pass. Until then the supported set is `numi init --verifiers lint,typecheck`.
 
 Files are written with `os.Root` (no path leaves the directory), refusing links, with mode 0644 (directories 0755), each through a temporary name and a rename, and what a failed run created is removed again. Tests: `go test ./sdk/go/cli` (golden files `testdata/init_*.golden`, rewritten deliberately with `-update`).
+
+## Suggest (`numi suggest`)
+
+`numi suggest --out DIR [path]` reads a Python repository and writes up to three ticket files into `DIR`, each in the format `numi v1a run --ticket FILE --path P` consumes (a UTF-8 text file whose first `# ` line is the title), and prints the exact `--path` for each. It is in both builds (public function `cli.RunSuggest`).
+
+It is a deterministic local scan. It is not an Engine run and not the Suggest rung of the autonomy ladder: no model is called, no policy decision is made, no evidence is recorded, no network is used, and no repository code is imported or run. The design (section 23) lists no `numi suggest`; this command is a helper that produces tickets for the operator to read and run, so the operator does not have to write the first tickets by hand.
+
+| Signal | Rule | Ticket scope (`--path`) |
+|---|---|---|
+| `untested-function` | a top-level public `def` whose name appears in no test file (any identifier token in `tests/`, `test/`, `test_*.py`, `*_test.py`) | one test file `tests/test_<module>.py` (`test/` if only that directory exists) |
+| `missing-type-hints` | a public top-level `def` with an unannotated parameter or no return annotation | the source file |
+| `missing-docstring` | a public top-level `def` whose body does not start with a string | the source file |
+| `todo-comment` | a `# TODO` or `# FIXME` comment | the source file |
+
+Selection: kinds in the order above, taking the first finding (sorted by path, then line) whose source file and target path are not yet used, until three; so the tickets differ in kind and file when the repository allows. Decorated functions, names starting with `_`, `__init__.py`, `__main__.py`, `setup.py`, `noxfile.py`, `conftest.py` and anything under `tests`, `test`, `docs`, `doc`, `examples` or `scripts` are not proposed.
+
+Bounds and safety. Files are read through `os.Root` with `Lstat` and a size-limited reader: regular files only, no links, no hidden entries, no `venv`, `node_modules`, `site-packages`, `__pycache__`, `build`, `dist`, `vendor`, `third_party`, `*.egg-info`, no `docs/design`; at most 20000 entries, 2000 Python files, 256 KiB per file, 32 MiB in all, 20000 lines per file, 30 s; invalid UTF-8 files are skipped. Only paths of `[A-Za-z0-9._/-]` (at most 200 bytes) are proposed, so every `--path` passes the `numi v1a run` path rules. Repository text reaches a ticket only in a final block labelled untrusted data: identifiers are ASCII by construction and a TODO text is cut to 120 runes and escaped (control, bidi and zero-width characters, backslash and double quote), inside quotes. The task text above the block is fixed. Output: `DIR` is created with mode 0700 when missing and must be outside the repository (any spelling or link); containment is decided by file identity of the directory and of every ancestor of its real path, so a case alias or a link to a subdirectory is refused, a '..' element in --out is refused (the operating system resolves it after a link), and the tickets are written through the real path that was checked; a bind mount of a repository subdirectory on Linux is NOT detected (known gap, follow-up card); files are mode 0600, never overwrite (exit 5), and are removed again if a later write fails. The repository is never written. Not used: ruff or any other subprocess (they would read repository configuration and add a tool dependency); a later card may add them.
+
+Exit codes: 0 ok (also when nothing can be suggested, and then nothing is written), 2 usage, 3 invalid (including `--out` inside the repository), 4 not found, 5 conflict, 1 internal.
 
 ## Exit codes (stable)
 

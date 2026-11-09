@@ -17,6 +17,9 @@ type Root struct {
 	// Init runs "numi init ..." with the arguments after "init". Both builds set it to RunInit. When nil the
 	// command is unknown.
 	Init func(ctx context.Context, args []string, stdout, stderr io.Writer) int
+	// Suggest runs "numi suggest ..." with the arguments after "suggest". Both builds set it to RunSuggest. When nil
+	// the command is unknown.
+	Suggest func(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	// Version is printed by "numi version".
 	Version string
 	// Stdout and Stderr receive the output and the errors; nil discards.
@@ -37,6 +40,9 @@ func (r Root) Run(ctx context.Context, args []string) int {
 		if r.Init != nil {
 			names = append(names, "init")
 		}
+		if r.Suggest != nil {
+			names = append(names, "suggest")
+		}
 		if r.Evidence != nil {
 			names = append(names, "evidence")
 		}
@@ -52,6 +58,10 @@ func (r Root) Run(ctx context.Context, args []string) int {
 	case "init":
 		if r.Init != nil {
 			return r.Init(ctx, args[1:], r.Stdout, r.Stderr)
+		}
+	case "suggest":
+		if r.Suggest != nil {
+			return r.Suggest(ctx, args[1:], r.Stdout, r.Stderr)
 		}
 	case "evidence":
 		if r.Evidence != nil {

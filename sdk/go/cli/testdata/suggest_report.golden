@@ -1,0 +1,13 @@
+numi suggest: repository "REPO"
+scanned: 7 python files (4 source, 2 test), 476 bytes
+suggestion 1: untested-function
+  ticket: "OUT/01-add-tests-parse_config.md"
+  run: numi v1a run --ticket "OUT/01-add-tests-parse_config.md" --path "tests/test_cfg.py" (plus your usual flags)
+suggestion 2: missing-type-hints
+  ticket: "OUT/02-add-type-hints-add.md"
+  run: numi v1a run --ticket "OUT/02-add-type-hints-add.md" --path "src/demo/calc.py" (plus your usual flags)
+suggestion 3: missing-docstring
+  ticket: "OUT/03-add-docstring-greet.md"
+  run: numi v1a run --ticket "OUT/03-add-docstring-greet.md" --path "src/demo/names.py" (plus your usual flags)
+note: a deterministic local scan, not an Engine run: no model, no policy decision; the repository was only read
+note: read each ticket before running it; the --path shown is the only file the change may touch
