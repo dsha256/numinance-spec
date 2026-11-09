@@ -82,6 +82,9 @@ type initData struct {
 	PrimaryCI             ciSystem
 	// TicketFile is true for --tickets file: only the README says where tickets come from; no binding is written.
 	TicketFile bool
+	// Branch and Owners come from the discovery report: the default branch (a safe name or empty) and a sentence on
+	// CODEOWNERS built from fixed text and a safe path or pattern.
+	Branch, Owners string
 }
 
 func newInitData(o initOptions) initData {

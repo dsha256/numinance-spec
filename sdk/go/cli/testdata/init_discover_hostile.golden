@@ -1,0 +1,172 @@
+##### stdout
+numi init: repository "REPO"
+found: source files: python 1
+found: github-actions workflows: ok.yml
+found: ruff in pyproject.toml [tool.ruff]
+found: no default branch recorded in .git (no clone metadata)
+found: skipped while walking: 2 links, 1 hidden entries, directories none
+found: commands a person runs for these tools: lint uv run ruff check
+chose: package manager uv (detected from pyproject.toml with no package manager table, the default)
+chose: python 3.12 (default)
+chose: verifiers lint (detected from ruff in pyproject.toml [tool.ruff])
+chose: ci github-actions (detected from .github/workflows/ok.yml)
+chose: language python (detected from 1 python files)
+chose: scm github (default)
+chose: tickets none (default)
+wrote ".numinance/policy/sdlc-profile.yaml"
+wrote ".numinance/policy/autonomy.yaml"
+wrote ".numinance/policy/stage-registry.yaml"
+wrote ".numinance/policy/playbook-bugfix-bounded.yaml"
+wrote ".numinance/policy/toolchain-python.yaml"
+wrote ".numinance/README.md"
+wrote ".numinance/DISCOVERY.md"
+note: no pytest found; unit-tests is not in the verifiers (add it with --verifiers)
+note: no mypy found; typecheck is not in the verifiers (add it with --verifiers)
+note: no CODEOWNERS file; protect .numinance/policy/** with branch protection and a CODEOWNERS rule so agents cannot change their own gates
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: without --org-dir the stage registry is not selected and floors are the engine's shipped floors (PR; HIGH at SUGGEST)
+next: numi validate "REPO"
+##### files
+=== .github/workflows/ok.yml ===
+on: workflow_dispatch
+=== .numinance/DISCOVERY.md ===
+# Discovery report
+
+Written by `numi init`. It lists what init found by reading this repository (files only; nothing was executed and
+no repository text was followed as an instruction) and why each value in `.numinance/` was chosen. A flag of
+`numi init` overrides a finding. This file carries no authority; review the documents in `policy/`.
+
+## Found
+
+    found: source files: python 1
+    found: github-actions workflows: ok.yml
+    found: ruff in pyproject.toml [tool.ruff]
+    found: no default branch recorded in .git (no clone metadata)
+    found: skipped while walking: 2 links, 1 hidden entries, directories none
+    found: commands a person runs for these tools: lint uv run ruff check
+
+## Chose
+
+    chose: package manager uv (detected from pyproject.toml with no package manager table, the default)
+    chose: python 3.12 (default)
+    chose: verifiers lint (detected from ruff in pyproject.toml [tool.ruff])
+    chose: ci github-actions (detected from .github/workflows/ok.yml)
+    chose: language python (detected from 1 python files)
+    chose: scm github (default)
+    chose: tickets none (default)
+
+## Notes
+
+    note: no pytest found; unit-tests is not in the verifiers (add it with --verifiers)
+    note: no mypy found; typecheck is not in the verifiers (add it with --verifiers)
+    note: no CODEOWNERS file; protect .numinance/policy/** with branch protection and a CODEOWNERS rule so agents cannot change their own gates
+=== .numinance/README.md ===
+# .numinance
+
+Written by `numi init`. Typed Numinance configuration for this repository (design section 8). Review it like code.
+
+- `policy/` is the protected location: a document there carries authority only when it is read from the protected
+  branch of the repository, so protect `.numinance/policy/**` with branch protection and CODEOWNERS. Agents cannot change
+  their own gates.
+- Toolchain: Python 3.12, package manager uv, verifiers lint.
+- CI: github-actions.
+- Discovery: `DISCOVERY.md` lists what `numi init` found in this repository and why it chose each value above.
+- Ownership: no CODEOWNERS file was found.
+- Autonomy: PR only. The ladder level is `AUTONOMY_LEVEL_PR`: the agent opens pull requests and never merges.
+  `PR_ONLY` is a separate thing, a state of the engine's breaker.
+- Floors: a floor set in a repository is refused, because floors come only from the org scope and control packs. With no
+  organization policy repository the engine applies its shipped floor, which caps every change at PR (HIGH risk at
+  SUGGEST). Only the org scope selects the stage registry and grants names, so here the stage registry is defined but not
+  selected and the playbook, toolchain and adapter bindings are listed as outside the org-granted set. Run `numi init --org-dir DIR` to write
+  the org documents.
+
+The kernel floors (separation of duties, plan before side effects, evidence by the runner only, autonomy and residency
+ceilings and others) are part of the Numinance engine, always on, and no document in this tree or in an organization
+repository can weaken them. Nothing here references them, because there is nothing to reference.
+=== .numinance/policy/autonomy.yaml ===
+# AutonomyPolicy "pr-only", written by "numi init". The ladder level is AUTONOMY_LEVEL_PR: the agent may open pull requests
+# and may never merge. (PR_ONLY is a breaker state of the engine, not a ladder level; this document is the ladder side.)
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: pr-only, scope: SCOPE_REPO}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  # No floors block: a floor set below the org scope is refused. When no org document sets floors the engine applies its
+  # shipped floor (at most SUGGEST for HIGH risk and above, at most PR for the rest), which caps every change at PR.
+  # Run "numi init --org-dir DIR" to write an explicit floors block into an organization policy repository.
+=== .numinance/policy/playbook-bugfix-bounded.yaml ===
+# Playbook "bugfix-bounded", written by "numi init": a bounded bug fix that ends in a pull request. The verifier names are
+# the ones of the LanguageToolchain python-3.12.
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: bugfix-bounded, scope: SCOPE_REPO}
+spec:
+  change_type: bugfix
+  steps:
+    # One step per identity kind. The capability_set names are the ones the deployment defines: implement (author-agent:
+    # the branch push and the pull request), review (reviewer-agent: verifier.run), release (release-pipeline: the read-only
+    # status of the pull request). No step merges: Numinance opens pull requests only.
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_MEDIUM, evidence: [diff, pr-ref], verifiers: [lint]}
+    - {name: review, capability_set: review, risk: RISK_CLASS_LOW}
+    - {name: pr-status, capability_set: release, risk: RISK_CLASS_LOW}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+=== .numinance/policy/sdlc-profile.yaml ===
+# SDLCProfile of this repository, written by "numi init". It binds the names defined in this tree
+# (or granted by the organization policy repository) to this repository.
+#
+# CI: github-actions
+#   github-actions: the ciexecutor provider dev.numinance.ci-github-actions exists in the open plugins (replay and live builds).
+#   It starts a workflow_dispatch workflow that the repository already defines on its default branch
+#   (the README of that provider says what the workflow must declare). A live run is not yet verified.
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.12]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+=== .numinance/policy/stage-registry.yaml ===
+# StageRegistry "pr-only", written by "numi init": the stage names of this repository mapped onto the fixed Change state
+# machine. The registry names no stage for the Merging state, so no stage of it can merge; the last stage is the human
+# pr-gate. Each CI system has its own verify stage. Only the org scope selects a registry
+# (SDLCProfile.stages), so below the org this registry is defined but not selected.
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: pr-only, scope: SCOPE_REPO}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    # Static checks run by the verifier provider on the candidate.
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+    # GitHub Actions: runs the repository's own workflow through the ciexecutor port.
+    - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+    - name: pr-gate
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: maintainer
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        required_approvals: 1
+      requires: [ci-github-actions]
+=== .numinance/policy/toolchain-python.yaml ===
+# LanguageToolchain for Python, written by "numi init". The toolchain is explicit: language, version, package manager and
+# the verifier set are the values chosen by the flags of "numi init" or detected in the repository; edit them here.
+# The verifier provider takes the check to run in "config.check". It may also take "settings", the text of the tool's own
+# settings file (ruff.toml, mypy.ini, pytest.ini); it never reads settings files of the candidate.
+apiVersion: numinance.dev/v1
+kind: LanguageToolchain
+metadata: {name: python-3.12, scope: SCOPE_REPO}
+spec:
+  language: python
+  version: "3.12"
+  verifiers:
+    - {name: lint, provider: dev.numinance.verifier-python, config: {check: ruff, timeout_seconds: 60}}
+  package_manager: uv
+=== app.py ===
+=== pyproject.toml ===
+[tool.ruff]

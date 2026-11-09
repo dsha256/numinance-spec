@@ -25,7 +25,7 @@ func readFiles(t *testing.T, dir string) map[string]string {
 	t.Helper()
 	files := map[string]string{}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil || d.IsDir() || d.Type()&fs.ModeSymlink != 0 {
 			return err
 		}
 		b, err := os.ReadFile(p) //nolint:gosec // walks t.TempDir
@@ -201,7 +201,7 @@ func TestInit_Run_FlagErrorsExitUsage(t *testing.T) {
 		args []string
 		want string
 	}{
-		{name: "no ci", args: []string{repo}, want: "--ci is required"},
+		{name: "empty ci", args: []string{"--ci", "", repo}, want: "--ci"},
 		{name: "unknown ci", args: []string{"--ci", "circleci", repo}, want: "--ci"},
 		{name: "unknown package manager", args: []string{"--ci", "both", "--package-manager", "conda", repo}, want: "--package-manager"},
 		{name: "python 2", args: []string{"--ci", "both", "--python-version", "2.7", repo}, want: "--python-version"},

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"flag"
@@ -16,12 +15,16 @@ import (
 // initTimeout bounds one "numi init" run.
 const initTimeout = 30 * time.Second
 
-const initUsage = `usage: numi init --ci github-actions|jenkins|both [flags] [path]
-  --ci SYSTEM             CI system(s) to wire: github-actions, jenkins or both (required)
+const initUsage = `usage: numi init [flags] [path]
+numi init inspects the repository (files only, nothing is executed) and writes .numinance/ from what it finds. Every
+flag below overrides what it found; the report says what was found and why each value was chosen.
+  --ci SYSTEM             CI system(s) to wire: github-actions, jenkins or both (default: detected from .github/workflows
+                          and Jenkinsfile; else github-actions)
   --org-dir DIR           also write the org-scoped documents (stage registry, grants, floors) into this organization policy repository
   --package-manager NAME  uv, pip or poetry (default: detected from uv.lock, poetry.lock, pyproject.toml, requirements.txt; else uv)
-  --python-version X.Y    Python version of the toolchain (default: .python-version, else 3.12)
-  --verifiers LIST        comma-separated subset of unit-tests,lint,typecheck (default: all three)
+  --python-version X.Y    Python version of the toolchain (default: .python-version, .tool-versions, requires-python; else 3.12)
+  --verifiers LIST        comma-separated subset of unit-tests,lint,typecheck (default: the ones whose tool (pytest, ruff, mypy)
+                          the repository shows; else all three)
   --language python       toolchain language; python is the only value (default python)
   --scm github            source-control provider; github is the only value (default github)
   --tickets file          tickets come from the ticket file the run is given (numi v1a run --ticket FILE); writes no ticketing binding
@@ -63,10 +66,12 @@ func closedChoices() []closedChoice {
 	}
 }
 
-// RunInit runs "numi init" with the arguments after "init" and returns the exit code. It writes a .numinance template
-// for a Python repository: an SDLCProfile, a StageRegistry, a Playbook, a LanguageToolchain, an AutonomyPolicy of PR
-// only and the adapter bindings of the chosen CI systems. The documents are template data of the first onboarding; the
-// code names no CI vendor. It never overwrites without --force, never follows a link and writes through os.Root.
+// RunInit runs "numi init" with the arguments after "init" and returns the exit code. It inspects the repository
+// (inspectRepo: files only, bounded, nothing executed) and writes a .numinance for it: an SDLCProfile, a
+// StageRegistry, a Playbook, a LanguageToolchain, an AutonomyPolicy of PR only and the adapter bindings of the CI
+// systems it found, plus DISCOVERY.md, the report of what it found and why it chose each value. A flag overrides what
+// was found. The code names no CI vendor: vendor names are template data. It never overwrites without --force, never
+// follows a link and writes through os.Root.
 func RunInit(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if stdout == nil {
 		stdout = io.Discard
@@ -138,7 +143,10 @@ func parseInit(args []string, stdout, stderr io.Writer) (initOptions, int) {
 	}
 	switch ci {
 	case "":
-		return usage("--ci is required: github-actions, jenkins or both")
+		if given["ci"] {
+			return usage("--ci is empty: github-actions, jenkins or both")
+		}
+		// Not given: runInit detects the CI system from the repository.
 	case ciGitHubActions:
 		opts.CIGitHub = true
 	case ciJenkins:
@@ -189,51 +197,23 @@ func runInit(ctx context.Context, opts initOptions) (string, error) {
 	case err != nil:
 		return "", safeErrorf(KindInvalid, "%s is not a directory that can be opened", quote(opts.Path))
 	}
-	h, err := detectHints(repoRoot)
+	in, err := inspectRepo(ctx, repoRoot)
 	_ = repoRoot.Close()
 	if err != nil {
 		return "", err
 	}
-	if len(h.Conflict) > 0 && opts.PackageManager == "" {
-		return "", Errorf(KindUsage, "conflicting package manager hints (%s); pass --package-manager", strings.Join(h.Conflict, ", "))
+	disc, err := decide(in, &opts)
+	if err != nil {
+		return "", err
 	}
-
-	manager := choice{Value: opts.PackageManager, Source: "flag"}
-	if manager.Value == "" {
-		manager = choice{Value: cmp.Or(h.PackageManager, defaultPackageManager), Source: "detected from " + h.Source}
-		if h.PackageManager == "" {
-			manager.Source = "default, no hint in the directory"
-		}
-	}
-	version := choice{Value: opts.PythonVersion, Source: "flag"}
-	if version.Value == "" {
-		version = choice{Value: cmp.Or(h.PythonVersion, defaultPythonVersion), Source: "detected from " + h.VersionSource}
-		if h.PythonVersion == "" {
-			version.Source = "default"
-		}
-	}
-	verifiers := choice{Value: strings.Join(opts.Verifiers, " "), Source: "flag"}
-	if len(opts.Verifiers) == 0 {
-		all := pythonVerifiers()
-		names := make([]string, len(all))
-		for i, v := range all {
-			names[i] = v.Name
-		}
-		opts.Verifiers = names
-		verifiers = choice{Value: strings.Join(names, " "), Source: "default"}
-	}
-	opts.PackageManager, opts.PythonVersion = manager.Value, version.Value
-	language, scm, tickets := closedChoiceOf(opts.Language, "python"), closedChoiceOf(opts.SCM, "github"), closedChoiceOf(opts.Tickets, "")
-	if tickets.Value == "" {
-		tickets.Value = "none"
-	}
-	opts.TicketFile = opts.Tickets == "file"
 
 	data := newInitData(opts)
+	data.Branch, data.Owners = disc.Branch, disc.Owners
 	repoFiles, err := planRepoTree(data)
 	if err != nil {
 		return "", Errorf(KindInternal, "%v", err)
 	}
+	repoFiles = append(repoFiles, outFile{Path: discoveryFile, Data: disc.markdown()})
 	repo, err := openTree(opts.Path, repoFiles, opts.Force)
 	if err != nil {
 		return "", err
@@ -265,13 +245,8 @@ func runInit(ctx context.Context, opts initOptions) (string, error) {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "numi init: repository \"%s\"\n", clean(opts.Path, maxFieldRunes))
-	fmt.Fprintf(&b, "chose: package manager %s\n", manager)
-	fmt.Fprintf(&b, "chose: python %s\n", version)
-	fmt.Fprintf(&b, "chose: verifiers %s\n", verifiers)
-	fmt.Fprintf(&b, "chose: ci %s (flag)\n", data.CIText())
-	fmt.Fprintf(&b, "chose: language %s\n", language)
-	fmt.Fprintf(&b, "chose: scm %s\n", scm)
-	fmt.Fprintf(&b, "chose: tickets %s\n", tickets)
+	foundLines, choseLines, noteLines := disc.stdoutLines()
+	b.WriteString(foundLines + choseLines)
 	for _, f := range repoFiles {
 		fmt.Fprintf(&b, "wrote \"%s\"\n", f.Path)
 	}
@@ -281,6 +256,7 @@ func runInit(ctx context.Context, opts initOptions) (string, error) {
 			fmt.Fprintf(&b, "wrote \"%s\"\n", f.Path)
 		}
 	}
+	b.WriteString(noteLines)
 	b.WriteString("autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)\n")
 	if data.Jenkins {
 		b.WriteString("note: the Jenkins provider dev.numinance.ciexecutor-jenkins exists in replay mode only (a live run is owed and it is not yet in the release bundle); the Jenkins binding names it\n")

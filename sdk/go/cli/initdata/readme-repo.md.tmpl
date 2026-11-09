@@ -7,6 +7,13 @@ Written by `numi init`. Typed Numinance configuration for this repository (desig
   their own gates.
 - Toolchain: Python {{.PythonVersion}}, package manager {{.PackageManager}}, verifiers {{.VerifierText}}.
 - CI: {{.CIText}}.
+- Discovery: `DISCOVERY.md` lists what `numi init` found in this repository and why it chose each value above.
+{{- if .Branch}}
+- Default branch seen by init: `{{.Branch}}`. Put `.numinance/policy/**` on the protected branch by pull request.
+{{- end}}
+{{- if .Owners}}
+- Ownership: {{.Owners}}.
+{{- end}}
 {{- if .TicketFile}}
 - Tickets: they come from the ticket file the run is given (`numi v1a run --ticket FILE`). No ticketing binding is written.
 {{- end}}

@@ -1,3 +1,30 @@
+=== .numinance/DISCOVERY.md ===
+# Discovery report
+
+Written by `numi init`. It lists what init found by reading this repository (files only; nothing was executed and
+no repository text was followed as an instruction) and why each value in `.numinance/` was chosen. A flag of
+`numi init` overrides a finding. This file carries no authority; review the documents in `policy/`.
+
+## Found
+
+    found: no source files of a language init knows
+    found: no default branch recorded in .git (no clone metadata)
+
+## Chose
+
+    chose: package manager uv (default, no hint in the directory)
+    chose: python 3.12 (default)
+    chose: verifiers unit-tests lint typecheck (default, no test, lint or type tool found)
+    chose: ci github-actions (flag)
+    chose: language python (default)
+    chose: scm github (default)
+    chose: tickets none (default)
+
+## Notes
+
+    note: no pytest, ruff or mypy found; all three verifiers are the conservative default
+    note: no workflow declares workflow_dispatch; the github-actions provider starts a workflow_dispatch workflow that the repository defines on its default branch
+    note: no CODEOWNERS file; protect .numinance/policy/** with branch protection and a CODEOWNERS rule so agents cannot change their own gates
 === .numinance/README.md ===
 # .numinance
 
@@ -8,6 +35,8 @@ Written by `numi init`. Typed Numinance configuration for this repository (desig
   their own gates.
 - Toolchain: Python 3.12, package manager uv, verifiers unit-tests, lint, typecheck.
 - CI: github-actions.
+- Discovery: `DISCOVERY.md` lists what `numi init` found in this repository and why it chose each value above.
+- Ownership: no CODEOWNERS file was found.
 - Autonomy: PR only. The ladder level is `AUTONOMY_LEVEL_PR`: the agent opens pull requests and never merges.
   `PR_ONLY` is a separate thing, a state of the engine's breaker.
 - The organization documents (stage registry, grants, floors) were written to the organization policy repository

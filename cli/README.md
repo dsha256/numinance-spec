@@ -14,7 +14,7 @@ The Numinance command line. This directory is the open build; the command logic 
 ```
 numi validate [--rev REV] [--org DIR] [--component ROOT] [--json] [path]
 numi validate --files [--json] path
-numi init --ci github-actions|jenkins|both [--org-dir DIR] [--package-manager uv|pip|poetry] [--python-version 3.N] [--verifiers LIST] [--force] [path]
+numi init [--ci github-actions|jenkins|both] [--org-dir DIR] [--package-manager uv|pip|poetry] [--python-version 3.N] [--verifiers LIST] [--force] [path]
 numi suggest --out DIR [path]
 numi extension verify [--lockfile FILE] [--store DIR] [--json]
 numi version
@@ -34,21 +34,21 @@ numi version
 
 ## Init (`numi init`)
 
-`numi init --ci github-actions|jenkins|both [path]` writes a `.numinance/` template for a Python repository, so the first repository can be onboarded and checked with `numi validate`. The command is in both builds (it needs no resolver) and is the public function `cli.RunInit`. It names no CI vendor in code: vendor names appear in the template data (`sdk/go/cli/initdata/*.tmpl`) and in the generated documents only.
+`numi init [path]` inspects the repository and writes a `.numinance/` for it from what it found, so the first repository can be onboarded and checked with `numi validate`. Every flag overrides a finding. When nothing is found the defaults are the conservative ones (see "Discovery" below). The command is in both builds (it needs no resolver) and is the public function `cli.RunInit`. It names no CI vendor in code: vendor names appear in the template data (`sdk/go/cli/initdata/*.tmpl`) and in the generated documents only.
 
 | Flag | Meaning |
 |---|---|
-| `--ci SYSTEM` | `github-actions`, `jenkins` or `both`. Required: absent is a usage error (exit 2), because a default CI would wire a system the repository may not have |
+| `--ci SYSTEM` | `github-actions`, `jenkins` or `both`. Default: detected, `github-actions` when `.github/workflows` holds a `.yml` or `.yaml` file and `jenkins` when a `Jenkinsfile` is in the root (both: `both`); with neither, `github-actions` (the provider that exists), reported as a default. An empty `--ci ""` is a usage error |
 | `--org-dir DIR` | also write the org-scoped documents into this organization policy repository (see below) |
 | `--package-manager NAME` | `uv`, `pip` or `poetry`. Default: detected from the target directory in this order: `uv.lock`, `poetry.lock`, `pyproject.toml` (`[tool.poetry]`, `[tool.uv]`), `requirements.txt`; with none of them `uv`. Two different managers named by the directory (for example `uv.lock` and `poetry.lock`) are a usage error until the flag decides |
-| `--python-version 3.N` | default: the first line of `.python-version` when it is a plain `3.N` or `3.N.P`, else `3.12` |
-| `--verifiers LIST` | comma-separated subset of `unit-tests`, `lint`, `typecheck` (pytest, ruff, mypy of the verifier provider); default all three |
+| `--python-version 3.N` | default, first match: the first line of `.python-version` when it is a plain `3.N` or `3.N.P`; `python 3.N` in `.tool-versions`; the lower bound of `requires-python` in `pyproject.toml`; the lower bound of `python` under `[tool.poetry.dependencies]`; else `3.12` |
+| `--verifiers LIST` | comma-separated subset of `unit-tests`, `lint`, `typecheck` (pytest, ruff, mypy of the verifier provider). Default: the verifiers whose tool the repository shows (see "Discovery"); with none shown, all three |
 | `--language python` | optional; python is the only accepted value and the default. Absent, the report says `chose: language python (default)`. Any other value is a usage error (exit 2): `--language go: only python has a toolchain template` |
 | `--scm github` | optional; github is the only accepted value and the default (`chose: scm github (default)`). Any other value is exit 2: `--scm gitlab: only github has a provider` |
 | `--tickets file` | optional; `file` is the only accepted value. Absent, no ticket binding (`chose: tickets none (default)`). Given, it writes no ticketing binding and no new kind field (the ticketing port has no file provider yet); it adds one line to `.numinance/README.md`: tickets come from the ticket file the run is given (`numi v1a run --ticket FILE`). Any other value is exit 2: `--tickets jira: no ticketing provider exists yet; use file` |
 | `--force` | overwrite the files init writes in an existing `.numinance`; other files are never touched |
 
-It prints each choice with its source (`flag`, `detected from uv.lock`, `default`), the files it wrote and notes. Exit codes: 0 OK, 2 usage, 3 invalid (the path is not a directory, or the config directory, `policy/` or a document is a symbolic link or not a regular file), 4 the directory is missing, 5 conflict (`.numinance` already has any file and no `--force`; also a leftover `*.numi-init.tmp`), 1 internal.
+It prints what it found (`found:`), each choice with its source (`chose: ... (flag)`, `(detected from uv.lock)`, `(default, ...)`), the files it wrote and notes (`note:`), and writes the same lines to `.numinance/DISCOVERY.md`. Exit codes: 0 OK, 2 usage, 3 invalid (the path is not a directory, or the config directory, `policy/` or a document is a symbolic link or not a regular file), 4 the directory is missing, 5 conflict (`.numinance` already has any file and no `--force`; also a leftover `*.numi-init.tmp`), 1 internal.
 
 What it writes (`.numinance/policy/` is the protected location of section 12: a document there carries authority, so protect it with branch protection and CODEOWNERS):
 
@@ -60,7 +60,21 @@ What it writes (`.numinance/policy/` is the protected location of section 12: a 
 | `policy/playbook-bugfix-bounded.yaml` | Playbook | three steps, one per identity kind, with the capability set names the deployment defines: `fix` (`implement`, MEDIUM, evidence `diff` and `pr-ref`, the verifiers of the toolchain; the branch push and the pull request), `review` (`review`) and `pr-status` (`release`, read-only status of the pull request). No step merges |
 | `policy/toolchain-python.yaml` | LanguageToolchain | language, version, `package_manager` and the verifiers with provider `dev.numinance.verifier-python` and `config.check` |
 | `ci-jenkins.yaml` | AdapterSelector | only for `--ci both` without `--org-dir`; outside `policy/`, so no authority |
-| `README.md` | | what the tree is |
+| `README.md` | | what the tree is, the default branch and the CODEOWNERS state init saw |
+| `DISCOVERY.md` | | the discovery report below; outside `policy/`, so no authority. Always in the repository tree, also with `--org-dir` |
+
+**Discovery.** `inspectRepo` (`sdk/go/cli/init_inspect.go`) reads the repository as untrusted data: files only, nothing is executed (no `uv`, `pytest`, VCS command, hook or script), through an `os.Root`, regular files only, no link followed (a link as a file, as `.github` or as any parent directory is skipped and counted), each file cut at 64 KiB (the report names a file that was cut), at most 32 workflow files, 8 requirements files, 2000 entries per directory, 5000 entries and depth 4 in the language walk, which skips hidden entries, `vendor`, `node_modules`, `venv`, `site-packages`, `__pycache__` and `third_party`, and what a previous run wrote in `.numinance`. Matching is on text, not a TOML or YAML parse: a table header, a settings file name, or the tool name as a word. A name from the repository is printed or written only when it is in `[A-Za-z0-9._-]` (workflow and requirements file names, branch names, CODEOWNERS patterns); anything else is counted and skipped, so a hostile name never reaches a document. Convention files (`AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `.editorconfig`, `.pre-commit-config.yaml`, `Makefile`, `tox.ini`, `noxfile.py`, the pull request template) are listed and never read.
+
+| Finding | Where it looks | Used for |
+|---|---|---|
+| Languages | extension counts in the bounded walk | the `chose: language` source, and a note when another language has more files than python (the python toolchain is then the template default and must be replaced by hand) |
+| Package manager | as `--package-manager` above | `package_manager`; `Pipfile`, `pdm.lock`, `environment.yml`, `setup.py` are noted as having no toolchain value |
+| pytest, ruff, mypy | strongest first: `pytest.ini`, `ruff.toml`, `.ruff.toml`, `mypy.ini`, `.mypy.ini`; a `[tool.pytest...]`, `[tool.ruff...]` or `[tool.mypy...]` table in `pyproject.toml`; `[tool:pytest]` or `[mypy]` in `setup.cfg`; `[pytest]` in `tox.ini`; `conftest.py`; the name as a dependency in `pyproject.toml` or `requirements*.txt`; the name in `.pre-commit-config.yaml`, `Jenkinsfile` or a workflow | the verifier set (`unit-tests`, `lint`, `typecheck`); a tool not found is noted, with the flag that adds it; none found gives all three. The report also prints the command a person runs for each (`uv run pytest`, `poetry run ruff check`) for comparison with the repository's own scripts; the verifier provider runs its own check |
+| CI | `.github/workflows/*.yml` and `*.yaml`, `Jenkinsfile` | the `ciexecutor` binding and CI stages; a note when no workflow declares `workflow_dispatch`, which the github-actions provider needs |
+| Default branch | `.git/refs/remotes/origin/HEAD`, else `.git/HEAD` (reported as the checked-out branch, not the default) | the report and the README; no kind has a field for it |
+| CODEOWNERS | `.github/CODEOWNERS`, `CODEOWNERS`, `docs/CODEOWNERS` | the report and the README: whether a rule (`*`, `**` or `.numinance...`) covers `.numinance/`, with a note when none does |
+
+The documents are the same as before; discovery changes which verifiers, CI stages, version and package manager they name. Autonomy stays at PR only and floors are as in "PR only" below. Not built here: `numi discover` of design section 23 (reading enforcement artifacts into draft kinds with confidence annotations, a self-test against HEAD and opening a pull request) is a later card. Tests: `go test ./sdk/go/cli` (fixture repositories with golden files `testdata/init_discover_*.golden`: python with uv, pytest, ruff and GitHub Actions; poetry with Jenkins; requirements only; empty; a Go repository; a hostile one with links, odd names, a file over the read limit and prompt-injection text).
 
 **PR only.** The ladder level is `AUTONOMY_LEVEL_PR` (the agent opens pull requests and never merges). `PR_ONLY` is a breaker state of the engine, not a ladder level. Floors are a ceiling and only the org scope and control packs may set them, so a floors block in a repository is refused by the loader and the resolver. With `--org-dir` the org tree gets an AutonomyPolicy whose floors cap every change at PR (`match: {risk: RISK_CLASS_READ}` matches every class; HIGH stays at SUGGEST); without it the engine applies its shipped floor, which is the same cap. The kernel floors (design section 12) are always on in the engine and no document can weaken them; a repository has no way to reference them, so the generated README says so instead.
 

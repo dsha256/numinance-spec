@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"regexp"
@@ -47,7 +46,8 @@ type hint struct {
 
 // detectHints looks for pyproject.toml, uv.lock, poetry.lock, requirements.txt and .python-version at the top of the
 // target repository. It never follows a link and reads at most maxHintBytes of a regular file. A missing file is no hint.
-func detectHints(root *os.Root) (hint, error) {
+func detectHints(r *repoReader) (hint, error) {
+	root := r.root
 	var h hint
 	type found struct{ manager, source string }
 	var hits []found
@@ -61,10 +61,7 @@ func detectHints(root *os.Root) (hint, error) {
 			hits = append(hits, found{f.manager, f.file})
 		}
 	}
-	pyproject, err := readHint(root, "pyproject.toml", maxHintBytes)
-	if err != nil {
-		return hint{}, err
-	}
+	pyproject := r.text("pyproject.toml", maxHintBytes)
 	hasPyproject := pyproject != nil
 	if hasPyproject {
 		if bytes.Contains(pyproject, []byte("[tool.poetry]")) || bytes.Contains(pyproject, []byte("[tool.poetry.")) {
@@ -94,15 +91,8 @@ func detectHints(root *os.Root) (hint, error) {
 			h.PackageManager, h.Source = defaultPackageManager, "pyproject.toml with no package manager table, the default"
 		}
 	}
-	if b, err := readHint(root, ".python-version", maxVersionBytes); err != nil {
-		return hint{}, err
-	} else if b != nil {
-		first, _, _ := strings.Cut(string(b), "\n")
-		if m := dotPythonVersionRe.FindStringSubmatch(strings.TrimSpace(first)); m != nil {
-			h.PythonVersion, h.VersionSource = m[1], ".python-version"
-		}
-	}
-	return h, nil
+	h.PythonVersion, h.VersionSource = pythonVersionHint(r, pyproject)
+	return h, r.err
 }
 
 // regularFile reports whether name exists in root as a regular file. A link or a special file is not one and is not
@@ -116,27 +106,6 @@ func regularFile(root *os.Root, name string) (bool, error) {
 		return false, Errorf(KindInternal, "cannot inspect %s", name)
 	}
 	return fi.Mode().IsRegular(), nil
-}
-
-// readHint reads at most limit bytes of the regular file name; nil means the file is absent or not regular.
-func readHint(root *os.Root, name string, limit int64) ([]byte, error) {
-	ok, err := regularFile(root, name)
-	if err != nil || !ok {
-		return nil, err
-	}
-	f, err := root.Open(name)
-	if err != nil {
-		return nil, Errorf(KindInternal, "cannot read %s", name)
-	}
-	defer func() { _ = f.Close() }()
-	b, err := io.ReadAll(io.LimitReader(f, limit))
-	if err != nil {
-		return nil, Errorf(KindInternal, "cannot read %s", name)
-	}
-	if b == nil {
-		b = []byte{}
-	}
-	return b, nil
 }
 
 // choice is a value init chose and where it came from, for the report.
