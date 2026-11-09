@@ -13,6 +13,8 @@ import (
 	"time"
 
 	pluginv1 "github.com/numinance/numinance-spec/sdk/go/gen/numinance/plugin/v1"
+
+	"github.com/numinance/numinance-spec/plugins/official/internal/ghprovider"
 )
 
 // Limits of what the provider reads from the tracker: every answer is untrusted, so it is size-limited and time-bound before it
@@ -38,11 +40,13 @@ var (
 )
 
 // client is a REST client bound to one instance host. It builds every URL itself, from the host it was given and the path
-// segments of the call; it never follows a redirect, never fetches a URL found in an answer and sets no credential header
-// (the replay needs none; a live build asks the host for a handle, see the README).
+// segments of the call; it never follows a redirect, never fetches a URL found in an answer and sets no header that
+// authenticates: a live call sends the credential handle the host gave it in ghprovider.HandleHeader and nothing else, and a
+// replay sends none.
 type client struct {
-	rt   http.RoundTripper
-	host string
+	rt     http.RoundTripper
+	host   string
+	handle string
 }
 
 // do sends one request and decodes a JSON answer into out (nil discards it). A status outside 200 to 299 is an *apiError.
@@ -73,6 +77,9 @@ func (c client) do(ctx context.Context, method string, segments []string, query 
 	req.Header.Set("Accept", "application/json")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.handle != "" {
+		req.Header.Set(ghprovider.HandleHeader, c.handle)
 	}
 	resp, err := (&http.Client{Transport: c.rt, Timeout: callTimeout, CheckRedirect: noRedirect}).Do(req)
 	if err != nil {
@@ -106,6 +113,8 @@ func noRedirect(*http.Request, []*http.Request) error { return http.ErrUseLastRe
 func failure(ctx context.Context, err error, readNotFound bool) error {
 	var ae *apiError
 	switch {
+	case errors.Is(err, ErrReadOnly):
+		return fail(pluginv1.Reason_REASON_PERMISSION_DENIED, msgReadOnly)
 	case errors.As(err, &ae):
 		switch {
 		case ae.status == http.StatusNotFound || (ae.status == http.StatusForbidden && readNotFound):

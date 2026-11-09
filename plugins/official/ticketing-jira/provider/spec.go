@@ -4,8 +4,9 @@
 // and bounded to the port's limits. A ticket never makes the provider fetch anything: it builds every URL from the one instance
 // host it was configured with and never follows a redirect.
 //
-// This build is replay only (ADR 0060, owed card 3). Live mode needs the credentials decision and the instance-bound network
-// intent decision (owed card 5); until then a provider that is not a replay answers every call as unavailable and sends nothing.
+// A replay build reads recorded exchanges and holds no credential. A live build (cmd/live) sends every request through the
+// egress proxy with a credential handle from the broker; it holds no token and declares one network destination, its instance
+// host on port 443 (decisions 2026-11-09/ticketing-jira-network-intent and 2026-11-09/ticketing-jira-credentials).
 package provider
 
 import (
@@ -29,7 +30,7 @@ const (
 	PluginID = "dev.numinance.ticketing-jira"
 	// ReplayPluginID is the extension id of the replaying build: the same provider over recorded, redacted exchanges.
 	ReplayPluginID = "dev.numinance.ticketing-jira-replay"
-	// Intent is the credential intent a live manifest declares for every capability; the broker catalog will resolve it (owed card 5).
+	// Intent is the credential intent a live manifest declares for every capability; the broker catalog resolves it to the Jira credential (decisions 2026-11-09/ticketing-jira-credentials).
 	Intent = "ticketing.jira.api"
 	// RecordType is the evidence record type every write declares.
 	RecordType = "ticketing-action"
@@ -110,7 +111,7 @@ func NewSpec(id, host string, t ghprovider.Transport) (ghprovider.Spec, error) {
 	}
 	natural, keyed := pluginv1.Idempotency_IDEMPOTENCY_NATURAL, pluginv1.Idempotency_IDEMPOTENCY_KEYED
 	read, write := pluginv1.SideEffect_SIDE_EFFECT_READ, pluginv1.SideEffect_SIDE_EFFECT_WRITE
-	p := &jira{host: host, replay: t.Replay, rt: t.RT}
+	p := &jira{host: host}
 	ro := func(llm string) ghprovider.Capability {
 		return ghprovider.Capability{Risk: annotationsv1.RiskClass_RISK_CLASS_READ, SideEffect: read, Idempotency: natural, LLM: llm}
 	}

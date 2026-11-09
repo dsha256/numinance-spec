@@ -392,8 +392,9 @@ func TestValidHost_RefusesWhatIsNotOneExactPublicName(t *testing.T) {
 	}
 }
 
-// Live mode is not part of this build: a provider that is not a replay sends nothing, whatever it is asked.
-func TestLive_IsNotAvailableAndSendsNothing(t *testing.T) {
+// A live provider whose host gives no credential handle (this test host never does) sends nothing, whatever it is asked: it never
+// falls back to an unauthenticated request.
+func TestLive_WithoutAHandleIsUnavailableAndSendsNothing(t *testing.T) {
 	rt := &counting{fn: func(*http.Request) (*http.Response, error) { return answer(200, "{}"), nil }}
 	srv, err := provider.New(provider.PluginID, replay.Host, "sha256:0", provider.Transport{RT: rt}, &recordingHost{}, nil)
 	if err != nil {

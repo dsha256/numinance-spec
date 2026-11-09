@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -139,19 +140,18 @@ func categoryName(s ticketingv1.IssueStateCategory) string {
 
 // jira is the provider's view of one instance.
 type jira struct {
-	host   string
-	replay bool
-	rt     http.RoundTripper
+	host string
 }
 
-// client returns the REST client of a call. Live mode is not part of this build: it needs the credentials and the network
-// intent decisions of ADR 0060 (owed cards 5 and 6), so a provider that is not the replay answers every call as unavailable
-// and sends nothing.
-func (p *jira) client() (client, error) {
-	if !p.replay {
-		return client{}, fail(pluginv1.Reason_REASON_UPSTREAM_UNAVAILABLE, msgNoLive)
+// client returns the REST client of a call. A live call asks the host for the credential handle of the manifest's intent first;
+// a host that cannot give one ends the call as unavailable and nothing is sent. The handle is the only thing that authenticates:
+// the egress proxy strips it and injects the credential the broker holds. A replay asks for none.
+func (p *jira) client(ctx context.Context, c *ghprovider.Call) (client, error) {
+	gc, err := c.Client(ctx)
+	if err != nil {
+		return client{}, fail(pluginv1.Reason_REASON_UPSTREAM_UNAVAILABLE, msgUnavailable)
 	}
-	return client{rt: p.rt, host: p.host}, nil
+	return client{rt: gc.Transport, host: p.host, handle: gc.Handle}, nil
 }
 
 func (p *jira) fetch(ctx context.Context, cl client, key string, q url.Values) (*issue, error) {
@@ -173,7 +173,7 @@ func receipt(ctx context.Context, c *ghprovider.Call, verb, project, key, result
 	}})
 }
 
-func (p *jira) getIssue(ctx context.Context, _ *ghprovider.Call, m *ticketingv1.GetIssueRequest) (*ticketingv1.GetIssueResponse, error) {
+func (p *jira) getIssue(ctx context.Context, c *ghprovider.Call, m *ticketingv1.GetIssueRequest) (*ticketingv1.GetIssueResponse, error) {
 	switch {
 	case !validProject(m.GetProject()):
 		return nil, invalid(msgProject)
@@ -182,7 +182,7 @@ func (p *jira) getIssue(ctx context.Context, _ *ghprovider.Call, m *ticketingv1.
 	case m.GetMaxBodyBytes() < 1 || m.GetMaxBodyBytes() > maxBodyBound:
 		return nil, invalid(msgBodyBound)
 	}
-	cl, err := p.client()
+	cl, err := p.client(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -248,14 +248,33 @@ func operationIDs(raw json.RawMessage) []string {
 // text and never as a wildcard, a fuzzy match, a phrase, a boolean or a field query.
 const jqlSpecial = `+-&|!(){}[]^~*?\:/`
 
-// escapeText returns text ready for the inside of a JQL string literal in a text search: a backslash before a special character
-// (written as two in the literal) and before the quote.
+// operatorWords are the words the text search reads as boolean operators when they stand alone in capitals.
+var operatorWords = //nolint:gochecknoglobals // read-only table
+[]string{"AND", "OR", "NOT"}
+
+// escapeText returns text ready for the inside of a JQL string literal in a text search. A special character gets a backslash
+// for the text search (written as two in the literal). A quote is escaped for both layers, so it neither ends the literal nor
+// opens a phrase the search cannot parse. The words AND, OR and NOT are operators only in capitals and the search ignores case,
+// so each is written in lower case: still matched as a word, never read as an operator.
 func escapeText(t string) string {
-	var b strings.Builder
+	var b, word strings.Builder
+	flush := func() {
+		w := word.String()
+		if slices.Contains(operatorWords, w) {
+			w = strings.ToLower(w)
+		}
+		b.WriteString(w)
+		word.Reset()
+	}
 	for _, r := range t {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
+			word.WriteRune(r)
+			continue
+		}
+		flush()
 		switch {
 		case r == '"':
-			b.WriteString(`\"`)
+			b.WriteString(`\\\"`)
 		case strings.ContainsRune(jqlSpecial, r):
 			b.WriteString(`\\`)
 			if r == '\\' {
@@ -267,6 +286,7 @@ func escapeText(t string) string {
 			b.WriteRune(r)
 		}
 	}
+	flush()
 	return b.String()
 }
 
@@ -289,7 +309,7 @@ func JQL(project, text string, state ticketingv1.IssueStateCategory) string {
 	return q + ` ORDER BY key ASC`
 }
 
-func (p *jira) searchIssues(ctx context.Context, _ *ghprovider.Call, m *ticketingv1.SearchIssuesRequest) (*ticketingv1.SearchIssuesResponse, error) {
+func (p *jira) searchIssues(ctx context.Context, c *ghprovider.Call, m *ticketingv1.SearchIssuesRequest) (*ticketingv1.SearchIssuesResponse, error) {
 	switch {
 	case !validProject(m.GetProject()):
 		return nil, invalid(msgProject)
@@ -300,7 +320,7 @@ func (p *jira) searchIssues(ctx context.Context, _ *ghprovider.Call, m *ticketin
 	case m.GetMaxResults() < 1 || m.GetMaxResults() > maxResults:
 		return nil, invalid(msgResultsBound)
 	}
-	cl, err := p.client()
+	cl, err := p.client(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +396,7 @@ func (p *jira) commentOnIssue(ctx context.Context, c *ghprovider.Call, m *ticket
 	case c.DryRun():
 		return nil, invalid(msgDryRun)
 	}
-	cl, err := p.client()
+	cl, err := p.client(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -398,6 +418,12 @@ func (p *jira) commentOnIssue(ctx context.Context, c *ghprovider.Call, m *ticket
 		if json.Unmarshal(raw, &rec) != nil || !idRe.MatchString(rec.CommentID) {
 			return nil, fail(pluginv1.Reason_REASON_UPSTREAM_ERROR, msgUpstream)
 		}
+		// The property is written by anyone who can edit the issue, so it only names a comment: the call answers Existing when
+		// that comment is ours (our credential's account wrote it) and says what was asked. Anything else fails closed, with
+		// nothing posted: no false claim of a comment, and no second comment either.
+		if err := p.recorded(ctx, cl, m.GetIssueKey(), rec.CommentID, m.GetBody()); err != nil {
+			return nil, err
+		}
 		receipt(ctx, c, "comment", m.GetProject(), m.GetIssueKey(), rec.CommentID)
 		return &ticketingv1.CommentOnIssueResponse{CommentId: rec.CommentID, Existing: true}, nil
 	}
@@ -418,6 +444,37 @@ func (p *jira) commentOnIssue(ctx context.Context, c *ghprovider.Call, m *ticket
 	return &ticketingv1.CommentOnIssueResponse{CommentId: made.ID}, nil
 }
 
+// recorded checks that the comment an issue property names is the one this call would make: it exists on the issue, its author is
+// the account of the credential in use and its text is the text asked for, plain paragraphs only. The tracker's answer is
+// untrusted: the check reads two fields and compares; nothing else of the comment is used.
+func (p *jira) recorded(ctx context.Context, cl client, issueKey, commentID, body string) error {
+	var found struct {
+		ID     string `json:"id"`
+		Author *struct {
+			AccountID string `json:"accountId"`
+		} `json:"author"`
+		Body json.RawMessage `json:"body"`
+	}
+	if err := cl.do(ctx, http.MethodGet, []string{"issue", issueKey, "comment", commentID}, nil, nil, &found); err != nil {
+		var ae *apiError
+		if errors.As(err, &ae) && ae.status == http.StatusNotFound {
+			return fail(pluginv1.Reason_REASON_UPSTREAM_ERROR, msgUpstream)
+		}
+		return failure(ctx, err, false)
+	}
+	var me struct {
+		AccountID string `json:"accountId"`
+	}
+	if err := cl.do(ctx, http.MethodGet, []string{"myself"}, nil, nil, &me); err != nil {
+		return failure(ctx, err, false)
+	}
+	text, plain := plainParagraphs(found.Body)
+	if found.ID != commentID || found.Author == nil || me.AccountID == "" || found.Author.AccountID != me.AccountID || !plain || text != body {
+		return fail(pluginv1.Reason_REASON_UPSTREAM_ERROR, msgUpstream)
+	}
+	return nil
+}
+
 func (p *jira) transitionIssue(ctx context.Context, c *ghprovider.Call, m *ticketingv1.TransitionIssueRequest) (*ticketingv1.TransitionIssueResponse, error) {
 	switch {
 	case !validProject(m.GetProject()):
@@ -427,7 +484,7 @@ func (p *jira) transitionIssue(ctx context.Context, c *ghprovider.Call, m *ticke
 	case !knownState(m.GetTarget()):
 		return nil, invalid(msgTarget)
 	}
-	cl, err := p.client()
+	cl, err := p.client(ctx, c)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +567,7 @@ func (p *jira) linkIssue(ctx context.Context, c *ghprovider.Call, m *ticketingv1
 	case m.GetProject() == m.GetBlockedProject() && m.GetIssueKey() == m.GetBlockedIssueKey():
 		return nil, invalid(msgSelfLink)
 	}
-	cl, err := p.client()
+	cl, err := p.client(ctx, c)
 	if err != nil {
 		return nil, err
 	}

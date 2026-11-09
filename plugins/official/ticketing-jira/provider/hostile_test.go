@@ -96,13 +96,13 @@ func TestComment_RefusesBodiesThatCouldDisguiseThemselves(t *testing.T) {
 func TestEvidence_IsAReceiptOfFourFields(t *testing.T) {
 	tg := newTarget(t)
 	ctx := t.Context()
-	secret := "kit-secret-comment-body-qzxj"
+	secret := "Checks passed."
 	for range 2 {
 		_, ev, err := tg.CommentOnIssue(ctx, ticketingkit.Options{Key: "kit-comment-1"}, &ticketingv1.CommentOnIssueRequest{Project: "PAY", IssueKey: "PAY-1", Body: secret})
 		if err != nil || len(ev) != 1 || ev[0].Type != "ticketing-action" || len(ev[0].Fields) != 4 {
 			t.Fatalf("CommentOnIssue = %v, %v, want one ticketing-action record of four fields", ev, err)
 		}
-		if strings.Contains(strings.Join(ev[0].Fields, " "), "qzxj") || strings.HasPrefix(ev[0].Fields[0], "key=kit") {
+		if strings.Contains(strings.Join(ev[0].Fields, " "), "Checks passed") || strings.HasPrefix(ev[0].Fields[0], "key=kit") {
 			t.Errorf("the record %v holds the comment text or the host key", ev[0].Fields)
 		}
 	}

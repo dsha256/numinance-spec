@@ -52,8 +52,8 @@ func TestCassette_OnlyReservedHostsAndTenants(t *testing.T) {
 		Tokens: vocabulary(),
 		Keys:   keys(),
 		// The dotted names of the README: the plugin id, the file and identifier names it mentions. Never a host.
-		Dotted: []string{"dev.numinance.ticketing-jira", "jira.json", "numinance.ports.ticketing.v1", "PluginService.Invoke", "ticketing.proto",
-			"ticketing.query_language", "ticketingkit.Observer", "ticketingkit.ScanDirWith", "world_test.go"},
+		Dotted: []string{"dev.numinance.ticketing-jira", "jira.json", "live.go", "live_test.go", "errors.go", "numinance.ports.ticketing.v1", "PluginService.Invoke", "ticketing.proto",
+			"ticketing.query_language", "ticketing.jira.api", "ticketingkit.Observer", "ticketingkit.ScanDirWith", "world_test.go"},
 	}
 	problems, err := ticketingkit.ScanDirWith(fstest.MapFS{
 		"testdata/jira.json": {Data: replay.Embedded()},

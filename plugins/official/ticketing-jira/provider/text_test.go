@@ -58,7 +58,12 @@ func TestJQL_TextIsEscapedNeverSpliced(t *testing.T) {
 	}{
 		{"plain text", "PAY", "invoice", unset, `project = "PAY" AND text ~ "invoice" ORDER BY key ASC`},
 		{"no text", "PAY", "", unset, `project = "PAY" ORDER BY key ASC`},
-		{"a quote cannot end the literal", "PAY", `a" OR project = "OPS`, unset, `project = "PAY" AND text ~ "a\" OR project = \"OPS" ORDER BY key ASC`},
+		{"a quote cannot end the literal or open a phrase", "PAY", `a" OR project = "OPS`, unset, `project = "PAY" AND text ~ "a\\\" or project = \\\"OPS" ORDER BY key ASC`},
+		{"a bare quote is escaped for the text search too", "PAY", `"`, unset, `project = "PAY" AND text ~ "\\\"" ORDER BY key ASC`},
+		{"operator words are neutralised, other words are not", "PAY", `fire AND ice OR NOT x ANDROID and NOTE`, unset,
+			`project = "PAY" AND text ~ "fire and ice or not x ANDROID and NOTE" ORDER BY key ASC`},
+		{"an operator word next to punctuation is neutralised", "PAY", `(a)AND(b) OR_x _NOT`, unset,
+			`project = "PAY" AND text ~ "\\(a\\)and\\(b\\) OR_x _NOT" ORDER BY key ASC`},
 		{"a backslash is doubled twice", "PAY", `a\b`, unset, `project = "PAY" AND text ~ "a\\\\b" ORDER BY key ASC`},
 		{"wildcards and operators are escaped", "PAY", `*?~+-&|!(){}[]^:/`, unset,
 			`project = "PAY" AND text ~ "\\*\\?\\~\\+\\-\\&\\|\\!\\(\\)\\{\\}\\[\\]\\^\\:\\/" ORDER BY key ASC`},
@@ -210,7 +215,7 @@ func TestPick_ChoosesTheLowestAvailableTransitionWithoutAScreen(t *testing.T) {
 func TestFixedMessages_StayInTheClosedVocabulary(t *testing.T) {
 	for _, m := range []string{
 		msgProject, msgIssueKey, msgBlockedProject, msgBlockedKey, msgBodyBound, msgResultsBound, msgText, msgState, msgTarget, msgLinkType, msgSelfLink,
-		msgComment, msgKey, msgDryRun, msgNotFound, msgNoTrans, msgRefused, msgRateLimited, msgUnavailable, msgUpstream, msgOverLimit, msgTimeout, msgNoLive,
+		msgComment, msgKey, msgDryRun, msgNotFound, msgNoTrans, msgRefused, msgRateLimited, msgUnavailable, msgUpstream, msgOverLimit, msgTimeout, msgReadOnly,
 	} {
 		if len(m) > 200 || strings.ContainsAny(m, "'\"\\%+=@") || strings.IndexFunc(m, func(r rune) bool { return r > 0x7e }) >= 0 || strings.ContainsAny(m, "0123456789") {
 			t.Errorf("message %q is outside the closed vocabulary of the kit or holds a digit", m)

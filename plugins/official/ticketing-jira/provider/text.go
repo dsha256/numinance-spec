@@ -223,3 +223,39 @@ func commentDocument(body string) map[string]any {
 	}
 	return map[string]any{"type": "doc", "version": 1, "content": paras}
 }
+
+// plainParagraphs reads a comment body that is exactly what commentDocument builds: a document of paragraphs whose only inline
+// nodes are unmarked text. It returns the paragraphs joined by a line feed, and false for anything else (a mention, a link mark,
+// a table, a body that is not a document), so an edited comment is never taken for the one the provider posted.
+func plainParagraphs(raw json.RawMessage) (string, bool) {
+	var doc struct {
+		Type    string `json:"type"`
+		Version int    `json:"version"`
+		Content []struct {
+			Type    string `json:"type"`
+			Content []struct {
+				Type  string            `json:"type"`
+				Text  string            `json:"text"`
+				Marks []json.RawMessage `json:"marks"`
+			} `json:"content"`
+		} `json:"content"`
+	}
+	if json.Unmarshal(raw, &doc) != nil || doc.Type != "doc" || len(doc.Content) == 0 || len(doc.Content) > maxADFNodes {
+		return "", false
+	}
+	lines := make([]string, 0, len(doc.Content))
+	for _, p := range doc.Content {
+		if p.Type != "paragraph" || len(p.Content) > 1 {
+			return "", false
+		}
+		line := ""
+		for _, n := range p.Content {
+			if n.Type != "text" || len(n.Marks) > 0 {
+				return "", false
+			}
+			line = n.Text
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n"), true
+}

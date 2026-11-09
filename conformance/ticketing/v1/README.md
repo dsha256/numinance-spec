@@ -9,7 +9,7 @@ a test can apply to any provider. Modes are those of ADR 0015: replay, live publ
 `kit_test.go` proves the kit against a small in-memory fake (`fake_test.go`, with the
 fixture `testdata/tracker.json`): the conforming fake passes every case, and each of fifty-six fakes broken in one way fails exactly the cases
 that guard that fault (and no other); a fake with four faults at once fails several. A provider's own test builds a `Target` over its replaying build and calls `ticketingkit.Run`, exactly as the
-`scmkit` and `cikit` tests do. The official provider `plugins/official/ticketing-jira` runs all 24 cases against its replaying build.
+`scmkit` and `cikit` tests do. The official provider `plugins/official/ticketing-jira` runs all 24 cases against its replaying build and against its live build (through a fake egress proxy to a fake Jira over TLS on a reserved name).
 
 ## Core
 
@@ -78,7 +78,8 @@ of these in its own replay tests:
 - Mentions and notifications (TICKETING-024 through `Observer`), above.
 - Egress rules. The kit cannot see the network. The provider's manifest declares only the exact host and port of the instance
   and the host enforces them (ADR 0060 ruling OQ2); a read-scoped token or a method-restricted injection rule is required before
-  any live card (decision 9).
+  any live card (decision 9). The Jira live build meets it as the decisions rows `2026-11-09/ticketing-jira-network-intent` and
+  `2026-11-09/ticketing-jira-credentials` say: a read-only account, and a transport that sends reads only unless write-back is on.
 - Redirects. The provider never follows a redirect with the injected credential.
 - Ticket-supplied URLs. No URL inside ticket content or a response (ADF media, `self`, pagination, inline cards) is ever
   fetched.

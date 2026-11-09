@@ -162,6 +162,19 @@ func linkBody(f fix, links ...string) map[string]any {
 	return map[string]any{"key": f.key, "fields": map[string]any{"project": projectOf(f), "issuelinks": entries}}
 }
 
+// commentAnswer is what Jira answers for a comment: its id, its author and its body as a document of plain paragraphs.
+func commentAnswer(id, text string) map[string]any {
+	paras := make([]any, 0, strings.Count(text, "\n")+1)
+	for _, line := range strings.Split(text, "\n") {
+		p := map[string]any{"type": "paragraph"}
+		if line != "" {
+			p["content"] = []any{map[string]any{"type": "text", "text": line}}
+		}
+		paras = append(paras, p)
+	}
+	return map[string]any{"id": id, "author": map[string]any{"accountId": me}, "body": map[string]any{"type": "doc", "version": 1, "content": paras}}
+}
+
 func commentBody(f fix, prop, commentID string) map[string]any {
 	m := map[string]any{"key": f.key, "fields": map[string]any{"project": projectOf(f)}}
 	if commentID != "" {
@@ -195,13 +208,19 @@ func issuePath(key string, rest ...string) string {
 	return "/rest/api/3/issue/" + strings.Join(append([]string{key}, rest...), "/")
 }
 
-// comment is one comment the kit makes, in the order of its cases: the issue, the host idempotency key, the id Jira gives it.
-type comment struct{ issue, key, id string }
+// comment is one comment the kit makes, in the order of its cases: the issue, the host idempotency key, the id Jira gives it and
+// the text the kit sent. The kit makes some of them twice; the second call reads the comment back, so the world answers for it
+// (a comment made once has no text here, which also keeps the markup of case TICKETING-024, with its at sign, out of the file).
+type comment struct{ issue, key, id, text string }
+
+// me is the account of the invented credential: the author of every comment of the world and the answer of the identity read.
+const me = "globex"
 
 var comments = //nolint:gochecknoglobals // read-only table
 []comment{
-	{"PAY-1", "kit-comment-1", "10001"}, {"PAY-1", "kit-comment-2", "10002"}, {"PAY-1", "kit-ev-comment", "10003"},
-	{"PAY-1", "kit-ev-secret", "10004"}, {"PAY-1", "kit-reuse", "10005"}, {"PAY-1", "kit-markup", "10006"}, {"PAY-6", "kit-reuse", "20001"},
+	{"PAY-1", "kit-comment-1", "10001", "Checks passed."}, {"PAY-1", "kit-comment-2", "10002", "Checks passed."},
+	{"PAY-1", "kit-ev-comment", "10003", "Evidence check."}, {"PAY-1", "kit-ev-secret", "10004", "kit-secret-comment-body-qzxj"},
+	{"PAY-1", "kit-reuse", "10005", "First issue."}, {"PAY-1", "kit-markup", "10006", ""}, {"PAY-6", "kit-reuse", "20001", "Another issue."},
 }
 
 // commentProbes are the calls the kit makes on issues that answer not found, with the key of the call.
@@ -342,7 +361,11 @@ func build() replay.Cassette {
 		add("GET", issuePath(cm.issue), commentQuery(prop), nil, g(v, "absent"), nil, 200, commentBody(f, prop, ""))
 		add("GET", issuePath(cm.issue), commentQuery(prop), nil, g(v, "present"), nil, 200, commentBody(f, prop, cm.id))
 		add("PUT", issuePath(cm.issue, "properties", prop), "", map[string]any{"commentId": cm.id}, g(v, "absent"), g(v, "present"), 201, nil)
+		if cm.text != "" {
+			add("GET", issuePath(cm.issue, "comment", cm.id), "", nil, g(v, "present"), nil, 200, commentAnswer(cm.id, cm.text))
+		}
 	}
+	add("GET", "/rest/api/3/myself", "", nil, nil, nil, 200, map[string]any{"accountId": me})
 	for _, cm := range commentProbes {
 		prop := provider.CommentProperty(cm.key)
 		switch {
@@ -440,7 +463,7 @@ func marshal(c replay.Cassette) []byte {
 // back from the generated file.
 func vocabulary() []string {
 	v := []string{
-		redaction, "GET", "POST", "PUT", "/rest/api/3/issueLink", "/rest/api/3/search/jql", readQuery, transitionQuery, linkQuery,
+		redaction, "GET", "POST", "PUT", "/rest/api/3/issueLink", "/rest/api/3/search/jql", "/rest/api/3/myself", me, "doc", "paragraph", readQuery, transitionQuery, linkQuery,
 		"open", "done", "none", "a", "b", "ab", "absent", "present", "0", "1", "2", "3", "4", "5", "6", "7",
 		"To Do", "In Progress", "Done", "new", "indeterminate", "Blocks", "is blocked by", "blocks",
 		"Bug", "Task", dirtyType, dirtyOpID, "op_0123456789abcdef", notFoundText, noProjectMsg, notableCap,
@@ -457,7 +480,7 @@ func vocabulary() []string {
 	v = append(v, issuePath(missingKey), issuePath(missingKey, "transitions"), issuePath(missingKey, "comment"))
 	for _, cm := range append(slices.Clone(comments), commentProbes...) {
 		prop := provider.CommentProperty(cm.key)
-		v = append(v, prop, commentQuery(prop), issuePath(cm.issue, "properties", prop), "prop."+cm.issue+"."+cm.key)
+		v = append(v, prop, commentQuery(prop), issuePath(cm.issue, "properties", prop), "prop."+cm.issue+"."+cm.key, issuePath(cm.issue, "comment", cm.id), cm.text)
 	}
 	for _, s := range searches {
 		v = append(v, provider.JQL(s.project, s.text, s.state))
@@ -472,7 +495,7 @@ func keys() []string {
 		"key", "fields", "summary", "description", "issuetype", "labels", "project", "resolution", "properties", "numinance.operation_ids",
 		"name", "statusCategory", "issuelinks", "type", "inward", "outward", "outwardIssue", "inwardIssue", "transitions", "id", "to",
 		"hasScreen", "isAvailable", "transition", "issues", "isLast", "nextPageToken", "commentId", "errorMessages", "errors",
-		"content", "text", "version", "jql", "maxResults",
+		"content", "text", "version", "jql", "maxResults", "author", "accountId",
 		"PAY-6", "links.PAY-8", "comments.PAY-1", "comments.PAY-6",
 	}
 	for _, cm := range append(slices.Clone(comments), commentProbes...) {

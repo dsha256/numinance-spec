@@ -47,7 +47,7 @@ const (
 	msgUpstream    = "unexpected answer from the tracker"
 	msgOverLimit   = "tracker answer is over the size limit"
 	msgTimeout     = "tracker call timed out"
-	msgNoLive      = "live mode is not available in this build"
+	msgReadOnly    = "this build is read only, write-back is not enabled"
 )
 
 func fail(r pluginv1.Reason, msg string) error { return &CallError{Reason: r, Message: msg} }
