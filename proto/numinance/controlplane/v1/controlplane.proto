@@ -1,0 +1,359 @@
+// The control plane Connect API for the dashboard and the CLI (design section 20, "Connect API"). The control plane holds metadata only and the product works without it in sovereign mode. This file carries the part of section 20 that the control plane context implements: ChangeService (ListChanges, GetChange, Approve, Reject), FleetService (ListRunners, GetRunner, GetBreakerState) and LicenceService (GetLicence, Verify). BreakerService, RegistryService, KnowledgeService and the Escalate and GetEvidenceSummary verbs of ChangeService follow in later minors.
+// Identity: no request carries a tenant or a principal. The server derives both from the verified credential of the call (WorkOS or the customer OIDC provider for a human, the runner credential for a runner) and scopes every read and write to that tenant, so a caller can never name another tenant's data. A change, a host or a bundle of another tenant is NOT_FOUND, exactly as one that does not exist.
+// Mutations: Approve and Reject require a human principal. The server checks the decision against the author of the Change before it forwards it (the decider is not the author, and not in the author's run) and refuses with PERMISSION_DENIED otherwise. This is an early refusal: the runtime's verified-signal handler and policy decide again, and the control plane is never the authority for an approval.
+// Licensing: expiry stops upgrades, new packs, the hosted dashboard and support. It never stops an installed runtime from completing authorised work, applying policy or exporting evidence, and there is no remote kill switch (ADR 0017). LicenceState reports it; it is not an instruction to any runtime.
+// Untrusted text: titles and names come from the customer's own runtime and tickets, and are data. A client renders them as text, never as markup or instructions.
+// Every element is since 1.2.0.
+syntax = "proto3";
+
+package numinance.controlplane.v1;
+
+import "google/protobuf/timestamp.proto";
+import "numinance/annotations/v1/annotations.proto";
+
+// ChangeService reads the change summaries the control plane builds from change and release events, and carries a human's decision to the runtime.
+service ChangeService {
+  // ListChanges lists the caller's tenant's change summaries, most recently updated first. The page is bounded by page_size (default 50, at most 200).
+  rpc ListChanges(ListChangesRequest) returns (ListChangesResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Lists the change summaries of the caller's tenant, newest first."
+    };
+  }
+  // GetChange returns one change summary of the caller's tenant.
+  rpc GetChange(GetChangeRequest) returns (GetChangeResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Returns one change summary of the caller's tenant."
+    };
+  }
+  // Approve forwards a human approval of the Change to the runtime after checking it against the author. A replay with the same idempotency key forwards one decision. No dry run: the check is the call, and the runtime decides again; a refused approval changes nothing.
+  rpc Approve(ApproveRequest) returns (ApproveResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Forwards a human approval of a Change to the runtime after checking the approver against the author."
+    };
+  }
+  // Reject forwards a human rejection of the Change to the runtime under the same checks as Approve.
+  rpc Reject(RejectRequest) returns (RejectResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Forwards a human rejection of a Change to the runtime after checking the decider against the author."
+    };
+  }
+}
+
+// FleetService reads the runner hosts of the caller's tenant: versions, profiles, breaker state and liveness.
+service FleetService {
+  // ListRunners lists the tenant's runner hosts ordered by host id.
+  rpc ListRunners(ListRunnersRequest) returns (ListRunnersResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Lists the runner hosts of the caller's tenant with version, profile, breaker and liveness."
+    };
+  }
+  // GetRunner returns one runner host, including the offers of its last host attestation.
+  rpc GetRunner(GetRunnerRequest) returns (GetRunnerResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Returns one runner host of the caller's tenant with its attested sandbox offers."
+    };
+  }
+  // GetBreakerState returns the circuit breaker the runner last reported. It changes nothing: the breaker is customer-local, and a stale report says so.
+  rpc GetBreakerState(GetBreakerStateRequest) returns (GetBreakerStateResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Returns the circuit breaker state a runner host last reported, and whether the report is stale."
+    };
+  }
+}
+
+// LicenceService reads and verifies the tenant's Ed25519-signed licence.
+service LicenceService {
+  // GetLicence verifies the caller's tenant's stored licence file against the pinned public key and returns its state and what it permits now.
+  rpc GetLicence(GetLicenceRequest) returns (GetLicenceResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Returns the verified licence of the caller's tenant, its state and its entitlements."
+    };
+  }
+  // Verify checks a licence file (at most 65536 bytes) against the pinned public key and returns what it states and permits now, without storing it. A file that does not verify is INVALID_ARGUMENT with one fixed message.
+  rpc Verify(VerifyRequest) returns (VerifyResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_READ
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "Verifies a licence file against the pinned public key without storing it."
+    };
+  }
+}
+
+// ChangeSummary is one row of the change_summaries read model.
+message ChangeSummary {
+  // The change identifier, chg_ plus 32 lowercase hex characters.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The section 6 state name.
+  string state = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // A short label, printable text, at most 200 bytes; untrusted.
+  string title = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The author principal name of the Change.
+  string author = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The time of the last fact applied to the row.
+  google.protobuf.Timestamp updated_at = 5 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// ListChangesRequest pages the change summaries.
+message ListChangesRequest {
+  // Optional, 0 to 200: the most rows to return; 0 means 50.
+  uint32 page_size = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// ListChangesResponse is a page of summaries.
+message ListChangesResponse {
+  // The summaries, most recently updated first.
+  repeated ChangeSummary changes = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetChangeRequest names a change.
+message GetChangeRequest {
+  // Required: the change identifier.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetChangeResponse is one summary.
+message GetChangeResponse {
+  // The summary.
+  ChangeSummary change = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// ApproveRequest names the Change a human approves.
+message ApproveRequest {
+  // Required: the change identifier.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required, 1 to 128 printable bytes: the idempotency key; the same key forwards one decision.
+  string idempotency_key = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// ApproveResponse acknowledges that the decision passed the control plane's checks and was handed to the runtime.
+message ApproveResponse {
+  // True when the decision was forwarded. The Change's state changes only when the runtime accepts the decision, and a client reads it back through GetChange.
+  bool forwarded = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// RejectRequest names the Change a human rejects.
+message RejectRequest {
+  // Required: the change identifier.
+  string change_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required, 1 to 128 printable bytes: the idempotency key; the same key forwards one decision.
+  string idempotency_key = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// RejectResponse acknowledges that the decision passed the control plane's checks and was handed to the runtime.
+message RejectResponse {
+  // True when the decision was forwarded. The Change's state changes only when the runtime accepts the decision, and a client reads it back through GetChange.
+  bool forwarded = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// BreakerState is the circuit breaker a runner reports.
+enum BreakerState {
+  // Zero value; never returned.
+  BREAKER_STATE_UNSPECIFIED = 0;
+  // Work is flowing.
+  BREAKER_STATE_CLOSED = 1;
+  // The breaker is open and work is paused.
+  BREAKER_STATE_TRIPPED = 2;
+}
+
+// NodeStatus is the liveness of a runner host.
+enum NodeStatus {
+  // Zero value; never returned.
+  NODE_STATUS_UNSPECIFIED = 0;
+  // The last heartbeat is within the freshness window.
+  NODE_STATUS_ONLINE = 1;
+  // The last heartbeat is older than the freshness window: what is shown may no longer be true.
+  NODE_STATUS_STALE = 2;
+}
+
+// CanaryStatus is the canary outcome of one profile on a host.
+enum CanaryStatus {
+  // Zero value; never returned.
+  CANARY_STATUS_UNSPECIFIED = 0;
+  // The suite has not run since the runner started; never a pass.
+  CANARY_STATUS_NOT_RUN = 1;
+  // Every probe required of the profile passed.
+  CANARY_STATUS_PASSED = 2;
+  // A required probe failed; the profile is not served.
+  CANARY_STATUS_FAILED = 3;
+}
+
+// SandboxOffer is one sandbox profile a host offers, as the host attested it.
+message SandboxOffer {
+  // The section 13 profile name: process, container or gvisor.
+  string profile = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The runtime name and version, printable, 1 to 128 bytes.
+  string runtime_version = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The canary status of the profile on this host.
+  CanaryStatus canary = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when a process offer cannot run each run as its own OS user; for dev environments only.
+  bool shared_user = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// Runner is one fleet node.
+message Runner {
+  // The host identifier, printable, at most 128 bytes.
+  string host_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The runner version, strict x.y.z.
+  string version = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The name of the resolved profile the runner serves.
+  string profile = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The breaker the runner last reported.
+  BreakerState breaker = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The customer-controlled update window the runner reported; may be empty.
+  string update_window = 5 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The liveness at the time of the read.
+  NodeStatus status = 6 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The time of the first registration.
+  google.protobuf.Timestamp registered_at = 7 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The time of the last heartbeat.
+  google.protobuf.Timestamp last_heartbeat_at = 8 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The digest (sha256:hex) of the canonical host attestation.
+  string attestation_digest = 9 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The offers of the last host attestation. Listed by GetRunner only.
+  repeated SandboxOffer offers = 10 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// ListRunnersRequest has no field: the tenant comes from the credential.
+message ListRunnersRequest {}
+
+// ListRunnersResponse lists the nodes.
+message ListRunnersResponse {
+  // The runners ordered by host id, without offers.
+  repeated Runner runners = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetRunnerRequest names a host.
+message GetRunnerRequest {
+  // Required: the host identifier.
+  string host_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetRunnerResponse is one node.
+message GetRunnerResponse {
+  // The runner with its offers.
+  Runner runner = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetBreakerStateRequest names a host.
+message GetBreakerStateRequest {
+  // Required: the host identifier.
+  string host_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetBreakerStateResponse is the reported breaker.
+message GetBreakerStateResponse {
+  // The host identifier.
+  string host_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The breaker the runner last reported.
+  BreakerState state = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the last heartbeat is older than the freshness window.
+  bool stale = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// LicenceState is where a licence stands now.
+enum LicenceState {
+  // Zero value; never returned.
+  LICENCE_STATE_UNSPECIFIED = 0;
+  // Before the expiry.
+  LICENCE_STATE_ACTIVE = 1;
+  // After the expiry and within the grace period.
+  LICENCE_STATE_GRACE = 2;
+  // After expiry plus grace: upgrades, new packs, the hosted dashboard and support stop. The runtime does not.
+  LICENCE_STATE_EXPIRED = 3;
+}
+
+// Allowance is one named limit of a plan.
+message Allowance {
+  // The allowance name, printable, at most 64 bytes.
+  string name = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The limit, zero or more.
+  int64 limit = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// Licence is a verified licence with what it permits now.
+message Licence {
+  // The plan name.
+  string plan = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The allowances of the plan.
+  repeated Allowance allowances = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The expiry.
+  google.protobuf.Timestamp expiry = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The grace period after the expiry, in seconds.
+  int64 grace_seconds = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The state now.
+  LicenceState state = 5 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when upgrades are permitted now.
+  bool upgrades = 6 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when installing new packs is permitted now.
+  bool new_packs = 7 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the hosted dashboard is permitted now.
+  bool hosted_dashboard = 8 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when support is permitted now.
+  bool support = 9 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True always: no licence state stops an installed runtime from completing authorised work, applying policy or exporting evidence.
+  bool runtime = 10 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// GetLicenceRequest has no field: the tenant comes from the credential.
+message GetLicenceRequest {}
+
+// GetLicenceResponse is the verified licence.
+message GetLicenceResponse {
+  // The licence.
+  Licence licence = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// VerifyRequest carries a licence file.
+message VerifyRequest {
+  // Required, 1 to 65536 bytes: the licence file as issued.
+  bytes file = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// VerifyResponse is what a verified file states and permits now.
+message VerifyResponse {
+  // The licence.
+  Licence licence = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
