@@ -30,6 +30,9 @@ const (
 	treeQueue = "items[id,task[name,url],actions[parameters[name,value]]]"
 	treeBuild = "builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}"
 	treeJob   = "buildable,property[parameterDefinitions[name]]"
+	// treeItem is a queue item read by its id; treeSingle one build read by its number.
+	treeItem   = "id,cancelled,executable[number],task[name,url],actions[parameters[name,value]]"
+	treeSingle = "number,building,result,timestamp,duration,actions[parameters[name,value]]"
 )
 
 // errNoRun is locate's answer when neither the queue nor the recent builds carry the operation.
@@ -193,39 +196,115 @@ func (p impl) locate(ctx context.Context, cl client, job, op string) (*located, 
 		if it.ID <= 0 || !revisionRe.MatchString(rev) {
 			return nil, upstream()
 		}
+		p.seen.put(op, it.ID)
 		return &located{state: civ1.OperationState_OPERATION_STATE_QUEUED, queueID: it.ID, revision: rev}, nil
 	}
 	var l struct {
-		Builds []struct {
-			Number    int64          `json:"number"`
-			Building  bool           `json:"building"`
-			Result    *string        `json:"result"`
-			Timestamp int64          `json:"timestamp"`
-			Duration  int64          `json:"duration"`
-			Actions   []paramsAction `json:"actions"`
-		} `json:"builds"`
+		Builds []buildInfo `json:"builds"`
 	}
 	if _, err := cl.do(ctx, request{method: http.MethodGet, path: job + "/api/json", query: url.Values{"tree": {treeBuild}}}, &l); err != nil {
 		return nil, failure(ctx, err)
 	}
 	for _, b := range l.Builds {
-		if paramValue(b.Actions, paramOperation) != op {
-			continue
+		if paramValue(b.Actions, paramOperation) == op {
+			p.seen.forget(op)
+			return b.located()
 		}
-		rev := paramValue(b.Actions, paramRevision)
-		if b.Number <= 0 || b.Number > 1<<53 || !revisionRe.MatchString(rev) {
-			return nil, upstream()
-		}
-		out := &located{state: buildState(b.Building, b.Result), number: b.Number, revision: rev, started: epoch(b.Timestamp)}
-		if ended(out.state) && !out.started.IsZero() && b.Duration >= 0 {
-			out.finished = out.started.Add(time.Duration(b.Duration) * time.Millisecond)
-		}
-		return out, nil
+	}
+	// Neither list shows the run. For a run whose queue item is known, the item says what became of it (the gap between the
+	// queue and the build list); an unknown or expired item changes nothing below.
+	if run, found, err := p.inGap(ctx, cl, job, op); err != nil || found {
+		return run, err
 	}
 	if len(l.Builds) >= buildsWindow {
 		return nil, ghprovider.Fail(pluginv1.Reason_REASON_LIMIT_EXCEEDED)
 	}
 	return nil, errNoRun
+}
+
+// buildInfo is one build as the tree treeBuild asks for it.
+type buildInfo struct {
+	Number    int64          `json:"number"`
+	Building  bool           `json:"building"`
+	Result    *string        `json:"result"`
+	Timestamp int64          `json:"timestamp"`
+	Duration  int64          `json:"duration"`
+	Actions   []paramsAction `json:"actions"`
+}
+
+// located checks a build that carries our operation id against the grammar and turns it into a located run.
+func (b buildInfo) located() (*located, error) {
+	rev := paramValue(b.Actions, paramRevision)
+	if b.Number <= 0 || b.Number > 1<<53 || !revisionRe.MatchString(rev) {
+		return nil, upstream()
+	}
+	out := &located{state: buildState(b.Building, b.Result), number: b.Number, revision: rev, started: epoch(b.Timestamp)}
+	if ended(out.state) && !out.started.IsZero() && b.Duration >= 0 {
+		out.finished = out.started.Add(time.Duration(b.Duration) * time.Millisecond)
+	}
+	return out, nil
+}
+
+// inGap resolves a run that is in neither the queue nor the job's builds although this process knows its queue item: Jenkins takes
+// an item off the queue before the build shows in the job's list, and keeps the item at /queue/item/<id> for a few minutes with
+// the build it became (executable) or the mark that it was cancelled. It answers found false when the item says nothing (it is
+// unknown, expired, cancelled or not ours), so the caller treats the run as absent. An item that is not yet a build is a queued
+// run: found, and cancellable.
+func (p impl) inGap(ctx context.Context, cl client, job, op string) (run *located, found bool, err error) {
+	id, ok := p.seen.get(op)
+	if !ok {
+		return nil, false, nil
+	}
+	var it struct {
+		ID         int64 `json:"id"`
+		Cancelled  bool  `json:"cancelled"`
+		Executable *struct {
+			Number int64 `json:"number"`
+		} `json:"executable"`
+		Task struct {
+			Name string `json:"name"`
+			URL  string `json:"url"`
+		} `json:"task"`
+		Actions []paramsAction `json:"actions"`
+	}
+	req := request{method: http.MethodGet, path: "/queue/item/" + itoa(id) + "/api/json", query: url.Values{"tree": {treeItem}}}
+	if _, err := cl.do(ctx, req, &it); err != nil {
+		if isStatus(err, http.StatusNotFound) {
+			p.seen.forget(op)
+			return nil, false, nil
+		}
+		return nil, false, failure(ctx, err)
+	}
+	// The id is from this process's own sightings, but the answer is untrusted all the same: it must be our item.
+	ours, err := p.itemIsJob(it.Task.URL, it.Task.Name, job)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ours || it.ID != id || paramValue(it.Actions, paramOperation) != op {
+		p.seen.forget(op)
+		return nil, false, nil
+	}
+	if it.Cancelled {
+		p.seen.forget(op)
+		return nil, false, nil
+	}
+	if it.Executable != nil && it.Executable.Number > 0 {
+		var b buildInfo
+		if _, err := cl.do(ctx, request{method: http.MethodGet, path: job + "/" + itoa(it.Executable.Number) + "/api/json", query: url.Values{"tree": {treeSingle}}}, &b); err != nil {
+			return nil, false, failure(ctx, err)
+		}
+		if b.Number != it.Executable.Number || paramValue(b.Actions, paramOperation) != op {
+			return nil, false, upstream()
+		}
+		p.seen.forget(op)
+		run, err := b.located()
+		return run, err == nil, err
+	}
+	rev := paramValue(it.Actions, paramRevision)
+	if !revisionRe.MatchString(rev) {
+		return nil, false, upstream()
+	}
+	return &located{state: civ1.OperationState_OPERATION_STATE_QUEUED, queueID: id, revision: rev}, true, nil
 }
 
 // checkJob reads the job and fails unless it exists, can be built and declares every parameter the provider will send.

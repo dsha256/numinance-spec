@@ -48,7 +48,8 @@ func TestParseURL(t *testing.T) {
 		wantErr  bool
 	}{
 		{"plain host", "https://jenkins.example.test", provider.Config{Host: "jenkins.example.test", Port: 443}, false},
-		{"port and context path", "https://ci.example.test:8443/jenkins/", provider.Config{Host: "ci.example.test", Port: 8443, Prefix: "/jenkins"}, false},
+		{"explicit port 443 and context path", "https://ci.example.test:443/jenkins/", provider.Config{Host: "ci.example.test", Port: 443, Prefix: "/jenkins"}, false},
+		{"any other port is refused", "https://ci.example.test:8443/jenkins/", provider.Config{}, true},
 		{"http is refused", "http://jenkins.example.test", provider.Config{}, true},
 		{"port 80 is refused", "https://jenkins.example.test:80", provider.Config{}, true},
 		{"an IP literal is refused", "https://10.0.0.5", provider.Config{}, true},
@@ -83,7 +84,7 @@ func TestParseURL(t *testing.T) {
 
 func TestManifest_DeclaresOnlyTheConfiguredServer(t *testing.T) {
 	t.Parallel()
-	cfg, err := provider.ParseURL("https://ci.example.test:8443/jenkins")
+	cfg, err := provider.ParseURL("https://ci.example.test/jenkins")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,8 +98,8 @@ func TestManifest_DeclaresOnlyTheConfiguredServer(t *testing.T) {
 	}
 	for _, c := range caps {
 		nets := c.GetNetworkIntents()
-		if len(nets) != 1 || nets[0].GetHost() != "ci.example.test" || nets[0].GetPort() != 8443 {
-			t.Errorf("%s network = %v, want exactly ci.example.test:8443", c.GetName(), nets)
+		if len(nets) != 1 || nets[0].GetHost() != "ci.example.test" || nets[0].GetPort() != 443 {
+			t.Errorf("%s network = %v, want exactly ci.example.test:443", c.GetName(), nets)
 		}
 		if got := c.GetCredentialIntents(); len(got) != 1 || got[0] != provider.Intent {
 			t.Errorf("%s credential intents = %v, want [%s]", c.GetName(), got, provider.Intent)
@@ -1076,16 +1077,16 @@ func TestTimeoutsAndOutages(t *testing.T) {
 
 func TestLive_OnlyTheConfiguredServerWithAHandle(t *testing.T) {
 	t.Parallel()
-	cfg, _ := provider.ParseURL("https://ci.example.test:8443")
+	cfg, _ := provider.ParseURL("https://ci.example.test")
 	live := provider.NewLive(cfg, ghprovider.NewRoutes(time.Now))
 	cases := []struct {
 		name, target, handle string
 	}{
-		{"no handle", "https://ci.example.test:8443/queue/api/json", ""},
-		{"a handle the host gave no proxy for", "https://ci.example.test:8443/queue/api/json", "unknown"},
-		{"another host", "https://evil.example.test:8443/queue/api/json", "unknown"},
-		{"the right host on the default port", "https://ci.example.test/queue/api/json", "unknown"},
-		{"plain http", "http://ci.example.test:8443/queue/api/json", "unknown"},
+		{"no handle", "https://ci.example.test/queue/api/json", ""},
+		{"a handle the host gave no proxy for", "https://ci.example.test/queue/api/json", "unknown"},
+		{"another host", "https://evil.example.test/queue/api/json", "unknown"},
+		{"the right host on another port", "https://ci.example.test:8443/queue/api/json", "unknown"},
+		{"plain http", "http://ci.example.test/queue/api/json", "unknown"},
 		{"the metadata address", "https://169.254.169.254/latest/meta-data", "unknown"},
 	}
 	for _, tc := range cases {

@@ -11,34 +11,51 @@ placeholder `dev.numinance.official/jenkins`, which is not a valid plugin id (a 
 
 ## Configuration
 
-One launch argument, recorded by the operator's install beside the manifest: `-url https://host[:port][/context]`. It is the only
-server the provider may reach. https only, a lowercase DNS name (no IP literal, no wildcard), no user name, query or fragment, port
-1 to 65535 except 80 (the egress proxy re-originates every port but 80 over TLS). The manifest's one network permission is
-`host:port` from it; nothing a request carries can change the destination. The replay build uses the made-up `jenkins.example.test`.
+One launch argument, recorded by the operator's install beside the manifest: `-url https://host[/context]`. It is the only server the
+provider may reach. `ParseURL` accepts https only, printable ASCII with no percent sign or backslash, no user name, query or
+fragment, port absent or 443 (nothing else: the manifest's one network permission is the host on 443), a lowercase DNS name of two
+or more labels (each at most 63 bytes, the name at most 253) that is no address in any spelling (decimal, octal, hex, short dotted,
+IPv6), no wildcard, trailing dot or non-ASCII character, and a final label that is not a local, private or reserved space
+(`localhost`, `local`, `internal`, `localdomain`, `lan`, `intranet`, `home`, `corp`, `arpa`, `invalid`, `onion`: a private server is
+named by a fully qualified name of the customer's own domain). The context path has at most four plain segments. Nothing a request
+carries can change the destination. The replay build and the tests use the made-up `jenkins.example.test`.
+This is a grammar, not an SSRF control by itself: the egress proxy decides what a name resolves to and refuses loopback, link-local,
+metadata and (without signed customer policy for that exact host) private addresses.
 
-### How the live manifest is produced, and the pending ruling
+### How the live manifest is produced
 
-There is no static, pre-signed manifest file for the live build. The manifest is built **in memory at launch**: `main` parses `-url`,
-and `ghprovider.New` assembles the `Manifest` (capabilities, one `network_intents` entry `{host, port}` taken from `-url`, the
+There is no static, pre-signed manifest file for the live build. The manifest is built **in memory at launch**: `cmd/live` parses
+`-url`, and `ghprovider.New` assembles the `Manifest` (capabilities, one `network_intents` entry `{host, 443}` taken from `-url`, the
 credential intent `ci.jenkins`), which `GetManifest` returns in the handshake. Its `digest` is the sha256 of the running executable and
 `signer_identity` is the fixed string `https://numinance.dev/official|<plugin id>`. Nothing signs a per-customer manifest: the build
-artifact is signed once, and the host and port in the manifest differ per customer because the launch argument does.
+artifact is signed once, and the host in the manifest differs per customer because the launch argument does.
 
-The master design (section 17, extensions) makes `network_intents[]{host, port}` part of the signed manifest, while a Jenkins host is
-per customer. That is an open question shared with the Jira ticketing provider, covered by the proposed ADR 0060 (an opus ruling is
-pending). **Live mode of this plugin is gated on that ruling**: until it lands, do not install the live build as an official, signed
-plugin, and do not read this README as saying its manifest is signed per customer. The replay build declares no network or credential
-permission and is unaffected.
+The master design (section 17) makes `network_intents[]{host, port}` part of the signed manifest, while a Jenkins host is per
+customer. The master is silent on that. The narrowest reading is recorded in `docs/build/decisions.md` 2026-11-09/ciexecutor-jenkins-
+network-intent: the existing mechanism, no `plugin/v1` change, and the live build **installed by the operator against one named
+server, not shipped in an official signed bundle**. The direction of ADR 0060 OQ2 (an instance-bound flag on `NetworkIntent`, the host
+bound only in org-scoped signed policy) stays owed before an official install. The replay build declares no network or credential
+permission.
 
 ## Credentials and egress
 
+Rows: `docs/build/decisions.md` 2026-11-09/ciexecutor-jenkins-network-intent and -credentials.
+
 - The provider asks the host for a credential handle for `ci.jenkins` and sends it in the `Numinance-Handle` header to the egress
   proxy, which strips it and injects the HTTP Basic credential (Jenkins user + API token) the broker holds. No token, user name or
-  `Authorization` header is ever in this process, a log or a cassette. The manifest declares no `materialized` credential.
+  `Authorization` header is ever in this process, a log or a cassette (a test asserts that no request leaves it with `Authorization`,
+  `Cookie` or `Proxy-Authorization`). The manifest declares no `materialized` credential.
 - The transport sends nothing without a handle the host gave a proxy for, and nothing to any host:port other than the configured one;
-  it never falls back to a direct connection and never follows a redirect.
-- Broker catalog entry (the operator's, not shipped here): intent `ci.jenkins`, delivery header `Authorization`, destination the
-  configured host and port.
+  it never falls back to a direct connection and never follows a redirect. It also sends only what the provider makes: GET, HEAD and
+  POST for a path under `<context>/job/`, `<context>/queue/` or `<context>/crumbIssuer/`, with no dot segment and no escaped dot,
+  slash, backslash or NUL. The proxy's injection rule cannot restrict a path inside the host, so the script console, credentials and
+  user management are out of reach of the provider by this rule, beside the account's own permissions.
+- Broker catalog entry (the operator's, not shipped here): intent `ci.jenkins`, `DeliveryHeader`, header `Authorization`, prefix
+  `Basic `, empty encoding (not `EncodingBasic`, whose user is fixed to `x-access-token`), `SecretRef` naming a secret whose value is
+  the base64 of `user:token`, `ReadClass` false, `RuleBound` false, one destination `{configured host, 443, path prefix = the context
+  path of -url when there is one}`.
+- The Jenkins account is dedicated to the pipeline folder and holds Overall/Read, Job/Read, Job/Build and Job/Cancel only, never
+  Job/Configure, Job/Create, Credentials or Administer.
 - Every client has a 30 s timeout and the caller's deadline; an answer is read through a 4 MiB limit and an oversized one is
   `LIMIT_EXCEEDED`, never decoded; a request body is at most 1 MiB. The body of an error answer is dropped (it is Jenkins's HTML).
 
@@ -69,6 +86,15 @@ Jenkins has no idempotency key and a build request answers with a queue item tha
    compared; with neither, the item is not ours. A repeat under the same key therefore starts no second run (`existing: true`); a
    window of 100 builds that lacks the operation fails closed (`LIMIT_EXCEEDED`) and starts nothing. The revision reported is the
    parameter of the build, checked against the grammar.
+
+   **The gap between the queue and the build list.** Jenkins takes an item off the queue a moment before the build shows in the job's
+   list, and keeps the item at `/queue/item/<id>/api/json` for a few minutes with the build it became (`executable`) or `cancelled`.
+   The operation id does not carry the item id, so the provider remembers it, per operation, in memory (at most 1024, oldest dropped)
+   when it starts a run or sees it in the queue. When neither list shows a run whose item is remembered, it reads the item: it must be
+   an item of our job that carries our operation id; if it has an `executable`, that build is read and answered; if it is neither
+   cancelled nor a build yet, the run is `QUEUED` and can be looked up, repeated under its key (no second POST) and cancelled; if it is
+   `cancelled`, unknown (404) or not ours, the run is absent as before. The memory is a hint: a provider process that never saw the
+   item (restarted since) has only the two lists, and the gap is then the narrow one described under Known limits.
 5. Anyone who can build the job can set its parameters. The job's permissions are the customer's to restrict to the pipeline identity;
    the provider can not tell a build of its own from one that carries the same parameters.
 
@@ -78,11 +104,25 @@ Jenkins has no idempotency key and a build request answers with a queue item tha
   asks for a crumb, `POST .../buildWithParameters` with the parameters in a urlencoded body (never in the URL), requires `201` with a
   `Location` of a queue item and answers `QUEUED`. Dry run checks the job and the parameters and starts nothing. Jenkins can not check
   that a commit exists (that is the SCM's), so a dry run does not.
+  **Outcome of the build request.** `Wrote` (the DEPLOY side effect) is claimed only for a `201` with a queue item, or for a run that
+  Jenkins shows under the key after an answer that did not say (a timeout, a connection reset, a 5xx from a proxy in front, a 2xx
+  without the queue item): the provider then looks the run up by its key, once, and answers it as a new run. A refusal (4xx, 3xx) is
+  not looked up. If the look finds nothing, or cannot be made (the caller's deadline has passed), the call fails with the reason of
+  the error (`TIMEOUT`, `UPSTREAM_UNAVAILABLE`, `UPSTREAM_ERROR`) and claims no effect: **those reasons on a build request mean the
+  outcome is not known**, and the host's retry under the same key finds the run if there is one and starts no second.
 - `GetOperation`: queue item -> `QUEUED`; build -> `RUNNING` (building, or no result yet) or the end state; `started_at` from the
   build timestamp, `finished_at` as timestamp + duration.
 - `CancelOperation` (MEDIUM; declares `ci-action`): a queued run is removed with `POST /queue/cancelItem?id=`, a build is stopped with
   `POST .../<n>/stop`, then re-read (up to three looks); an ended run is answered as it is and nothing is posted. If Jenkins has not
-  reported an end by then, the state answered is the one read (`RUNNING`), never `CANCELLED`.
+  reported an end by then, the state answered is the one read (`RUNNING`), never `CANCELLED`. After a queue cancel, a re-read that
+  shows the run in neither list (also when the 100-build window is full: a run that had left the queue first would head the window,
+  being the newest build) is the cancel Jenkins confirmed, `CANCELLED`; a run in the gap is read from its item (see above) and, once
+  a build, stopped by the next look.
+- Evidence: the `ci-run-ref` receipt of a start (also of a repeat, so a retry heals a missing one) and the `ci-action` receipt of a
+  cancel are submitted after the effect. If the host does not take one, the call still ends `SUCCEEDED` with the effect recorded (a
+  `Wrote` for the DEPLOY or WRITE side effect), no evidence id for that record, and a `WARNING` diagnostic (`UPSTREAM_UNAVAILABLE`,
+  `Call.Warn`); the host derives `PARTIAL` from the missing declared evidence (a provider never claims `PARTIAL`). The failure is not
+  discarded and not turned into a failure of a call whose effect has happened.
 - `ListArtifacts`: names from `artifacts[relativePath]`, sizes from the `Content-Length` of a `HEAD` of each artifact (the build JSON
   has no size; content is never fetched; a missing length is `UPSTREAM_ERROR`, never a guess). The digest is empty: Jenkins reports no
   sha256 (its fingerprints are MD5). At most 256 artifacts.
@@ -105,7 +145,7 @@ Nothing from Jenkins is logged; the provider logs nothing.
 
 ## Builds, cassettes, tests
 
-- `ciexecutor-jenkins` (live, through the egress proxy; `-url` required) and `ciexecutor-jenkins-replay` (`cmd/replay`, over
+- `ciexecutor-jenkins` (`cmd/live`: live, through the egress proxy; `-url` required) and `ciexecutor-jenkins-replay` (`cmd/replay`, over
   `replay/cassettes/ci.json`). The replay build's manifest declares no network and no credential and the `dev` environment only.
 - The cassette is hand-written from the Jenkins documentation, **not recorded**: the server is `jenkins.example.test`, names and the
   crumb are made up, and it keeps only the answer headers `Location` and `Content-Length`; `ParseCassette` refuses any other header
@@ -114,10 +154,17 @@ Nothing from Jenkins is logged; the provider logs nothing.
 - `go test ./plugins/official/ciexecutor-jenkins/... ./conformance/ciexecutor/...` from `numinance-spec`. The ciexecutor conformance
   kit (CORE-001 to CORE-008) runs against the replay build in `conformance/ciexecutor/v1/kit_test.go`
   (`TestKit_ReplayingJenkinsProvider`). The unit tests run against a small stateful fake Jenkins.
+- The same kit (all eight cases, none skipped) also runs against the **live build** in `provider/live_kit_test.go`
+  (`TestLive_ConformanceKitPassesThroughTheProxyToATLSFake`): the provider's `Live` transport sends absolute-form requests with a
+  handle to a fake egress proxy on loopback, which checks the destination (`jenkins.example.test:443`), strips the handle, injects a
+  credential only it holds and re-originates over TLS to a fake Jenkins that serves a certificate for the reserved name. The
+  fake Jenkins refuses a request without the injected credential or a POST without the crumb, so the test also proves the crumb is
+  sent, the handle never reaches Jenkins, the provider holds no authenticating header, every request is for the instance host on 443
+  and the build request and the stop are the only POSTs. Only the proxy of the test dials a loopback listener for the reserved name.
 
 ## Verified against what
 
-Replay only. Nothing here has run against a real Jenkins. **A live run is owed.** Facts used from the Jenkins remote access API
+Replay and a local TLS fake only. Nothing here has run against a real Jenkins. **A live run is owed.** Facts used from the Jenkins remote access API
 documentation, to confirm on a live server (verify against a live Jenkins):
 
 - `POST /job/<name>/buildWithParameters` answers `201` with `Location: <root>/queue/item/<id>/`; a job with no parameters answers 400.
@@ -129,22 +176,27 @@ documentation, to confirm on a live server (verify against a live Jenkins):
   not keep cookies. A server that ties crumbs to a session ("proxy compatibility" off) may refuse it: then a build request answers
   403 (PERMISSION_DENIED).
 - A queue item that was cancelled leaves no trace in the lists read here, so a repeat of `CancelOperation` or a `GetOperation` after it
-  answers `NOT_FOUND` (the first cancel answers `CANCELLED`). Jenkins's `/queue/item/<id>/api/json` shows `cancelled` for a while;
-  the id is not part of the operation id, so it is not used.
+  answers `NOT_FOUND` (the first cancel answers `CANCELLED`). `/queue/item/<id>/api/json` shows `cancelled` or the `executable` of
+  the build for a few minutes after the item leaves the queue, with `id`, `task[name,url]` and `actions[parameters[name,value]]`
+  (the gap lookup relies on this: confirm it, and for how long, on a live server).
 - `building`, `result` (`null` while building), `timestamp` (start, ms) and `duration` (ms) of a build.
 - Large queues or job folders are only bounded by the 4 MiB answer limit.
 
 ## Known limits (left as they are)
 
-- Evidence emission failures are discarded (`_ = Emit`), as in the scm provider; the host turns a declared record that is missing into
-  PARTIAL.
-- After a successful queue cancel, a full 100-build window can make the re-read fail `LIMIT_EXCEEDED` (it fails closed).
-- If the build request times out after Jenkins accepted it, the side effect is not recorded (`Wrote`); the host's retry finds the run by
-  the key and starts no second one.
+- **A job with 100 or more builds fails every new key with `LIMIT_EXCEEDED`.** A start looks for the key in the 100 newest builds; a
+  full window that lacks it is not proof that no earlier attempt exists further back, so the call fails closed and starts nothing.
+  That is the safe choice for a deploy-class side effect, but on a job with a long history it means a new key can not start a run.
+  Settling it needs a decision on how long a key may be retried (a time bound on the window, or deeper pages up to a bound); it is
+  the first thing to settle in the live card. Get and cancel of a recent run are not affected.
+- If the build request fails in a way that does not say whether Jenkins took it and the look-up by key finds nothing, the call fails
+  `TIMEOUT` or `UPSTREAM_UNAVAILABLE` with no effect claimed (see Calls): the caller must treat those reasons on a start as
+  "unknown" and retry under the same key. The side effect of a stop request that times out is not claimed either (a stop is
+  repeatable).
 - A dry run over an existing run answers no operation id and emits no `ci-run-ref` receipt (a dry run has no effect to record).
 - The crumb field name must look like Jenkins's (contain `crumb`) and must not begin with a header name the client or the proxy owns.
-- The host must be a DNS name; a name whose labels are all numbers (decimal, or `0x` followed by any hex digits including none, as
-  `0x7f.0x0.0x0.0x1`) is refused. This is not an SSRF control: the egress proxy denies private, loopback, link-local and metadata
+- The host grammar (see Configuration) refuses addresses in any spelling and local or private final labels. It does not resolve
+  names: the egress proxy denies loopback, link-local, metadata and (without signed customer policy for that exact host) private
   ranges, and that is to be verified in the live card.
 - Ambiguity: an item that carries our operation id and whose task URL ends with our job path but has a `/job/` segment before it
   (a job of the same name in a parent folder, or a root mount containing `/job/` that is not the configured context path) is an
@@ -152,14 +204,15 @@ documentation, to confirm on a live server (verify against a live Jenkins):
   path in `-url`. Someone who can queue such an item can therefore block calls on that operation (never start a second run).
 - Same-job forgery: someone who can build THIS job can set `numinance_operation_id` and `numinance_revision` on a build of it and so
   be taken for the run. That is Jenkins write access to the job and is the customer's to restrict (point 5).
-- A gap exists in which Jenkins has removed an item from the queue but the build is not yet in the job's builds list; a lookup in that
-  gap sees neither, and a retry under the same key could POST a second build. It is narrow, and it is not new.
+- The queue item memory is per process. A provider process restarted between a start and a lookup of a run that is in the gap between
+  the queue and the build list sees neither list and answers `NOT_FOUND`, and a start under the same key in that moment could POST a
+  second build. The gap is seconds long and needs a restart inside it.
 - A crumb field name with a non-ASCII character is refused (case folding is only defined for ASCII).
 
 ## Not done
 
 - A live run against a real Jenkins and a recording tool (a server and an API token are needed).
 - Inclusion in the release bundle (`.goreleaser.yaml`, `tools/release/bundle`): not added in this card.
-- Live mode is gated on the ruling about a per-customer network intent in a signed manifest (ADR 0060, above).
+- An official signed install: the instance-bound network intent (ADR 0060 OQ2) is owed; the live build is operator-installed.
 - Multibranch pipelines, branch jobs whose name contains `/`, a sha256 digest of artifacts, `TIMED_OUT`.
 - The provider does not fetch or return the console log and does not read pipeline stages.

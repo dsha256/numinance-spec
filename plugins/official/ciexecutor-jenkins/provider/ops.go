@@ -22,13 +22,15 @@ import (
 
 // queueLocationRe is the Location Jenkins answers a build request with: the queue item. Only its shape is checked; the host in
 // it is Jenkins's own root URL setting and is never followed.
-var queueLocationRe = regexp.MustCompile(`/queue/item/\d{1,15}/?$`)
+var queueLocationRe = regexp.MustCompile(`/queue/item/(\d{1,15})/?$`)
 
 // impl is the provider over one Jenkins server.
 type impl struct {
 	cfg Config
 	// poll is how long CancelOperation waits between looks at a run it asked Jenkins to stop; a replay passes zero.
 	poll time.Duration
+	// seen is the queue items of the runs this process has seen.
+	seen *queueIndex
 }
 
 // client builds the client of a call: it asks the host for the credential handle first (a replay has none).
@@ -101,32 +103,80 @@ func (p impl) start(ctx context.Context, c *ghprovider.Call, m *civ1.StartOperat
 		form.Set(k, v)
 	}
 	rep, err := cl.do(ctx, request{method: http.MethodPost, path: job + "/buildWithParameters", form: form, header: crumb}, nil)
+	if err == nil && rep.status == http.StatusCreated {
+		// Jenkins accepts a build with 201 and the queue item in Location.
+		if qid, ok := queueItemID(rep.header.Get("Location")); ok {
+			p.seen.put(op, qid)
+			c.Wrote(pluginv1.SideEffect_SIDE_EFFECT_DEPLOY, m.GetRepository())
+			return p.started(ctx, c, m, id, civ1.OperationState_OPERATION_STATE_QUEUED, false), nil
+		}
+	}
+	// Anything else does not say whether Jenkins took the build: a timeout, a reset or a 5xx from a proxy in front may follow an
+	// accepted request, and a 2xx without the queue item is odd. Neither "wrote" nor "did not write" is claimed from the answer;
+	// Jenkins is asked for the run by its key. A run found is the effect of this very request (nothing was found before it).
+	if buildMayHaveBeenTaken(err) && ctx.Err() == nil {
+		run, ferr := p.locate(ctx, cl, job, op)
+		if ferr == nil && run.revision == m.GetRevision() {
+			c.Wrote(pluginv1.SideEffect_SIDE_EFFECT_DEPLOY, m.GetRepository())
+			return p.started(ctx, c, m, id, run.state, false), nil
+		}
+	}
+	// Not found, or not asked: the outcome is not known, so the call fails with the reason of the error and claims no effect. The
+	// host's retry under the same key finds a run that was started after all and starts no second one.
 	if err != nil {
 		return nil, failure(ctx, err)
 	}
-	c.Wrote(pluginv1.SideEffect_SIDE_EFFECT_DEPLOY, m.GetRepository())
-	// Jenkins accepts a build with 201 and the queue item in Location. Anything else is not an accepted build; the host's retry
-	// finds a build that was started after all by the key above, and starts no second one.
-	if rep.status != http.StatusCreated || !validLocation(rep.header.Get("Location")) {
-		return nil, upstream()
-	}
-	return p.started(ctx, c, m, id, civ1.OperationState_OPERATION_STATE_QUEUED, false), nil
+	return nil, upstream()
 }
 
-func validLocation(loc string) bool {
+// buildMayHaveBeenTaken reports whether the error of a build request leaves it open that Jenkins took the build: no error (an odd
+// answer), a transport error after the request was written, an answer over the limit or a 5xx. A refusal (4xx, 3xx) and a request
+// the transport would not send mean it did not.
+func buildMayHaveBeenTaken(err error) bool {
+	var ae *ghprovider.APIError
+	switch {
+	case err == nil:
+		return true
+	case errors.Is(err, ghprovider.ErrNoEgress):
+		return false
+	case errors.As(err, &ae):
+		return ae.Status >= 500
+	}
+	return true
+}
+
+// queueItemID reads the id of the queue item from the Location of an accepted build request. Only its shape is checked.
+func queueItemID(loc string) (int64, bool) {
 	u, err := url.Parse(loc)
-	return err == nil && len(loc) <= 1024 && queueLocationRe.MatchString(u.Path)
+	if err != nil || len(loc) > 1024 {
+		return 0, false
+	}
+	m := queueLocationRe.FindStringSubmatch(u.Path)
+	if m == nil {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(m[1], 10, 64)
+	return id, err == nil && id > 0
 }
 
 func (p impl) started(ctx context.Context, c *ghprovider.Call, m *civ1.StartOperationRequest, id string, st civ1.OperationState, existing bool) *civ1.StartOperationResponse {
 	// The receipt names the run's reference, never the parameters' values or the log.
-	_ = c.Emit(ctx, "ci-run-ref", RecordType, &structpb.Struct{Fields: map[string]*structpb.Value{
+	receipt(ctx, c, "ci-run-ref", RecordType, &structpb.Struct{Fields: map[string]*structpb.Value{
 		"repository":   structpb.NewStringValue(m.GetRepository()),
 		"pipeline":     structpb.NewStringValue(m.GetPipeline()),
 		"revision":     structpb.NewStringValue(m.GetRevision()),
 		"operation_id": structpb.NewStringValue(id),
 	}})
 	return &civ1.StartOperationResponse{OperationId: id, State: st, Existing: existing}
+}
+
+// receipt submits one evidence record. The run has already happened, so a record the host would not take does not undo it and
+// does not fail the call: the call ends SUCCEEDED with no id for that record and a WARNING, and the host derives PARTIAL from the
+// declared evidence that is missing. A retry under the same key records the receipt again.
+func receipt(ctx context.Context, c *ghprovider.Call, key, recordType string, payload *structpb.Struct) {
+	if err := c.Emit(ctx, key, recordType, payload); err != nil {
+		c.Warn(pluginv1.Reason_REASON_UPSTREAM_UNAVAILABLE)
+	}
 }
 
 // find locates the run of an operation id; a run Jenkins does not show is NOT_FOUND.
@@ -202,7 +252,7 @@ func (p impl) cancel(ctx context.Context, c *ghprovider.Call, m *civ1.CancelOper
 		c.Wrote(pluginv1.SideEffect_SIDE_EFFECT_WRITE, m.GetRepository())
 		if !emitted {
 			emitted = true
-			_ = c.Emit(ctx, "action", ciAction, &structpb.Struct{Fields: map[string]*structpb.Value{
+			receipt(ctx, c, "action", ciAction, &structpb.Struct{Fields: map[string]*structpb.Value{
 				"capability":   structpb.NewStringValue("ciexecutor.cancel_operation"),
 				"repository":   structpb.NewStringValue(m.GetRepository()),
 				"operation_id": structpb.NewStringValue(m.GetOperationId()),
@@ -219,6 +269,10 @@ func (p impl) cancel(ctx context.Context, c *ghprovider.Call, m *civ1.CancelOper
 		case errors.Is(err, errNoRun) && cancelledQueued:
 			// A cancelled queue item leaves no trace in the lists read here: not in the queue and never a build.
 			return &civ1.CancelOperationResponse{State: civ1.OperationState_OPERATION_STATE_CANCELLED}, nil
+		case cancelledQueued && isLimitExceeded(err):
+			// The window of builds is full and does not hold the run. After our cancel of its queue item that is the answer too: a
+			// run that had left the queue first would head the window, being the newest build.
+			return &civ1.CancelOperationResponse{State: civ1.OperationState_OPERATION_STATE_CANCELLED}, nil
 		case err != nil && errors.Is(err, errNoRun):
 			return nil, upstream()
 		case err != nil:
@@ -228,6 +282,11 @@ func (p impl) cancel(ctx context.Context, c *ghprovider.Call, m *civ1.CancelOper
 		}
 		run = after
 	}
+}
+
+func isLimitExceeded(err error) bool {
+	var ce *ghprovider.CallError
+	return errors.As(err, &ce) && ce.Reason == pluginv1.Reason_REASON_LIMIT_EXCEEDED
 }
 
 func (p impl) artifacts(ctx context.Context, c *ghprovider.Call, m *civ1.ListArtifactsRequest) (*civ1.ListArtifactsResponse, error) {

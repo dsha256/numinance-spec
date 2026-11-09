@@ -64,7 +64,7 @@ func method[Req, Resp any, PReq interface {
 // NewSpec returns the provider's spec for the Jenkins server cfg names over the given transport. poll is how long CancelOperation
 // waits between looks at a build it asked Jenkins to stop; a replay passes zero.
 func NewSpec(id string, cfg Config, t ghprovider.Transport, poll time.Duration) ghprovider.Spec {
-	p := impl{cfg: cfg, poll: poll}
+	p := impl{cfg: cfg, poll: poll, seen: new(queueIndex)}
 	natural, keyed := pluginv1.Idempotency_IDEMPOTENCY_NATURAL, pluginv1.Idempotency_IDEMPOTENCY_KEYED
 	ro := func(llm string) ghprovider.Capability {
 		return ghprovider.Capability{Risk: annotationsv1.RiskClass_RISK_CLASS_READ, SideEffect: pluginv1.SideEffect_SIDE_EFFECT_READ, Idempotency: natural, LLM: llm}

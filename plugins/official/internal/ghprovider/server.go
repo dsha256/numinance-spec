@@ -91,6 +91,7 @@ type Call struct {
 	transport  Transport
 	evidence   []string
 	effects    []*pluginv1.ObservedSideEffect
+	notes      []*pluginv1.Diagnostic
 }
 
 // DryRun reports whether the host asked for no side effects.
@@ -120,6 +121,18 @@ func (c *Call) Emit(ctx context.Context, key, recordType string, payload *struct
 	}
 	c.evidence = append(c.evidence, id)
 	return nil
+}
+
+// Warn adds a WARNING note with the reason to the call's result. A provider uses it for something that did not fail the call but
+// that the host and a reader must see, for instance an evidence record it could not submit: the call then ends SUCCEEDED with no
+// id for that record, the host derives PARTIAL from the missing declared evidence, and the note says why. A reason is noted once.
+func (c *Call) Warn(r pluginv1.Reason) {
+	for _, n := range c.notes {
+		if n.GetReason() == r {
+			return
+		}
+	}
+	c.notes = append(c.notes, &pluginv1.Diagnostic{Reason: r, Severity: pluginv1.Severity_SEVERITY_WARNING})
 }
 
 // Wrote records a side effect the call made.
@@ -261,7 +274,7 @@ func (s *Server) Invoke(call *pluginv1.InvokeRequest, stream grpc.ServerStreamin
 			return status.Error(codes.Internal, "marshal")
 		}
 		return stream.Send(&pluginv1.InvokeResponse{Result: &pluginv1.ActionResult{
-			Status: pluginv1.InvokeStatus_INVOKE_STATUS_SUCCEEDED, Result: packed, EvidenceIds: c.evidence, SideEffects: c.effects,
+			Status: pluginv1.InvokeStatus_INVOKE_STATUS_SUCCEEDED, Result: packed, EvidenceIds: c.evidence, SideEffects: c.effects, Diagnostics: c.notes,
 		}})
 	case errors.As(err, &failure):
 		return stream.Send(Failed(failure.Reason))
