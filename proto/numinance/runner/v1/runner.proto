@@ -1,0 +1,123 @@
+// The runner wire: a runner states its host and its host attestation to the local coordinator (engine) or to the control plane, outbound over mTLS (design section 13, Runner design; section 20, Fleet; ADR 0061).
+// Direction: the runner calls; nothing calls the runner.
+// Identity: no request carries a tenant, a principal or a ceiling. The server derives the tenant and the runner principal from the client certificate, and the host id in a report must equal the host id bound into that credential. A runner cannot state a ceiling: the engine derives it from the offers and canary statuses.
+// Ordering: the server issues the start nonce in the RegisterRunner response; the runner never picks it. A heartbeat carries that nonce and a counter. For one nonce, every heartbeat increments the counter and refreshes freshness; an equal report (same nonce, counter and content) is a replay no-op, and a lower counter, or the same counter with different content, is ABORTED. A new nonce is issued only by RegisterRunner, which is how a restarted runner takes its host up again. Freshness is judged by the server's receive time, never by a time in the report.
+// Untrusted input: a report is size-limited and schema-checked, hosts per tenant are capped, and the breaker state is display only.
+// Every element is since 1.2.0.
+syntax = "proto3";
+
+package numinance.runner.v1;
+
+import "numinance/annotations/v1/annotations.proto";
+
+// RunnerService carries a runner's statement of fact about its host.
+service RunnerService {
+  // RegisterRunner records a host and its attestation, or re-attests it after a runner restart. Every call issues a fresh start nonce and retires the earlier one, so a retry is not a replay (the stored host state is the same). A host stays with the runner name that registered it. No dry run: the call states a fact and there is nothing to preview.
+  rpc RegisterRunner(RegisterRunnerRequest) returns (RegisterRunnerResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: false
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "A runner registers its host with its host attestation."
+    };
+  }
+  // Heartbeat refreshes a registered host every 60 seconds with the current report. A host that is not registered is NOT_FOUND. No dry run: the call states a fact and there is nothing to preview.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_LOW
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      since: "1.2.0"
+      llm_description: "A runner refreshes the report of its registered host."
+    };
+  }
+}
+
+// Canary is the canary outcome of one profile on a host.
+enum Canary {
+  // Zero value; refused.
+  CANARY_UNSPECIFIED = 0;
+  // The suite has not run since the runner started; never a pass.
+  CANARY_NOT_RUN = 1;
+  // Every probe required of the profile passed.
+  CANARY_PASSED = 2;
+  // A required probe failed; the profile is not served.
+  CANARY_FAILED = 3;
+}
+
+// Breaker is the circuit breaker a runner states for its deployment. It is display only: the policy context holds the state of record.
+enum Breaker {
+  // Zero value; refused.
+  BREAKER_UNSPECIFIED = 0;
+  // Work is flowing.
+  BREAKER_CLOSED = 1;
+  // The breaker is open and work is paused.
+  BREAKER_TRIPPED = 2;
+}
+
+// Offer is one sandbox profile a host offers, as the host states it.
+message Offer {
+  // The section 13 profile name: process, container or gvisor; each at most once.
+  string profile = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The runtime name and version, printable, 1 to 128 bytes.
+  string runtime_version = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The canary status of the profile on this host.
+  Canary canary = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when a process offer cannot run each run as its own OS user; refused for any other profile.
+  bool shared_user = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// Report is what a runner states about its host.
+message Report {
+  // Required: the host identifier, printable, at most 128 bytes. It must equal the host id bound into the credential.
+  string host_id = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: the runner version, strict x.y.z.
+  string version = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: the name of the resolved profile the runner serves, printable, at most 128 bytes.
+  string profile = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: the breaker state the runner states; display only.
+  Breaker breaker = 4 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Optional: the customer-controlled update window, printable, at most 128 bytes.
+  string update_window = 5 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Required: one to 3 offers.
+  repeated Offer offers = 6 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Optional: at most 256 image digests, sha256:hex.
+  repeated string image_digests = 7 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Heartbeat: required, the start nonce the server issued in the RegisterRunner response. RegisterRunner: ignored, the runner never picks the nonce.
+  string start_nonce = 8 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Heartbeat: required, two or more; the registration is counter one, and every heartbeat of the start increments it. RegisterRunner: ignored.
+  uint64 counter = 9 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// RegisterRunnerRequest carries the first report of a start.
+message RegisterRunnerRequest {
+  // The report.
+  Report report = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// RegisterRunnerResponse acknowledges the report.
+message RegisterRunnerResponse {
+  // The start nonce the server issued for this start, 16 to 64 printable bytes. Heartbeats carry it; the first heartbeat uses counter 2.
+  string start_nonce = 3 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // The digest (sha256:hex) of the canonical host attestation as stored: sha256 over the domain tag numinance.host-attestation/v1, a NUL byte and the canonical JSON.
+  string attestation_digest = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // Always true for an accepted registration; kept for symmetry with HeartbeatResponse.
+  bool applied = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// HeartbeatRequest carries a later report of a start.
+message HeartbeatRequest {
+  // The report.
+  Report report = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// HeartbeatResponse acknowledges the report.
+message HeartbeatResponse {
+  // The digest (sha256:hex) of the canonical host attestation as stored: sha256 over the domain tag numinance.host-attestation/v1, a NUL byte and the canonical JSON.
+  string attestation_digest = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+  // True when the report was stored; false for an equal report, which changes nothing.
+  bool applied = 2 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
