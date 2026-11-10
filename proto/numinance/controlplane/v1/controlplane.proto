@@ -3,7 +3,8 @@
 // Mutations: Approve and Reject require a human principal. The server checks the decision against the author of the Change before it forwards it (the decider is not the author, and not in the author's run) and refuses with PERMISSION_DENIED otherwise. This is an early refusal: the runtime's verified-signal handler and policy decide again, and the control plane is never the authority for an approval.
 // Licensing: expiry stops upgrades, new packs, the hosted dashboard and support. It never stops an installed runtime from completing authorised work, applying policy or exporting evidence, and there is no remote kill switch (ADR 0017). LicenceState reports it; it is not an instruction to any runtime.
 // Untrusted text: titles and names come from the customer's own runtime and tickets, and are data. A client renders them as text, never as markup or instructions.
-// Every element is since 1.2.0.
+// Operator verbs: OperatorService (RegisterTenant, PublishBundle, IssueLicence) is served only by cmd/controlplane, never by the engine, and only for a human of the Numinance operator organisation holding the role operator, whose session the credential verifier has checked for MFA (ADR 0064). The operator role is read from the verified credential, never from a message. Every other caller, a customer human, an agent, a runner or break glass, is refused with PERMISSION_DENIED, and an operator credential is refused by every tenant-scoped verb above. The control plane signs nothing: a licence is signed offline by a founder key and the control plane stores what the pinned public keys vouch for.
+// Every element of ChangeService, FleetService and LicenceService is since 1.2.0; every element of OperatorService is since 1.3.0.
 syntax = "proto3";
 
 package numinance.controlplane.v1;
@@ -118,6 +119,46 @@ service LicenceService {
       supports_dry_run: false
       since: "1.2.0"
       llm_description: "Verifies a licence file against the pinned public key without storing it."
+    };
+  }
+}
+
+// OperatorService carries the verbs that act on a named tenant and are not the tenant's own. Only a human operator may call them (ADR 0064); each names its target tenant in the request or in the signed claims, and the tenant must be registered, except RegisterTenant, which creates it.
+service OperatorService {
+  // RegisterTenant records a tenant under a kernel-minted ten_ identifier and its WorkOS organisation id, which is never the operator organisation. HIGH: it creates the scope every later customer call is checked against. Idempotent by the tenant identifier: the same tenant again is a replay, and another name or organisation under an existing identifier is ABORTED. No dry run: the record is the whole effect and a refused call changes nothing; the compensating action is none, because a registered tenant holds metadata only and is retired by the operator in the store.
+  rpc RegisterTenant(RegisterTenantRequest) returns (RegisterTenantResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      evidence: "tenant-registered"
+      since: "1.3.0"
+      llm_description: "Registers a customer tenant under a kernel-minted identifier and its organisation. Operator only."
+    };
+  }
+  // PublishBundle offers a Numinance-published registry artifact (vendor-pack/<name> or release/<name>) to a registered tenant at a version and registry digest, after the registry vouches for them. HIGH: the offered bundle is what a runner may fetch. Idempotent: the same digest again is a replay, another digest under an offered version is ABORTED. While no registry is wired the call is UNAVAILABLE. No dry run: the registry check is the call and a refused offer changes nothing.
+  rpc PublishBundle(PublishBundleRequest) returns (PublishBundleResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      evidence: "bundle-offered"
+      since: "1.3.0"
+      llm_description: "Offers a registry-published Numinance artifact to a registered tenant. Operator only."
+    };
+  }
+  // IssueLicence stores the licence file a founder signed offline for the tenant its signed claims name, after the file verifies against the pinned founder public keys and the tenant is registered. HIGH: the licence is the tenant's entitlement. Idempotent: the same file again is a replay, a lower serial than the stored one or another file under the same serial is ABORTED, so an older licence is never reinstalled. No dry run: VerifyLicence of LicenceService is the check without storing. The control plane never signs.
+  rpc IssueLicence(IssueLicenceRequest) returns (IssueLicenceResponse) {
+    option (numinance.annotations.v1.action) = {
+      risk: RISK_CLASS_HIGH
+      exec: EXEC_MODE_SYNC
+      idempotent: true
+      supports_dry_run: false
+      evidence: "licence-issued"
+      since: "1.3.0"
+      llm_description: "Stores an offline-signed licence file for the tenant it names. Operator only; the control plane never signs."
     };
   }
 }
@@ -356,4 +397,55 @@ message VerifyRequest {
 message VerifyResponse {
   // The licence.
   Licence licence = 1 [(numinance.annotations.v1.field).since = "1.2.0"];
+}
+
+// RegisterTenantRequest names the tenant to create.
+message RegisterTenantRequest {
+  // Required: the tenant identifier, ten_ plus 32 lowercase hex characters, minted by the kernel; the same identifier again is a replay.
+  string tenant_id = 1 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // Required, printable text of at most 128 bytes: the tenant's display name; untrusted.
+  string name = 2 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // Required, printable text of at most 128 bytes: the tenant's WorkOS organisation id, never the operator organisation.
+  string organisation = 3 [(numinance.annotations.v1.field).since = "1.3.0"];
+}
+
+// RegisterTenantResponse is the registered tenant.
+message RegisterTenantResponse {
+  // The tenant identifier.
+  string tenant_id = 1 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // The time of the first registration.
+  google.protobuf.Timestamp registered_at = 2 [(numinance.annotations.v1.field).since = "1.3.0"];
+}
+
+// PublishBundleRequest names the registry artifact to offer.
+message PublishBundleRequest {
+  // Required: the registered tenant the artifact is offered to.
+  string tenant_id = 1 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // Required: vendor-pack/<name> or release/<name>, at most 64 bytes. A customer policy or floors bundle is never offered here.
+  string artifact_id = 2 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // Required: the strict x.y.z version.
+  string version = 3 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // Required: the registry digest, sha256: plus 64 lowercase hex characters.
+  string digest = 4 [(numinance.annotations.v1.field).since = "1.3.0"];
+}
+
+// PublishBundleResponse acknowledges the offer.
+message PublishBundleResponse {}
+
+// IssueLicenceRequest carries the signed licence file.
+message IssueLicenceRequest {
+  // Required, 1 to 65536 bytes: the licence file as signed offline. The tenant is the one its signed claims name.
+  bytes file = 1 [(numinance.annotations.v1.field).since = "1.3.0"];
+}
+
+// IssueLicenceResponse is what the stored file states.
+message IssueLicenceResponse {
+  // The tenant identifier the signed claims name.
+  string tenant_id = 1 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // The monotonic per-tenant serial of the licence.
+  int64 serial = 2 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // The plan name.
+  string plan = 3 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // The expiry.
+  google.protobuf.Timestamp expiry = 4 [(numinance.annotations.v1.field).since = "1.3.0"];
 }

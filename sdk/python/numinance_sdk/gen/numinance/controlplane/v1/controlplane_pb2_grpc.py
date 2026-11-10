@@ -515,3 +515,167 @@ class LicenceService:
             timeout,
             metadata,
             _registered_method=True)
+
+
+class OperatorServiceStub:
+    """OperatorService carries the verbs that act on a named tenant and are not the tenant's own. Only a human operator may call them (ADR 0064); each names its target tenant in the request or in the signed claims, and the tenant must be registered, except RegisterTenant, which creates it.
+    """
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.RegisterTenant = channel.unary_unary(
+                '/numinance.controlplane.v1.OperatorService/RegisterTenant',
+                request_serializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.RegisterTenantRequest.SerializeToString,
+                response_deserializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.RegisterTenantResponse.FromString,
+                _registered_method=True)
+        self.PublishBundle = channel.unary_unary(
+                '/numinance.controlplane.v1.OperatorService/PublishBundle',
+                request_serializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.PublishBundleRequest.SerializeToString,
+                response_deserializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.PublishBundleResponse.FromString,
+                _registered_method=True)
+        self.IssueLicence = channel.unary_unary(
+                '/numinance.controlplane.v1.OperatorService/IssueLicence',
+                request_serializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.IssueLicenceRequest.SerializeToString,
+                response_deserializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.IssueLicenceResponse.FromString,
+                _registered_method=True)
+
+
+class OperatorServiceServicer:
+    """OperatorService carries the verbs that act on a named tenant and are not the tenant's own. Only a human operator may call them (ADR 0064); each names its target tenant in the request or in the signed claims, and the tenant must be registered, except RegisterTenant, which creates it.
+    """
+
+    def RegisterTenant(self, request, context):
+        """RegisterTenant records a tenant under a kernel-minted ten_ identifier and its WorkOS organisation id, which is never the operator organisation. HIGH: it creates the scope every later customer call is checked against. Idempotent by the tenant identifier: the same tenant again is a replay, and another name or organisation under an existing identifier is ABORTED. No dry run: the record is the whole effect and a refused call changes nothing; the compensating action is none, because a registered tenant holds metadata only and is retired by the operator in the store.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def PublishBundle(self, request, context):
+        """PublishBundle offers a Numinance-published registry artifact (vendor-pack/<name> or release/<name>) to a registered tenant at a version and registry digest, after the registry vouches for them. HIGH: the offered bundle is what a runner may fetch. Idempotent: the same digest again is a replay, another digest under an offered version is ABORTED. While no registry is wired the call is UNAVAILABLE. No dry run: the registry check is the call and a refused offer changes nothing.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def IssueLicence(self, request, context):
+        """IssueLicence stores the licence file a founder signed offline for the tenant its signed claims name, after the file verifies against the pinned founder public keys and the tenant is registered. HIGH: the licence is the tenant's entitlement. Idempotent: the same file again is a replay, a lower serial than the stored one or another file under the same serial is ABORTED, so an older licence is never reinstalled. No dry run: VerifyLicence of LicenceService is the check without storing. The control plane never signs.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_OperatorServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'RegisterTenant': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterTenant,
+                    request_deserializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.RegisterTenantRequest.FromString,
+                    response_serializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.RegisterTenantResponse.SerializeToString,
+            ),
+            'PublishBundle': grpc.unary_unary_rpc_method_handler(
+                    servicer.PublishBundle,
+                    request_deserializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.PublishBundleRequest.FromString,
+                    response_serializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.PublishBundleResponse.SerializeToString,
+            ),
+            'IssueLicence': grpc.unary_unary_rpc_method_handler(
+                    servicer.IssueLicence,
+                    request_deserializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.IssueLicenceRequest.FromString,
+                    response_serializer=numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.IssueLicenceResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'numinance.controlplane.v1.OperatorService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('numinance.controlplane.v1.OperatorService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class OperatorService:
+    """OperatorService carries the verbs that act on a named tenant and are not the tenant's own. Only a human operator may call them (ADR 0064); each names its target tenant in the request or in the signed claims, and the tenant must be registered, except RegisterTenant, which creates it.
+    """
+
+    @staticmethod
+    def RegisterTenant(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/numinance.controlplane.v1.OperatorService/RegisterTenant',
+            numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.RegisterTenantRequest.SerializeToString,
+            numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.RegisterTenantResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def PublishBundle(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/numinance.controlplane.v1.OperatorService/PublishBundle',
+            numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.PublishBundleRequest.SerializeToString,
+            numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.PublishBundleResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def IssueLicence(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/numinance.controlplane.v1.OperatorService/IssueLicence',
+            numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.IssueLicenceRequest.SerializeToString,
+            numinance_dot_controlplane_dot_v1_dot_controlplane__pb2.IssueLicenceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
