@@ -141,31 +141,31 @@ func (r *repoReader) list(name string, limit int) (entries []fs.DirEntry, more b
 // pythonVersionHint finds the Python version the repository asks for, in the order .python-version, .tool-versions,
 // requires-python and the poetry python constraint. A lower bound is taken: it is the oldest version the code must run
 // on. A value that is not a plain 3.N is not guessed at.
-func pythonVersionHint(r *repoReader, pyproject []byte) (version, source string) {
+func pythonVersionHint(r *repoReader, pyproject []byte) (version, source string, ev evidence) {
 	if b := r.text(".python-version", maxVersionBytes); b != nil {
 		first, _, _ := strings.Cut(string(b), "\n")
 		if m := dotPythonVersionRe.FindStringSubmatch(strings.TrimSpace(first)); m != nil {
-			return m[1], ".python-version"
+			return m[1], ".python-version", evVersionFile
 		}
 	}
 	if b := r.text(".tool-versions", maxHintBytes); b != nil {
 		if m := toolVersionsRe.FindSubmatch(b); m != nil {
-			return string(m[1]), ".tool-versions"
+			return string(m[1]), ".tool-versions", evVersionFile
 		}
 	}
 	if m := requiresPythonRe.FindSubmatch(pyproject); m != nil {
 		if lb := lowerBoundRe.FindSubmatch(m[1]); lb != nil {
-			return string(lb[1]), "pyproject.toml requires-python"
+			return string(lb[1]), "pyproject.toml requires-python", evRequiresPython
 		}
 	}
 	if strings.Contains(string(pyproject), "[tool.poetry.dependencies]") {
 		if m := poetryPythonRe.FindSubmatch(pyproject); m != nil {
 			if lb := lowerBoundRe.FindSubmatch(m[1]); lb != nil {
-				return string(lb[1]), "pyproject.toml [tool.poetry.dependencies] python"
+				return string(lb[1]), "pyproject.toml [tool.poetry.dependencies] python", evRequiresPython
 			}
 		}
 	}
-	return "", ""
+	return "", "", ""
 }
 
 // toolSpec is how one verifier's tool shows itself in a repository. The tables are data; the order of the checks in
@@ -230,9 +230,11 @@ func toolWord(name string) *regexp.Regexp {
 	return regexp.MustCompile(`(?i)(?:^|[^a-z0-9_.-])` + name + `(?:$|[^a-z0-9_])`)
 }
 
-// foundTool is a tool that the repository shows, and the file that shows it.
+// foundTool is a tool that the repository shows, and the file that shows it. Evidence is the kind of that file, from
+// which "numi discover" looks up a confidence level.
 type foundTool struct {
 	Tool, Where string
+	Evidence    evidence
 }
 
 // langCount is the number of source files of one language found by the bounded walk.
@@ -289,6 +291,11 @@ type inspection struct {
 	// Dispatch is true when a workflow declares workflow_dispatch.
 	Dispatch    bool
 	Jenkinsfile bool
+	// Artifacts holds, per safe-named workflow, the jobs and the events found by "numi discover"'s line scan; Hooks are the
+	// safe ids of the pre-commit hooks and OddHooks counts the ids that were skipped. "numi init" does not use them.
+	Artifacts []workflowArtifact
+	Hooks     []string
+	OddHooks  int
 	// Tools holds one finding per verifier name.
 	Tools map[string]foundTool
 	// DefaultBranch and BranchSource: the branch, and where it was read; BranchIsCurrent is true when only the checked
@@ -356,10 +363,22 @@ func inspectRepo(ctx context.Context, root *os.Root) (inspection, error) {
 			in.Dispatch = true
 		}
 	}
+	dispatching := map[string]bool{}
+	for _, p := range workflowPaths {
+		if texts[p] == nil {
+			continue
+		}
+		art := scanWorkflow(strings.TrimPrefix(p, ".github/workflows/"), texts[p])
+		in.Artifacts = append(in.Artifacts, art)
+		dispatching[p] = art.Dispatched
+	}
+	if b := texts[".pre-commit-config.yaml"]; b != nil {
+		in.Hooks, in.OddHooks = scanHooks(b)
+	}
 	in.Tools = map[string]foundTool{}
 	for _, spec := range toolSpecs() {
-		if where := findTool(r, spec, pyproject, texts, sources); where != "" {
-			in.Tools[spec.Verifier] = foundTool{Tool: spec.Tool, Where: where}
+		if where, ev := findTool(r, spec, pyproject, texts, sources, dispatching); where != "" {
+			in.Tools[spec.Verifier] = foundTool{Tool: spec.Tool, Where: where, Evidence: ev}
 		}
 	}
 
@@ -387,35 +406,48 @@ func inspectRepo(ctx context.Context, root *os.Root) (inspection, error) {
 	return in, nil
 }
 
-// findTool returns the place that shows the tool, strongest evidence first, or "" when none does.
-func findTool(r *repoReader, spec toolSpec, pyproject []byte, texts map[string][]byte, sources []string) string {
+// findTool returns the place that shows the tool and the kind of evidence it is, strongest evidence first, or "" when
+// none does. dispatching names the workflow paths that declare workflow_dispatch.
+func findTool(r *repoReader, spec toolSpec, pyproject []byte, texts map[string][]byte, sources []string, dispatching map[string]bool) (string, evidence) {
 	for _, f := range spec.Files {
 		if r.plainPath(f) {
-			return f
+			return f, evSettingsFile
 		}
 	}
 	if spec.PyprojectTable.Match(pyproject) {
-		return "pyproject.toml [" + spec.Table + "]"
+		return "pyproject.toml [" + spec.Table + "]", evPyprojectTable
 	}
 	for _, o := range spec.OtherFiles {
 		if b := r.text(o.Name, maxHintBytes); b != nil && o.Section.Match(b) {
-			return o.Name
+			return o.Name, evOtherSection
 		}
 	}
 	for _, f := range spec.Hints {
 		if r.plainPath(f) {
-			return f
+			return f, evHintFile
 		}
 	}
 	if spec.Word.Match(pyproject) {
-		return "pyproject.toml (dependency)"
+		return "pyproject.toml (dependency)", evDependency
 	}
 	for _, s := range sources {
 		if b := texts[s]; b != nil && spec.Word.Match(b) {
-			return s
+			return s, textEvidence(s, dispatching)
 		}
 	}
-	return ""
+	return "", ""
+}
+
+// textEvidence is the evidence kind of a tool named in a source text: a workflow that declares workflow_dispatch, a
+// requirements file, or any other hook, Jenkinsfile or workflow text.
+func textEvidence(source string, dispatching map[string]bool) evidence {
+	switch {
+	case dispatching[source]:
+		return evDispatchFlow
+	case strings.Contains(source, "requirements"):
+		return evRequirementsUse
+	}
+	return evTextUse
 }
 
 // findBranch reads the default branch from the remote HEAD the clone recorded; failing that, the checked-out branch.

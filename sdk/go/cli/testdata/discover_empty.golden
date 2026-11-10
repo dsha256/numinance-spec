@@ -1,0 +1,254 @@
+##### stdout
+numi discover: repository "REPO"
+found: no source files of a language init knows
+found: no default branch recorded in .git (no clone metadata)
+artifact: CODEOWNERS: none found
+chose: package manager uv; confidence low; evidence default, no hint in the repository
+chose: python 3.12; confidence low; evidence default, no version found
+chose: language python; confidence low; evidence default, no python files found
+chose: verifier unit-tests pytest; confidence low; evidence no evidence, conservative default
+chose: verifier lint ruff; confidence low; evidence no evidence, conservative default
+chose: verifier typecheck mypy; confidence low; evidence no evidence, conservative default
+chose: ci github-actions; confidence low; evidence default, no .github/workflows or Jenkinsfile found
+chose: scm github; confidence low; evidence default, github is the only provider that exists
+chose: tickets none; confidence low; evidence default, no ticketing provider exists yet
+chose: default branch none; confidence low; evidence no clone metadata in .git
+chose: CODEOWNERS none found; confidence low; evidence no CODEOWNERS file
+chose: autonomy PR only; confidence high; evidence fixed by numi discover, not discovered
+wrote "OUT/.numinance/policy/sdlc-profile.yaml"
+wrote "OUT/.numinance/policy/autonomy.yaml"
+wrote "OUT/.numinance/policy/stage-registry.yaml"
+wrote "OUT/.numinance/policy/playbook-bugfix-bounded.yaml"
+wrote "OUT/.numinance/policy/toolchain-python.yaml"
+wrote "OUT/.numinance/DISCOVER.md"
+wrote "OUT/PULL_REQUEST.md"
+self-test: HEAD not resolved (no readable .git/HEAD: not a git repository, a gitfile or a worktree)
+self-test: 5 drafted documents decoded by the kind loader (schema and loader checks)
+self-test: a second read of the repository gave the same decisions and the same HEAD
+self-test: no evidence, conservative default, confidence low: unit-tests (pytest), lint (ruff), typecheck (mypy)
+note: no pytest, ruff or mypy found; all three verifiers are the conservative default
+note: no workflow declares workflow_dispatch; the github-actions provider starts a workflow_dispatch workflow that the repository defines on its default branch
+note: no CODEOWNERS file; protect .numinance/policy/** with branch protection and a CODEOWNERS rule so agents cannot change their own gates
+note: the draft is a proposal: every value is a reading of files by pattern, not an execution of the repository's own commands; review each one
+autonomy: PR only (ladder level AUTONOMY_LEVEL_PR, no merge)
+note: discover did not open a pull request and ran no git or gh command: opening it is an operator step that is not built
+next, as the operator (each command is yours to run; read the draft first):
+  1. review OUT/.numinance/DISCOVER.md and OUT/PULL_REQUEST.md
+  2. git -C REPO switch -c numinance/onboarding
+  3. cp -R OUT/.numinance REPO/
+  4. numi validate --files OUT/.numinance (the open build; the engine build validates after step 5 with numi validate)
+  5. git -C REPO add .numinance && git -C REPO commit -m "Add the Numinance configuration drafted by numi discover"
+  6. gh pr create --body-file OUT/PULL_REQUEST.md --title "Add the Numinance configuration drafted by numi discover"
+##### files
+=== .numinance/DISCOVER.md ===
+# Discover report
+
+Written by `numi discover`. It lists what discover found by reading the repository (files only; nothing was executed,
+no git, gh or network command was run, and no repository text was followed as an instruction), what the draft in
+`.numinance/` chose from it, how far each choice can be trusted, and the result of the self-test. This file carries no
+authority; review the documents in `policy/`. Opening the pull request is an operator step that discover does not do.
+
+## Found
+
+    found: no source files of a language init knows
+    found: no default branch recorded in .git (no clone metadata)
+
+## Enforcement artifacts
+
+    artifact: CODEOWNERS: none found
+
+## Chose, with confidence
+
+    chose: package manager uv; confidence low; evidence default, no hint in the repository
+    chose: python 3.12; confidence low; evidence default, no version found
+    chose: language python; confidence low; evidence default, no python files found
+    chose: verifier unit-tests pytest; confidence low; evidence no evidence, conservative default
+    chose: verifier lint ruff; confidence low; evidence no evidence, conservative default
+    chose: verifier typecheck mypy; confidence low; evidence no evidence, conservative default
+    chose: ci github-actions; confidence low; evidence default, no .github/workflows or Jenkinsfile found
+    chose: scm github; confidence low; evidence default, github is the only provider that exists
+    chose: tickets none; confidence low; evidence default, no ticketing provider exists yet
+    chose: default branch none; confidence low; evidence no clone metadata in .git
+    chose: CODEOWNERS none found; confidence low; evidence no CODEOWNERS file
+    chose: autonomy PR only; confidence high; evidence fixed by numi discover, not discovered
+
+## Notes
+
+    note: no pytest, ruff or mypy found; all three verifiers are the conservative default
+    note: no workflow declares workflow_dispatch; the github-actions provider starts a workflow_dispatch workflow that the repository defines on its default branch
+    note: no CODEOWNERS file; protect .numinance/policy/** with branch protection and a CODEOWNERS rule so agents cannot change their own gates
+    note: the draft is a proposal: every value is a reading of files by pattern, not an execution of the repository's own commands; review each one
+
+## Self-test
+
+    self-test: HEAD not resolved (no readable .git/HEAD: not a git repository, a gitfile or a worktree)
+    self-test: 5 drafted documents decoded by the kind loader (schema and loader checks)
+    self-test: a second read of the repository gave the same decisions and the same HEAD
+    self-test: no evidence, conservative default, confidence low: unit-tests (pytest), lint (ruff), typecheck (mypy)
+=== .numinance/policy/autonomy.yaml ===
+# AutonomyPolicy "pr-only", written by "numi init". The ladder level is AUTONOMY_LEVEL_PR: the agent may open pull requests
+# and may never merge. (PR_ONLY is a breaker state of the engine, not a ladder level; this document is the ladder side.)
+apiVersion: numinance.dev/v1
+kind: AutonomyPolicy
+metadata: {name: pr-only, scope: SCOPE_REPO}
+# The extensions block holds the confidence of each drafted value (high, medium or low) and the evidence
+# that showed it. The Engine never reads it. Written by "numi discover"; review each value before merging.
+extensions:
+  dev.numinance.discover:
+    spec.defaults.level: {confidence: high, evidence: "fixed by numi discover, not discovered"}
+spec:
+  defaults: {level: AUTONOMY_LEVEL_PR}
+  # No floors block: a floor set below the org scope is refused. When no org document sets floors the engine applies its
+  # shipped floor (at most SUGGEST for HIGH risk and above, at most PR for the rest), which caps every change at PR.
+  # Run "numi init --org-dir DIR" to write an explicit floors block into an organization policy repository.
+=== .numinance/policy/playbook-bugfix-bounded.yaml ===
+# Playbook "bugfix-bounded", written by "numi init": a bounded bug fix that ends in a pull request. The verifier names are
+# the ones of the LanguageToolchain python-3.12.
+apiVersion: numinance.dev/v1
+kind: Playbook
+metadata: {name: bugfix-bounded, scope: SCOPE_REPO}
+# The extensions block holds the confidence of each drafted value (high, medium or low) and the evidence
+# that showed it. The Engine never reads it. Written by "numi discover"; review each value before merging.
+extensions:
+  dev.numinance.discover:
+    spec.steps.fix.verifiers: {confidence: low, evidence: "no evidence, conservative default"}
+spec:
+  change_type: bugfix
+  steps:
+    # One step per identity kind. The capability_set names are the ones the deployment defines: implement (author-agent:
+    # the branch push and the pull request), review (reviewer-agent: verifier.run), release (release-pipeline: the read-only
+    # status of the pull request). No step merges: Numinance opens pull requests only.
+    - {name: fix, capability_set: implement, risk: RISK_CLASS_MEDIUM, evidence: [diff, pr-ref], verifiers: [unit-tests, lint, typecheck]}
+    - {name: review, capability_set: review, risk: RISK_CLASS_LOW}
+    - {name: pr-status, capability_set: release, risk: RISK_CLASS_LOW}
+  max_repair_attempts: 2
+  qualification: {min_runs: 20, max_rework_rate: 1000, max_regression_rate: 0, max_rollback_rate: 50, zero_security_escapes: true}
+=== .numinance/policy/sdlc-profile.yaml ===
+# SDLCProfile of this repository, written by "numi init". It binds the names defined in this tree
+# (or granted by the organization policy repository) to this repository.
+#
+# CI: github-actions
+#   github-actions: the ciexecutor provider dev.numinance.ci-github-actions exists in the open plugins (replay and live builds).
+#   It starts a workflow_dispatch workflow that the repository already defines on its default branch
+#   (the README of that provider says what the workflow must declare). A live run is not yet verified.
+apiVersion: numinance.dev/v1
+kind: SDLCProfile
+metadata: {name: python-repo, scope: SCOPE_REPO}
+# The extensions block holds the confidence of each drafted value (high, medium or low) and the evidence
+# that showed it. The Engine never reads it. Written by "numi discover"; review each value before merging.
+extensions:
+  dev.numinance.discover:
+    spec.toolchains: {confidence: low, evidence: "default, no version found"}
+    spec.adapters.ciexecutor: {confidence: low, evidence: "default, no .github/workflows or Jenkinsfile found"}
+    spec.adapters.scm: {confidence: low, evidence: "default, github is the only provider that exists"}
+spec:
+  playbooks: [bugfix-bounded]
+  toolchains: [python-3.12]
+  adapters:
+    scm: {provider: dev.numinance.scm-github, instance: main}
+    ciexecutor: {provider: dev.numinance.ci-github-actions, instance: ci}
+=== .numinance/policy/stage-registry.yaml ===
+# StageRegistry "pr-only", written by "numi init": the stage names of this repository mapped onto the fixed Change state
+# machine. The registry names no stage for the Merging state, so no stage of it can merge; the last stage is the human
+# pr-gate. Each CI system has its own verify stage. Only the org scope selects a registry
+# (SDLCProfile.stages), so below the org this registry is defined but not selected.
+apiVersion: numinance.dev/v1
+kind: StageRegistry
+metadata: {name: pr-only, scope: SCOPE_REPO}
+# The extensions block holds the confidence of each drafted value (high, medium or low) and the evidence
+# that showed it. The Engine never reads it. Written by "numi discover"; review each value before merging.
+extensions:
+  dev.numinance.discover:
+    spec.stages.ci: {confidence: low, evidence: "default, no .github/workflows or Jenkinsfile found"}
+spec:
+  stages:
+    - {name: triage, maps_to: CHANGE_STATE_CLASSIFIED}
+    - {name: plan-review, maps_to: CHANGE_STATE_PLAN_GATE, gate: {kind: GATE_KIND_PLAN}, requires: [triage]}
+    - {name: implement, maps_to: CHANGE_STATE_IMPLEMENTING, requires: [plan-review]}
+    # Static checks run by the verifier provider on the candidate.
+    - {name: verify-static, maps_to: CHANGE_STATE_VERIFYING, requires: [implement]}
+    # GitHub Actions: runs the repository's own workflow through the ciexecutor port.
+    - {name: ci-github-actions, maps_to: CHANGE_STATE_VERIFYING, requires: [verify-static]}
+    - name: pr-gate
+      maps_to: CHANGE_STATE_RELEASE_GATE
+      gate:
+        kind: GATE_KIND_HUMAN
+        approver_role: maintainer
+        sod: {distinct_from: [author-agent, reviewer-agent]}
+        required_approvals: 1
+      requires: [ci-github-actions]
+=== .numinance/policy/toolchain-python.yaml ===
+# LanguageToolchain for Python, written by "numi init". The toolchain is explicit: language, version, package manager and
+# the verifier set are the values chosen by the flags of "numi init" or detected in the repository; edit them here.
+# The verifier provider takes the check to run in "config.check". It may also take "settings", the text of the tool's own
+# settings file (ruff.toml, mypy.ini, pytest.ini); it never reads settings files of the candidate.
+# unit-tests (pytest) runs candidate code, which the verifier provider refuses to do outside a nested sandbox that is not
+# built yet: today only the replaying build serves it, so a live run of unit-tests is UNAVAILABLE. lint and typecheck are
+# static and run.
+apiVersion: numinance.dev/v1
+kind: LanguageToolchain
+metadata: {name: python-3.12, scope: SCOPE_REPO}
+# The extensions block holds the confidence of each drafted value (high, medium or low) and the evidence
+# that showed it. The Engine never reads it. Written by "numi discover"; review each value before merging.
+extensions:
+  dev.numinance.discover:
+    spec.language: {confidence: low, evidence: "default, no python files found"}
+    spec.version: {confidence: low, evidence: "default, no version found"}
+    spec.package_manager: {confidence: low, evidence: "default, no hint in the repository"}
+    spec.verifiers.unit-tests: {confidence: low, evidence: "no evidence, conservative default"}
+    spec.verifiers.lint: {confidence: low, evidence: "no evidence, conservative default"}
+    spec.verifiers.typecheck: {confidence: low, evidence: "no evidence, conservative default"}
+spec:
+  language: python
+  version: "3.12"
+  verifiers:
+    - {name: unit-tests, provider: dev.numinance.verifier-python, config: {check: pytest, timeout_seconds: 300}}
+    - {name: lint, provider: dev.numinance.verifier-python, config: {check: ruff, timeout_seconds: 60}}
+    - {name: typecheck, provider: dev.numinance.verifier-python, config: {check: mypy, timeout_seconds: 120}}
+  package_manager: uv
+=== PULL_REQUEST.md ===
+Add the Numinance configuration drafted by numi discover
+
+## What this adds
+
+A draft `.numinance/` for this repository, written by `numi discover` from the enforcement artifacts the repository already has (files only; nothing was executed). Autonomy is PR only: the agent may open pull requests and may never merge. Nothing in this pull request merges anything.
+
+## What was discovered
+
+- no source files of a language init knows
+- no default branch recorded in .git (no clone metadata)
+
+## Confidence
+
+Each drafted value carries its confidence and evidence under `extensions` (`dev.numinance.discover`) in its document. High: a settings file, a pyproject table, a lockfile or a version file. Medium: a dependency listing, a requires-python bound, a section of another file or a workflow with workflow_dispatch. Low: only a use in a hook, requirements or CI text, the current branch, or a default taken because nothing was found.
+
+| Decision | Value | Confidence | Evidence |
+| --- | --- | --- | --- |
+| package manager | uv | low | default, no hint in the repository |
+| python | 3.12 | low | default, no version found |
+| language | python | low | default, no python files found |
+| verifier unit-tests | pytest | low | no evidence, conservative default |
+| verifier lint | ruff | low | no evidence, conservative default |
+| verifier typecheck | mypy | low | no evidence, conservative default |
+| ci | github-actions | low | default, no .github/workflows or Jenkinsfile found |
+| scm | github | low | default, github is the only provider that exists |
+| tickets | none | low | default, no ticketing provider exists yet |
+| default branch | none | low | no clone metadata in .git |
+| CODEOWNERS | none found | low | no CODEOWNERS file |
+| autonomy | PR only | high | fixed by numi discover, not discovered |
+
+## Self-test
+
+- HEAD not resolved (no readable .git/HEAD: not a git repository, a gitfile or a worktree)
+- 5 drafted documents decoded by the kind loader (schema and loader checks)
+- a second read of the repository gave the same decisions and the same HEAD
+- no evidence, conservative default, confidence low: unit-tests (pytest), lint (ruff), typecheck (mypy)
+
+## Reviewer checklist
+
+- [ ] Every row of low confidence is read against the repository and corrected or accepted on purpose.
+- [ ] The verifiers, the Python version and the package manager match how the repository really runs its checks.
+- [ ] The CI binding names the workflow the repository uses, and that workflow declares workflow_dispatch on the default branch.
+- [ ] `.numinance/policy/**` is protected with a CODEOWNERS rule (for example `/.numinance/policy/ @your-org/security`) and branch protection that requires that owner's review, so agents cannot change their own gates.
+- [ ] Nothing in this pull request merges anything: the autonomy level is PR only and the pull request needs a human approval like any other.
+- [ ] The confidence annotations under `extensions` are kept or removed as the team prefers; the Engine never reads them.

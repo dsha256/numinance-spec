@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 )
 
 const (
@@ -28,10 +29,17 @@ type treeWriter struct {
 	files   []outFile
 	force   bool
 	created []string
+	// tool names the command in messages: "init" or "discover".
+	tool string
 }
 
 // openTree opens dir and checks that the files can be written.
 func openTree(dir string, files []outFile, force bool) (*treeWriter, error) {
+	return openTreeFor("init", dir, files, force)
+}
+
+// openTreeFor is openTree for the command named tool, which its messages use.
+func openTreeFor(tool, dir string, files []outFile, force bool) (*treeWriter, error) {
 	root, err := os.OpenRoot(dir)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -39,7 +47,7 @@ func openTree(dir string, files []outFile, force bool) (*treeWriter, error) {
 	case err != nil:
 		return nil, safeErrorf(KindInvalid, "%s is not a directory that can be opened", quote(dir))
 	}
-	w := &treeWriter{root: root, files: files, force: force}
+	w := &treeWriter{root: root, files: files, force: force, tool: tool}
 	if err := w.preflight(); err != nil {
 		_ = root.Close()
 		return nil, err
@@ -71,6 +79,9 @@ func (w *treeWriter) close() { _ = w.root.Close() }
 
 // preflight is the whole check before the first byte is written.
 func (w *treeWriter) preflight() error {
+	if err := w.preflightOutside(); err != nil {
+		return err
+	}
 	fi, err := w.root.Lstat(configRoot)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
@@ -88,7 +99,7 @@ func (w *treeWriter) preflight() error {
 			return err
 		}
 		if !empty {
-			return Errorf(KindConflict, "%s already has files; pass --force to overwrite the files init writes (other files are never touched)", configRoot)
+			return Errorf(KindConflict, "%s already has files; pass --force to overwrite the files %s writes (other files are never touched)", configRoot, w.tool)
 		}
 	}
 	for _, f := range w.files {
@@ -109,6 +120,27 @@ func (w *treeWriter) preflight() error {
 			return safeErrorf(KindInternal, "cannot inspect %s", quote(f.Path))
 		case !fi.Mode().IsRegular():
 			return safeErrorf(KindInvalid, "%s is a link or not a regular file; refusing to overwrite it", quote(f.Path))
+		}
+	}
+	return nil
+}
+
+// preflightOutside checks the files that are not below configRoot (init has none; discover writes PULL_REQUEST.md
+// beside it): a link or a special file is refused, and an existing file is a conflict without force.
+func (w *treeWriter) preflightOutside() error {
+	for _, f := range w.files {
+		if strings.HasPrefix(f.Path, configRoot+"/") {
+			continue
+		}
+		fi, err := w.root.Lstat(f.Path)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+		case err != nil:
+			return safeErrorf(KindInternal, "cannot inspect %s", quote(f.Path))
+		case !fi.Mode().IsRegular():
+			return safeErrorf(KindInvalid, "%s is a link or not a regular file; refusing to overwrite it", quote(f.Path))
+		case !w.force:
+			return safeErrorf(KindConflict, "%s already exists; pass --force to overwrite the files %s writes", quote(f.Path), w.tool)
 		}
 	}
 	return nil

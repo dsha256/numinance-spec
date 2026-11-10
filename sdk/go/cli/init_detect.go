@@ -42,6 +42,8 @@ type hint struct {
 	Conflict []string
 	// PythonVersion and VersionSource come from .python-version; empty when absent or not understood.
 	PythonVersion, VersionSource string
+	// ManagerEvidence and VersionEvidence are the evidence kinds of the two findings, for "numi discover".
+	ManagerEvidence, VersionEvidence evidence
 }
 
 // detectHints looks for pyproject.toml, uv.lock, poetry.lock, requirements.txt and .python-version at the top of the
@@ -49,7 +51,10 @@ type hint struct {
 func detectHints(r *repoReader) (hint, error) {
 	root := r.root
 	var h hint
-	type found struct{ manager, source string }
+	type found struct {
+		manager, source string
+		ev              evidence
+	}
 	var hits []found
 
 	for _, f := range []struct{ file, manager string }{{"uv.lock", "uv"}, {"poetry.lock", "poetry"}} {
@@ -58,17 +63,17 @@ func detectHints(r *repoReader) (hint, error) {
 			return hint{}, err
 		}
 		if ok {
-			hits = append(hits, found{f.manager, f.file})
+			hits = append(hits, found{f.manager, f.file, evLockfile})
 		}
 	}
 	pyproject := r.text("pyproject.toml", maxHintBytes)
 	hasPyproject := pyproject != nil
 	if hasPyproject {
 		if bytes.Contains(pyproject, []byte("[tool.poetry]")) || bytes.Contains(pyproject, []byte("[tool.poetry.")) {
-			hits = append(hits, found{"poetry", "pyproject.toml [tool.poetry]"})
+			hits = append(hits, found{"poetry", "pyproject.toml [tool.poetry]", evPyprojectTable})
 		}
 		if bytes.Contains(pyproject, []byte("[tool.uv]")) || bytes.Contains(pyproject, []byte("[tool.uv.")) {
-			hits = append(hits, found{"uv", "pyproject.toml [tool.uv]"})
+			hits = append(hits, found{"uv", "pyproject.toml [tool.uv]", evPyprojectTable})
 		}
 	}
 	managers := map[string]bool{}
@@ -81,17 +86,17 @@ func detectHints(r *repoReader) (hint, error) {
 	case len(managers) > 1:
 		h.Conflict = sources
 	case len(hits) > 0:
-		h.PackageManager, h.Source = hits[0].manager, strings.Join(sources, ", ")
+		h.PackageManager, h.Source, h.ManagerEvidence = hits[0].manager, strings.Join(sources, ", "), hits[0].ev
 	default:
 		if ok, err := regularFile(root, "requirements.txt"); err != nil {
 			return hint{}, err
 		} else if ok {
-			h.PackageManager, h.Source = "pip", "requirements.txt"
+			h.PackageManager, h.Source, h.ManagerEvidence = "pip", "requirements.txt", evDependency
 		} else if hasPyproject {
-			h.PackageManager, h.Source = defaultPackageManager, "pyproject.toml with no package manager table, the default"
+			h.PackageManager, h.Source, h.ManagerEvidence = defaultPackageManager, "pyproject.toml with no package manager table, the default", evNothingFound
 		}
 	}
-	h.PythonVersion, h.VersionSource = pythonVersionHint(r, pyproject)
+	h.PythonVersion, h.VersionSource, h.VersionEvidence = pythonVersionHint(r, pyproject)
 	return h, r.err
 }
 

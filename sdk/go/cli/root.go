@@ -20,6 +20,9 @@ type Root struct {
 	// Suggest runs "numi suggest ..." with the arguments after "suggest". Both builds set it to RunSuggest. When nil
 	// the command is unknown.
 	Suggest func(ctx context.Context, args []string, stdout, stderr io.Writer) int
+	// Discover runs "numi discover ..." with the arguments after "discover". Both builds set it to RunDiscover. When nil
+	// the command is unknown.
+	Discover func(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	// Extension runs "numi extension ..." with the arguments after "extension". The open build sets it to RunExtension
 	// (offline verification of the lockfile pins). When nil the command is unknown.
 	Extension func(ctx context.Context, args []string, stdout, stderr io.Writer) int
@@ -46,6 +49,9 @@ func (r Root) Run(ctx context.Context, args []string) int {
 		if r.Suggest != nil {
 			names = append(names, "suggest")
 		}
+		if r.Discover != nil {
+			names = append(names, "discover")
+		}
 		if r.Evidence != nil {
 			names = append(names, "evidence")
 		}
@@ -68,6 +74,10 @@ func (r Root) Run(ctx context.Context, args []string) int {
 	case "suggest":
 		if r.Suggest != nil {
 			return r.Suggest(ctx, args[1:], r.Stdout, r.Stderr)
+		}
+	case "discover":
+		if r.Discover != nil {
+			return r.Discover(ctx, args[1:], r.Stdout, r.Stderr)
 		}
 	case "evidence":
 		if r.Evidence != nil {
