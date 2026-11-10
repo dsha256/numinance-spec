@@ -73,8 +73,8 @@ Jenkins has no idempotency key and a build request answers with a queue item tha
    be able to change the job definition (the same rule as a protected default branch for GitHub Actions).
 3. The operation id the provider issues is `<32 hex of sha256(key, repository, pipeline)>.<pipeline with '/' as ':'>`, at most
    128 bytes (so a pipeline name is at most 95 bytes). It names the job because `GetOperation` carries only the repository and the id.
-4. A run is found by that parameter, first in the queue (`/queue/api/json`) and then in the job's recent builds (the 100 builds
-   Jenkins lists), before a new one is started. The queue is global (every job of the server) and the operation id is not secret, so
+4. A run is found by that parameter, first in the queue (`/queue/api/json`) and then in the job's recent builds (the newest
+   1000, read newest first in pages of 100), before a new one is started. The queue is global (every job of the server) and the operation id is not secret, so
    a queue item counts only when **both** hold: it carries our `numinance_operation_id`, and it is an item of our job. The task URL
    of Jenkins is `<root URL>/job/<a>/job/<b>`, and its root part is Jenkins's own setting, which behind a reverse proxy may differ
    from the path of `-url`. So the item is ours when its URL path **ends with** our job path
@@ -83,8 +83,8 @@ Jenkins has no idempotency key and a build request answers with a queue item tha
    it can neither shadow the real run nor block a call; a cancel only ever uses the id of our own item. A path that ends with ours
    but has a `/job/` segment before it can not be told from a parent folder (or from a root mount that contains `/job/` and is not
    the configured one), so it fails closed with `UPSTREAM_ERROR` and nothing is started. With no task URL the task's short name is
-   compared; with neither, the item is not ours. A repeat under the same key therefore starts no second run (`existing: true`); a
-   window of 100 builds that lacks the operation fails closed (`LIMIT_EXCEEDED`) and starts nothing. The revision reported is the
+   compared; with neither, the item is not ours. A repeat under the same key therefore starts no second run (`existing: true`); the
+   newest 1000 builds, if they lack the operation, fail closed (`LIMIT_EXCEEDED`) and start nothing. The revision reported is the
    parameter of the build, checked against the grammar.
 
    **The gap between the queue and the build list.** Jenkins takes an item off the queue a moment before the build shows in the job's
@@ -115,8 +115,8 @@ Jenkins has no idempotency key and a build request answers with a queue item tha
 - `CancelOperation` (MEDIUM; declares `ci-action`): a queued run is removed with `POST /queue/cancelItem?id=`, a build is stopped with
   `POST .../<n>/stop`, then re-read (up to three looks); an ended run is answered as it is and nothing is posted. If Jenkins has not
   reported an end by then, the state answered is the one read (`RUNNING`), never `CANCELLED`. After a queue cancel, a re-read that
-  shows the run in neither list (also when the 100-build window is full: a run that had left the queue first would head the window,
-  being the newest build) is the cancel Jenkins confirmed, `CANCELLED`; a run in the gap is read from its item (see above) and, once
+  shows the run in neither list (also when all 1000 builds are read and the last page is still full: a run that had left the queue first would head the first
+  page, being the newest build) is the cancel Jenkins confirmed, `CANCELLED`; a run in the gap is read from its item (see above) and, once
   a build, stopped by the next look.
 - Evidence: the `ci-run-ref` receipt of a start (also of a repeat, so a retry heals a missing one) and the `ci-action` receipt of a
   cancel are submitted after the effect. If the host does not take one, the call still ends `SUCCEEDED` with the effect recorded (a
@@ -164,11 +164,12 @@ Nothing from Jenkins is logged; the provider logs nothing.
 
 ## Verified against what
 
-Replay and a local TLS fake only. Nothing here has run against a real Jenkins. **A live run is owed.** Facts used from the Jenkins remote access API
+Replay and a local TLS fake only. Nothing here has run against a real Jenkins. **A live run is owed** (see Live runs). Facts used from the Jenkins remote access API
 documentation, to confirm on a live server (verify against a live Jenkins):
 
 - `POST /job/<name>/buildWithParameters` answers `201` with `Location: <root>/queue/item/<id>/`; a job with no parameters answers 400.
-- `GET /job/<name>/api/json?tree=...` honors `tree` with a range (`builds[...]{0,100}`), `property[parameterDefinitions[name]]`, and
+- `GET /job/<name>/api/json?tree=...` honors `tree` with a range (`builds[...]{0,100}`, then `{100,200}` and so on up to `{900,1000}`, newest build first, end exclusive; a
+  page shorter than the range is the end of the list), `property[parameterDefinitions[name]]`, and
   `artifacts[relativePath]` on a build; queue items list `actions[parameters[name,value]]` and `task[url]`.
 - `POST /queue/cancelItem?id=` and `POST /job/<name>/<n>/stop` answer a redirect (2xx or 3xx is accepted); the stop becomes `ABORTED`
   asynchronously.
@@ -180,15 +181,44 @@ documentation, to confirm on a live server (verify against a live Jenkins):
   the build for a few minutes after the item leaves the queue, with `id`, `task[name,url]` and `actions[parameters[name,value]]`
   (the gap lookup relies on this: confirm it, and for how long, on a live server).
 - `building`, `result` (`null` while building), `timestamp` (start, ms) and `duration` (ms) of a build.
-- Large queues or job folders are only bounded by the 4 MiB answer limit.
+- Large queues or job folders are only bounded by the 4 MiB answer limit. A page of 100 builds with parameters is read through the same
+  limit.
+- The container fixture (see Live runs) additionally relies, unchecked, on `ApiTokenStore.addFixedNewToken` taking a plain token of
+  `11` and 32 hex characters, and on `Folder.createProject` in an init script.
+
+## Live runs
+
+Two harnesses exist. **Neither has been run**: no Docker daemon was running and no controller was available where they were
+written. The live-fake conformance run (`TestLive_ConformanceKitPassesThroughTheProxyToATLSFake`) stays the only executed
+evidence for the live build.
+
+- `provider/live_controller_test.go` (`TestLiveController_DryRunAndOptionalBuild`): against an operator's controller, through the
+  operator's egress proxy, which holds the Jenkins token. The test holds no credential, only a handle. Skipped unless
+  `NUMINANCE_JENKINS_LIVE=1`; then `NUMINANCE_JENKINS_LIVE_{URL,PROXY,HANDLE,REPO,PIPELINE,REVISION}` are all required. It does a dry
+  run of `StartOperation` (checks the job and its `numinance_*` parameters, starts nothing). Because starting a build is a side effect,
+  the steps that start, repeat under the same key, wait to leave the queue (2 minutes), cancel, read the end state and read the console
+  reference run only with `NUMINANCE_JENKINS_LIVE_START=1`. It never logs a title, a parameter or log content. The env parsing and the
+  scenario logic are covered by unit tests that run (`TestControllerEnv`, `TestLiveScenario_AgainstTheFake`).
+- `provider/live_docker_test.go` (`//go:build integration`, `TestDockerJenkins_StartRepeatRunCancel`): builds the throwaway controller
+  of `testdata/jenkins-docker` (image pinned by digest, `cloudbees-folder`, setup wizard off, an init script that creates an admin with
+  a random per-run API token, no anonymous read, crumbs on, folders `acme/widgets` and the jobs `release` and `dry` with the
+  `numinance_*` and `environment` parameters, each sleeping 300 s). It drives the provider for `jenkins.example.test` through a plain
+  HTTP in-test proxy that checks the destination and handle, strips the handle and injects Basic credentials from the random token. It
+  expects QUEUED, a repeat under the same key (same operation id, no second build), RUNNING within 2 minutes, a console reference,
+  no artifacts, and `CANCELLED`. It compiles and passes `go vet -tags integration`, and is skipped unless `NUMINANCE_JENKINS_DOCKER=1`
+  and `docker info` succeeds:
+  `cd numinance-spec && NUMINANCE_JENKINS_DOCKER=1 go test -tags integration -run TestDockerJenkins ./plugins/official/ciexecutor-jenkins/provider/`.
+  Expect to fix the fixture on the first run.
 
 ## Known limits (left as they are)
 
-- **A job with 100 or more builds fails every new key with `LIMIT_EXCEEDED`.** A start looks for the key in the 100 newest builds; a
-  full window that lacks it is not proof that no earlier attempt exists further back, so the call fails closed and starts nothing.
-  That is the safe choice for a deploy-class side effect, but on a job with a long history it means a new key can not start a run.
-  Settling it needs a decision on how long a key may be retried (a time bound on the window, or deeper pages up to a bound); it is
-  the first thing to settle in the live card. Get and cancel of a recent run are not affected.
+- **A job with more than 1000 builds fails a new key with `LIMIT_EXCEEDED` when the run is not among the newest 1000.** A start looks
+  for the key newest first in up to 10 pages of 100 builds and stops at the first page of fewer than 100 (the end of the list). If the
+  tenth page is still full and lacks the key, an earlier attempt could exist further back, so the call fails closed and starts nothing.
+  A key retried after more than 1000 newer builds therefore cannot start a run. The pages are separate requests: a build that lands
+  between two of them shifts the list down, so an entry can appear on two pages (harmless) but none is skipped. Up to 10 requests
+  are made for a get or cancel of a run that does not exist, and a page that holds more builds than the range asked for is an
+  `UPSTREAM_ERROR`.
 - If the build request fails in a way that does not say whether Jenkins took it and the look-up by key finds nothing, the call fails
   `TIMEOUT` or `UPSTREAM_UNAVAILABLE` with no effect claimed (see Calls): the caller must treat those reasons on a start as
   "unknown" and retry under the same key. The side effect of a stop request that times out is not claimed either (a stop is
@@ -211,7 +241,8 @@ documentation, to confirm on a live server (verify against a live Jenkins):
 
 ## Not done
 
-- A live run against a real Jenkins and a recording tool (a server and an API token are needed).
+- A live run against a real Jenkins and a recording tool (a server and an API token are needed). Two harnesses are written and not run
+  (see Live runs).
 - Inclusion in the release bundle (`.goreleaser.yaml`, `tools/release/bundle`): not added in this card.
 - An official signed install: the instance-bound network intent (ADR 0060 OQ2) is owed; the live build is operator-installed.
 - Multibranch pipelines, branch jobs whose name contains `/`, a sha256 digest of artifacts, `TIMED_OUT`.

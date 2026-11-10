@@ -23,17 +23,25 @@ import (
 // again by that parameter in the queue and in the job's recent builds. The job is the folder path <owner>/<name> and the
 // pipeline name under it.
 const (
-	// buildsWindow is how many recent builds one look at the job reads (Jenkins's own window of the builds property). A full
-	// window that does not hold the operation may hold it further back, so the look fails closed (LIMIT_EXCEEDED).
-	buildsWindow = 100
+	// buildsPage is how many builds one request reads (a Jenkins range {from,to} of the builds property). A page of fewer builds is
+	// the end of the list.
+	buildsPage = 100
+	// buildsPages bounds the look: the newest buildsPage*buildsPages builds are read, newest first. If the last page is still full
+	// and does not hold the operation, it may hold it further back, so the look fails closed (LIMIT_EXCEEDED).
+	buildsPages = 10
 
-	treeQueue = "items[id,task[name,url],actions[parameters[name,value]]]"
-	treeBuild = "builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]{0,100}"
-	treeJob   = "buildable,property[parameterDefinitions[name]]"
+	treeQueue       = "items[id,task[name,url],actions[parameters[name,value]]]"
+	treeBuildFields = "builds[number,building,result,timestamp,duration,actions[parameters[name,value]]]"
+	treeJob         = "buildable,property[parameterDefinitions[name]]"
 	// treeItem is a queue item read by its id; treeSingle one build read by its number.
 	treeItem   = "id,cancelled,executable[number],task[name,url],actions[parameters[name,value]]"
 	treeSingle = "number,building,result,timestamp,duration,actions[parameters[name,value]]"
 )
+
+// treeBuild is the tree that reads page n (from 0) of the job's builds, newest first: the range {n*100,(n+1)*100}.
+func treeBuild(page int) string {
+	return treeBuildFields + "{" + strconv.Itoa(page*buildsPage) + "," + strconv.Itoa((page+1)*buildsPage) + "}"
+}
 
 // errNoRun is locate's answer when neither the queue nor the recent builds carry the operation.
 var errNoRun = errors.New("no run of the operation")
@@ -199,30 +207,43 @@ func (p impl) locate(ctx context.Context, cl client, job, op string) (*located, 
 		p.seen.put(op, it.ID)
 		return &located{state: civ1.OperationState_OPERATION_STATE_QUEUED, queueID: it.ID, revision: rev}, nil
 	}
-	var l struct {
-		Builds []buildInfo `json:"builds"`
-	}
-	if _, err := cl.do(ctx, request{method: http.MethodGet, path: job + "/api/json", query: url.Values{"tree": {treeBuild}}}, &l); err != nil {
-		return nil, failure(ctx, err)
-	}
-	for _, b := range l.Builds {
-		if paramValue(b.Actions, paramOperation) == op {
-			p.seen.forget(op)
-			return b.located()
+	// The builds are read newest first in pages. A build that lands between two reads shifts the list down by one, so a page may
+	// repeat the last entry of the one before (harmless); it can never skip one. A page is read through the same limited client and
+	// every build that carries our id is validated as before.
+	full := false
+	for page := range buildsPages {
+		var l struct {
+			Builds []buildInfo `json:"builds"`
 		}
+		if _, err := cl.do(ctx, request{method: http.MethodGet, path: job + "/api/json", query: url.Values{"tree": {treeBuild(page)}}}, &l); err != nil {
+			return nil, failure(ctx, err)
+		}
+		if len(l.Builds) > buildsPage {
+			return nil, upstream() // Jenkins did not honour the range: not the answer asked for
+		}
+		for _, b := range l.Builds {
+			if paramValue(b.Actions, paramOperation) == op {
+				p.seen.forget(op)
+				return b.located()
+			}
+		}
+		if len(l.Builds) < buildsPage {
+			break // the end of the list
+		}
+		full = page == buildsPages-1
 	}
 	// Neither list shows the run. For a run whose queue item is known, the item says what became of it (the gap between the
 	// queue and the build list); an unknown or expired item changes nothing below.
 	if run, found, err := p.inGap(ctx, cl, job, op); err != nil || found {
 		return run, err
 	}
-	if len(l.Builds) >= buildsWindow {
+	if full {
 		return nil, ghprovider.Fail(pluginv1.Reason_REASON_LIMIT_EXCEEDED)
 	}
 	return nil, errNoRun
 }
 
-// buildInfo is one build as the tree treeBuild asks for it.
+// buildInfo is one build as the tree treeBuild(page) asks for it.
 type buildInfo struct {
 	Number    int64          `json:"number"`
 	Building  bool           `json:"building"`

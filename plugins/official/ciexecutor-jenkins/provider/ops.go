@@ -270,8 +270,8 @@ func (p impl) cancel(ctx context.Context, c *ghprovider.Call, m *civ1.CancelOper
 			// A cancelled queue item leaves no trace in the lists read here: not in the queue and never a build.
 			return &civ1.CancelOperationResponse{State: civ1.OperationState_OPERATION_STATE_CANCELLED}, nil
 		case cancelledQueued && isLimitExceeded(err):
-			// The window of builds is full and does not hold the run. After our cancel of its queue item that is the answer too: a
-			// run that had left the queue first would head the window, being the newest build.
+			// All buildsPages pages of builds are full and none holds the run. After our cancel of its queue item that is the answer
+			// too: a run that had left the queue first would head the first page, being the newest build.
 			return &civ1.CancelOperationResponse{State: civ1.OperationState_OPERATION_STATE_CANCELLED}, nil
 		case err != nil && errors.Is(err, errNoRun):
 			return nil, upstream()

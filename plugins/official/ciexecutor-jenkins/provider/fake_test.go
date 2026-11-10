@@ -296,8 +296,9 @@ func (f *fake) RoundTrip(r *http.Request) (*http.Response, error) {
 		return answer(200, js(map[string]any{"items": items})), nil
 	case path == jobBase+"/api/json" && strings.HasPrefix(tree, "builds"):
 		bs := []map[string]any{}
-		for _, b := range f.builds {
-			if !f.hideFromList {
+		from, to := treeRange(tree)
+		for i, b := range f.builds {
+			if !f.hideFromList && i >= from && i < to {
 				bs = append(bs, f.buildJSON(b))
 			}
 		}
@@ -326,6 +327,54 @@ func (f *fake) RoundTrip(r *http.Request) (*http.Response, error) {
 		return answer(302, ""), nil
 	}
 	return answer(404, "<html>not found</html>"), nil
+}
+
+// treeRange is the {from,to} range a Jenkins tree ends with (from inclusive, to exclusive); without one the whole list.
+func treeRange(tree string) (from, to int) {
+	i := strings.LastIndex(tree, "{")
+	if i < 0 || !strings.HasSuffix(tree, "}") {
+		return 0, int(^uint(0) >> 1)
+	}
+	a, b, ok := strings.Cut(tree[i+1:len(tree)-1], ",")
+	from, err1 := strconv.Atoi(a)
+	to, err2 := strconv.Atoi(b)
+	if !ok || err1 != nil || err2 != nil {
+		return 0, 0
+	}
+	return from, to
+}
+
+// pad appends n older builds of other runs at the end of the (newest first) list, numbered below the existing ones.
+func (f *fake) pad(n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for i := range n {
+		f.builds = append(f.builds, fakeBuild{n: 1000 + n - i, form: url.Values{"numinance_operation_id": {"other"}}, result: str("SUCCESS"), duration: 1})
+	}
+}
+
+// newer prepends n newer builds of other runs to the (newest first) list: a busy job after the run was started.
+func (f *fake) newer(n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fill := make([]fakeBuild, 0, n+len(f.builds))
+	for i := range n {
+		fill = append(fill, fakeBuild{n: 5000 + n - i, form: url.Values{"numinance_operation_id": {"other"}}, result: str("SUCCESS"), duration: 1})
+	}
+	f.builds = append(fill, f.builds...)
+}
+
+// buildGets is the number of GETs of the job's list of builds.
+func (f *fake) buildGets() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "GET "+jobBase+"/api/json?") && strings.Contains(c, "builds%5B") {
+			n++
+		}
+	}
+	return n
 }
 
 func (f *fake) server(h *host) *provider.Server { return f.serverAt(h, provider.ExampleURL) }
