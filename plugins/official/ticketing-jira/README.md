@@ -124,6 +124,26 @@ replaying provider, the timing, redirect, URL, error-class and egress checks abo
 at handshake, and unit tests of the text rendering, the JQL escaping and the grammar. The host-level acceptance (the real plugin host launching the
 replaying build) is the reference implementation's.
 
+## Write-back
+
+Built:
+
+- The provider's three writes (`CommentOnIssue` keyed by the host's idempotency key, `TransitionIssue` with dry run, `LinkIssue`), the
+  live build sending writes only with `-write-back`, and the replay and live-fake conformance run (24 cases).
+- The host side of a comment: the ticket comment adapter of the private repository posts a blocking question through a
+  vendor-neutral client after a policy decision, redaction, a size cap and a restricted-source refusal (see the knowledge context
+  README, "Ticket write-back"). It is tested against a fake client only.
+- the gated live-tenant test of `provider/`: a harness for the first run against a real tenant, skipped unless `NUMINANCE_JIRA_LIVE=1` and the
+  `NUMINANCE_JIRA_LIVE_*` variables are set. It holds no credential: the operator's own egress proxy holds the read-scoped token and
+  injects it for the handle. It reads one issue and checks that the read-only build refuses a comment. It sends no write, and it has
+  not been run, so it proves nothing about a tenant yet.
+
+Deferred, not done: the production composition (`cmd/engine` still composes `NoTickets`); a plugin-host-backed client; the write
+identity (ADR 0060 OQ4: the runner never writes; a ruling and an ADR are owed, Tier 1); shipped capability sets, floors and a policy
+grant for the ticketing writes (no shipped set contains the three writes, ADR 0060 decision 9); the restricted-visibility marker on
+`BundleSource`; engine intake of Jira tickets; `TransitionIssue` and `LinkIssue` driven by the Engine; verification against a real
+tenant.
+
 ## Not done
 
 - **Fixed in this card (review findings of PR 582).** `CommentOnIssue` no longer believes the property alone (see "Comments"); the
