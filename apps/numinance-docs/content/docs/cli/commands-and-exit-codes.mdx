@@ -39,11 +39,18 @@ Every command pairs the code with a one-line message on stderr or stdout. `numi 
 | --- | --- | --- |
 | `numi version` | [Install](/docs/cli/install) | 0 |
 | `numi init` | [numi init](/docs/cli/init) | 0, 1, 2, 3, 4, 5 |
+| `numi discover --out DIR` | this page, below | 0, 1, 2, 3, 4, 5 |
 | `numi validate --files` | [numi validate](/docs/cli/validate) | 0, 2, 3, 4 |
 | `numi validate` | [numi validate](/docs/cli/validate) | 2, 3, 4, 7 (0 never in the open build) |
 | `numi evidence verify` | [numi evidence verify](/docs/cli/evidence-verify) | 0, 1, 2, 3, 4, 5, 7, 8 |
 
 Machine output: `--json` prints one JSON object on `validate` and `evidence verify`. Default output is for people and can change.
+
+## numi discover
+
+`numi discover --out DIR [--force] [path]` reads the enforcement artifacts a repository already has (files only; nothing is executed, and no `git`, `gh` or network command is run), drafts the same five kinds as `numi init` with a confidence annotation on each drafted value, self-tests the draft against the repository HEAD in process, and writes it into `DIR`, which must be outside the repository: `DIR/.numinance/`, a report `DIR/.numinance/DISCOVER.md` and the text of a pull request, `DIR/PULL_REQUEST.md`. Confidence is under the `extensions` map of each document (`dev.numinance.discover`) as `{confidence, evidence}` per field.
+
+It does not open the pull request. That is an operator step that is not built: discover prints the commands (branch, copy, `gh pr create --body-file DIR/PULL_REQUEST.md`) and runs none of them. Autonomy stays at PR only, and nothing merges. Exit 3 means `--out` is inside the repository or a drafted document did not load; exit 5 means `DIR/.numinance` already has files (pass `--force`), or the repository changed while discover ran. See `cli/README.md`, section "Discover", for the confidence levels and the self-test.
 
 ## Designed command surface
 
@@ -55,7 +62,6 @@ Machine output: `--json` prints one JSON object on `validate` and `evidence veri
 
 | Command | Intended purpose |
 | --- | --- |
-| `numi discover` | Read the enforcement artifacts a repository already has, draft configuration documents with confidence annotations, self-test them, and propose the result as a pull request for human review |
 | `numi connect` | Guided connection of a knowledge provider, source control or CI: resolve the provider in a registry, authorize, list its tools, approve a read-only subset and pin hashes, then smoke-test |
 | `numi plan` | A dry run for a ticket: classify, resolve context, show the plan and the grant that would be issued; no execution |
 | `numi run` | Start a change from a ticket at a chosen autonomy level, bounded by the policy ceiling; requires a runtime |
