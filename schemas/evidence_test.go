@@ -407,3 +407,65 @@ func TestEvidenceSchemas_RejectBadDocuments(t *testing.T) {
 		t.Error("closed-basic is not a positive export")
 	}
 }
+
+// TestEvidenceSchemas_ToolCapabilityActions pins that the published action grammar covers what the open verifier accepts
+// (sdk/go/evidenceverify capabilityRe): a gateway receipt names tool.<plugin>.<name>, so an export that holds one validates, and
+// the malformed three-segment names do not.
+func TestEvidenceSchemas_ToolCapabilityActions(t *testing.T) {
+	schemas := evidenceSchemas(t)
+	b, err := os.ReadFile(path.Join(evidenceExports, "closed-basic", "records.ndjson"))
+	if err != nil {
+		t.Fatalf("ReadFile(closed-basic/records.ndjson) = %v", err)
+	}
+	first, _, _ := bytes.Cut(b, []byte{'\n'})
+	rv, err := decodeJSON(first)
+	if err != nil {
+		t.Fatalf("decode first record: %v", err)
+	}
+	base, _ := rv.(map[string]any)
+	entry := func(action string) any {
+		return map[string]any{
+			"sequence": json.Number("2"), "ev_id": "ev_" + strings.Repeat("0", 32), "record_hash": "sha256:" + strings.Repeat("0", 64),
+			"action": action, "actor": "runner-1", "actor_kind": "runner", "action_outcome": "succeeded",
+		}
+	}
+	record := func(action string) any {
+		m := map[string]any{}
+		for k, v := range base {
+			m[k] = v
+		}
+		m["action"] = action
+		return m
+	}
+	tests := []struct {
+		action string
+		valid  bool
+	}{
+		{"tool.jenkins.get_build_log", true},
+		{"tool.mcp-datadog.create_datadog_notebook", true},
+		{"tool.a.b", true},
+		{"scm.open_pull_request", true},
+		{"ChangeOpened.v1", true},
+		{"tool.jenkins", true}, // the two-segment capability port.verb
+		{"tool.Jenkins.get", false},
+		{"tool.jenkins-.get", false},
+		{"tool.-jenkins.get", false},
+		{"tool..get", false},
+		{"tool.jenkins.Get", false},
+		{"tool.jenkins.get.more", false},
+		{"tool." + strings.Repeat("a", 64) + ".get", false},
+		{"other.jenkins.get", false},
+	}
+	for _, tt := range tests {
+		for name, doc := range map[string]struct {
+			schema string
+			doc    any
+		}{"record": {"record", record(tt.action)}, "review entry": {"review", map[string]any{
+			"export_version": json.Number("1"), "change_id": "chg_" + strings.Repeat("0", 32), "decisions": []any{entry(tt.action)},
+		}}} {
+			if err := schemas[doc.schema].Validate(doc.doc); (err == nil) != tt.valid {
+				t.Errorf("%s schema Validate(action %q) = %v, want valid %v", name, tt.action, err, tt.valid)
+			}
+		}
+	}
+}

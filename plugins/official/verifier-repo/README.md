@@ -27,7 +27,7 @@ document are refused.
   "check": "repo",
   "scope": {
     "allow_paths": ["docs/runbooks/"],
-    "protected_paths": [".claude/", ".github/", "docs/design/"],
+    "protected_paths": [".agent/", ".github/", "docs/design/"],
     "max_files": 1, "max_added_lines": 50, "max_added_bytes": 8192, "max_deleted_files": 0, "allow_modify": false
   },
   "context": {"base": "<full commit id>", "paths": ["README.md", "..."], "justfile": "<text of the base Justfile>"}

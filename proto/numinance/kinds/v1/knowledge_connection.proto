@@ -13,6 +13,11 @@ import "numinance/types/v1/types.proto";
 // knowledge port. It is org-scoped only: the loader refuses another
 // metadata.scope and the profile context refuses one loaded below the org. It holds no credential; the broker supplies a
 // handle. extensions never hold credentials, endpoints, tool mappings or caps.
+//
+// Deprecated in 1.3.0 (design sections 8, 14 and 17): a knowledge source is installed as an MCP-backed plugin whose
+// tools map to Search and Fetch, named in AdapterSelectorSpec.tools and pinned in LockfileSpec.pinned_tools. The kind
+// keeps loading for the deprecation window (VERSIONING.md); a document of it is reported with a DEPRECATED diagnostic,
+// and cli/migrations rewrites the selector and the lockfile.
 message KnowledgeConnection {
   // api_version is required and is "numinance.dev/v1".
   string api_version = 1 [(numinance.annotations.v1.field).since = "1.0.0"];
@@ -21,7 +26,7 @@ message KnowledgeConnection {
   // metadata is required; the loader enforces it, the schema cannot.
   Metadata metadata = 3 [(numinance.annotations.v1.field).since = "1.0.0"];
   // spec is required; the loader enforces it, the schema cannot.
-  KnowledgeConnectionSpec spec = 4 [(numinance.annotations.v1.field).since = "1.0.0"];
+  KnowledgeConnectionSpec spec = 4 [(numinance.annotations.v1.field) = {since: "1.0.0", deprecated_in: "1.3.0", replaced_by: "numinance.kinds.v1.AdapterSelectorSpec.tools"}];
   // extensions holds vendor or customer data under reverse-DNS keys; the Engine never reads it.
   map<string, google.protobuf.Value> extensions = 5 [(numinance.annotations.v1.field).since = "1.0.0"];
 }

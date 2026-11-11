@@ -20,7 +20,8 @@ const (
 )
 
 var (
-	capabilityRe = regexp.MustCompile(`^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$`)
+	// A capability is port.verb, or tool.<plugin>.<name> for a tool of the tool gateway (the plugin is one lowercase DNS label).
+	capabilityRe = regexp.MustCompile(`^(?:[a-z][a-z0-9]*\.[a-z][a-z0-9_]*|tool\.[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z][a-z0-9_]*)$`)
 	lifecycleRe  = regexp.MustCompile(`^[A-Z][A-Za-z0-9]*\.v([1-9]\d*)$`)
 	semverRe     = regexp.MustCompile(`^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$`)
 	viewTokenRe  = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,127}$`)

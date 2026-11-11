@@ -28,7 +28,7 @@ from numinance.kinds.v1 import meta_pb2 as numinance_dot_kinds_dot_v1_dot_meta__
 from numinance.types.v1 import types_pb2 as numinance_dot_types_dot_v1_dot_types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n*numinance/kinds/v1/executor_manifest.proto\x12\x12numinance.kinds.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\x1a\x1enuminance/types/v1/types.proto\"\xad\x03\n\x10\x45xecutorManifest\x12,\n\x0b\x61pi_version\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\napiVersion\x12\x1f\n\x04kind\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04kind\x12\x45\n\x08metadata\x18\x03 \x01(\x0b\x32\x1c.numinance.kinds.v1.MetadataB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08metadata\x12I\n\x04spec\x18\x04 \x01(\x0b\x32(.numinance.kinds.v1.ExecutorManifestSpecB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04spec\x12\x61\n\nextensions\x18\x05 \x03(\x0b\x32\x34.numinance.kinds.v1.ExecutorManifest.ExtensionsEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\nextensions\x1aU\n\x0f\x45xtensionsEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.ValueR\x05value:\x02\x38\x01\"\xb4\x02\n\x14\x45xecutorManifestSpec\x12\'\n\x08provider\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08provider\x12W\n\x0c\x63\x61pabilities\x18\x02 \x03(\x0e\x32&.numinance.types.v1.ExecutorCapabilityB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0c\x63\x61pabilities\x12\x46\n\x06models\x18\x03 \x03(\x0b\x32!.numinance.kinds.v1.ExecutorModelB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x06models\x12R\n\ncost_class\x18\x04 \x01(\x0e\x32%.numinance.kinds.v1.ExecutorCostClassB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\ncost_class\"[\n\rExecutorModel\x12\x1b\n\x02id\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x02id\x12-\n\x0bmax_context\x18\x02 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0bmax_context*\x93\x01\n\x11\x45xecutorCostClass\x12#\n\x1f\x45XECUTOR_COST_CLASS_UNSPECIFIED\x10\x00\x12\x1b\n\x17\x45XECUTOR_COST_CLASS_LOW\x10\x01\x12\x1e\n\x1a\x45XECUTOR_COST_CLASS_MEDIUM\x10\x02\x12\x1c\n\x18\x45XECUTOR_COST_CLASS_HIGH\x10\x03\x42\xe4\x01\n\x16\x63om.numinance.kinds.v1B\x15\x45xecutorManifestProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n*numinance/kinds/v1/executor_manifest.proto\x12\x12numinance.kinds.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\x1a\x1enuminance/types/v1/types.proto\"\xad\x03\n\x10\x45xecutorManifest\x12,\n\x0b\x61pi_version\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\napiVersion\x12\x1f\n\x04kind\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04kind\x12\x45\n\x08metadata\x18\x03 \x01(\x0b\x32\x1c.numinance.kinds.v1.MetadataB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08metadata\x12I\n\x04spec\x18\x04 \x01(\x0b\x32(.numinance.kinds.v1.ExecutorManifestSpecB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04spec\x12\x61\n\nextensions\x18\x05 \x03(\x0b\x32\x34.numinance.kinds.v1.ExecutorManifest.ExtensionsEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\nextensions\x1aU\n\x0f\x45xtensionsEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.ValueR\x05value:\x02\x38\x01\"\xd8\x05\n\x14\x45xecutorManifestSpec\x12\'\n\x08provider\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08provider\x12W\n\x0c\x63\x61pabilities\x18\x02 \x03(\x0e\x32&.numinance.types.v1.ExecutorCapabilityB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0c\x63\x61pabilities\x12\x46\n\x06models\x18\x03 \x03(\x0b\x32!.numinance.kinds.v1.ExecutorModelB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x06models\x12R\n\ncost_class\x18\x04 \x01(\x0e\x32%.numinance.kinds.v1.ExecutorCostClassB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\ncost_class\x12U\n\x0emcp_transports\x18\x06 \x03(\x0e\x32 .numinance.kinds.v1.McpTransportB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0R\x0emcp_transports\x12\x38\n\x0eintent_channel\x18\x07 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0H\x00R\x0eintent_channel\x88\x01\x01\x12\x36\n\rskills_format\x18\x08 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0H\x01R\rskills_format\x88\x01\x01\x12\x36\n\rplugin_format\x18\t \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0H\x02R\rplugin_format\x88\x01\x01\x12,\n\x08lockdown\x18\n \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0H\x03R\x08lockdown\x88\x01\x01\x12/\n\x0c\x66\x65\x61ture_gaps\x18\x0b \x03(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0R\x0c\x66\x65\x61ture_gapsB\x11\n\x0f_intent_channelB\x10\n\x0e_skills_formatB\x10\n\x0e_plugin_formatB\x0b\n\t_lockdown\"[\n\rExecutorModel\x12\x1b\n\x02id\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x02id\x12-\n\x0bmax_context\x18\x02 \x01(\rB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x0bmax_context*\x93\x01\n\x11\x45xecutorCostClass\x12#\n\x1f\x45XECUTOR_COST_CLASS_UNSPECIFIED\x10\x00\x12\x1b\n\x17\x45XECUTOR_COST_CLASS_LOW\x10\x01\x12\x1e\n\x1a\x45XECUTOR_COST_CLASS_MEDIUM\x10\x02\x12\x1c\n\x18\x45XECUTOR_COST_CLASS_HIGH\x10\x03*i\n\x0cMcpTransport\x12\x1d\n\x19MCP_TRANSPORT_UNSPECIFIED\x10\x00\x12\x17\n\x13MCP_TRANSPORT_STDIO\x10\x01\x12!\n\x1dMCP_TRANSPORT_STREAMABLE_HTTP\x10\x02\x42\xe4\x01\n\x16\x63om.numinance.kinds.v1B\x15\x45xecutorManifestProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -56,18 +56,32 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['models']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['cost_class']._loaded_options = None
   _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['cost_class']._serialized_options = b'\222\265\030\007\n\0051.0.0'
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['mcp_transports']._loaded_options = None
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['mcp_transports']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['intent_channel']._loaded_options = None
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['intent_channel']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['skills_format']._loaded_options = None
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['skills_format']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['plugin_format']._loaded_options = None
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['plugin_format']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['lockdown']._loaded_options = None
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['lockdown']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['feature_gaps']._loaded_options = None
+  _globals['_EXECUTORMANIFESTSPEC'].fields_by_name['feature_gaps']._serialized_options = b'\222\265\030\007\n\0051.3.0'
   _globals['_EXECUTORMODEL'].fields_by_name['id']._loaded_options = None
   _globals['_EXECUTORMODEL'].fields_by_name['id']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_EXECUTORMODEL'].fields_by_name['max_context']._loaded_options = None
   _globals['_EXECUTORMODEL'].fields_by_name['max_context']._serialized_options = b'\222\265\030\007\n\0051.0.0'
-  _globals['_EXECUTORCOSTCLASS']._serialized_start=1040
-  _globals['_EXECUTORCOSTCLASS']._serialized_end=1187
+  _globals['_EXECUTORCOSTCLASS']._serialized_start=1460
+  _globals['_EXECUTORCOSTCLASS']._serialized_end=1607
+  _globals['_MCPTRANSPORT']._serialized_start=1609
+  _globals['_MCPTRANSPORT']._serialized_end=1714
   _globals['_EXECUTORMANIFEST']._serialized_start=204
   _globals['_EXECUTORMANIFEST']._serialized_end=633
   _globals['_EXECUTORMANIFEST_EXTENSIONSENTRY']._serialized_start=548
   _globals['_EXECUTORMANIFEST_EXTENSIONSENTRY']._serialized_end=633
   _globals['_EXECUTORMANIFESTSPEC']._serialized_start=636
-  _globals['_EXECUTORMANIFESTSPEC']._serialized_end=944
-  _globals['_EXECUTORMODEL']._serialized_start=946
-  _globals['_EXECUTORMODEL']._serialized_end=1037
+  _globals['_EXECUTORMANIFESTSPEC']._serialized_end=1364
+  _globals['_EXECUTORMODEL']._serialized_start=1366
+  _globals['_EXECUTORMODEL']._serialized_end=1457
 # @@protoc_insertion_point(module_scope)

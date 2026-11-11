@@ -13,7 +13,7 @@ A record is a JSON object. The JSON Schema is `schemas/evidence/v1/record.schema
 | `ev_id` | string | required | `ev_` and 32 lowercase hexadecimal characters |
 | `change_id` | string | required | `chg_` and 32 lowercase hexadecimal characters |
 | `sequence` | integer | required | 1 to 2^53-1 |
-| `action` | string | required | a capability `port.verb` (`^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$`) or a versioned lifecycle event name (`^[A-Z][A-Za-z0-9]*\.v[1-9][0-9]*$`, with a major version that fits 31 bits: 1 to 2147483647), at most 128 bytes |
+| `action` | string | required | a capability `port.verb` (`^[a-z][a-z0-9]*\.[a-z][a-z0-9_]*$`), a tool capability `tool.<plugin>.<name>` of the tool gateway (`^tool\.[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z][a-z0-9_]*$`: the plugin is one lowercase DNS label, the name lowercase snake_case) or a versioned lifecycle event name (`^[A-Z][A-Za-z0-9]*\.v[1-9][0-9]*$`, with a major version that fits 31 bits: 1 to 2147483647), at most 128 bytes |
 | `actor_principal` | string | required | 1 to 256 bytes of printable ASCII (0x20 to 0x7e), no leading or trailing space |
 | `actor_kind` | string | required | one of `author-agent`, `reviewer-agent`, `release-pipeline`, `human-approver`, `runner`, `break-glass`, or, on a receipt record only, `broker` or `egress-proxy` ([receipts](receipts.md)) |
 | `actor_run_id` | string | optional | `run_` and 32 hex; required when `actor_kind` is `author-agent` or `reviewer-agent` |

@@ -86,6 +86,11 @@ func (KnowledgeAuth) EnumDescriptor() ([]byte, []int) {
 // knowledge port. It is org-scoped only: the loader refuses another
 // metadata.scope and the profile context refuses one loaded below the org. It holds no credential; the broker supplies a
 // handle. extensions never hold credentials, endpoints, tool mappings or caps.
+//
+// Deprecated in 1.3.0 (design sections 8, 14 and 17): a knowledge source is installed as an MCP-backed plugin whose
+// tools map to Search and Fetch, named in AdapterSelectorSpec.tools and pinned in LockfileSpec.pinned_tools. The kind
+// keeps loading for the deprecation window (VERSIONING.md); a document of it is reported with a DEPRECATED diagnostic,
+// and cli/migrations rewrites the selector and the lockfile.
 type KnowledgeConnection struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// api_version is required and is "numinance.dev/v1".
@@ -457,7 +462,7 @@ var File_numinance_kinds_v1_knowledge_connection_proto protoreflect.FileDescript
 
 const file_numinance_kinds_v1_knowledge_connection_proto_rawDesc = "" +
 	"\n" +
-	"-numinance/kinds/v1/knowledge_connection.proto\x12\x12numinance.kinds.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\x1a\x1enuminance/types/v1/types.proto\"\xb6\x03\n" +
+	"-numinance/kinds/v1/knowledge_connection.proto\x12\x12numinance.kinds.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\x1a\x1enuminance/types/v1/types.proto\"\xec\x03\n" +
 	"\x13KnowledgeConnection\x12,\n" +
 	"\vapi_version\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\n" +
@@ -465,9 +470,9 @@ const file_numinance_kinds_v1_knowledge_connection_proto_rawDesc = "" +
 	"\x04kind\x18\x02 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x04kind\x12E\n" +
 	"\bmetadata\x18\x03 \x01(\v2\x1c.numinance.kinds.v1.MetadataB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\bmetadata\x12L\n" +
-	"\x04spec\x18\x04 \x01(\v2+.numinance.kinds.v1.KnowledgeConnectionSpecB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\x04spec\x12d\n" +
+	"\x051.0.0R\bmetadata\x12\x81\x01\n" +
+	"\x04spec\x18\x04 \x01(\v2+.numinance.kinds.v1.KnowledgeConnectionSpecB@\x92\xb5\x18<\n" +
+	"\x051.0.0\x12\x051.3.0\x1a,numinance.kinds.v1.AdapterSelectorSpec.toolsR\x04spec\x12d\n" +
 	"\n" +
 	"extensions\x18\x05 \x03(\v27.numinance.kinds.v1.KnowledgeConnection.ExtensionsEntryB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\n" +

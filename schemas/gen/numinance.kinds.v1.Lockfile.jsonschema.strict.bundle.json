@@ -73,6 +73,36 @@
       "title": "Locked Knowledge Tool",
       "type": "object"
     },
+    "numinance.kinds.v1.LockedTool.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "LockedTool pins one tool of one plugin connection by the hash of its canonicalised description, schemas and\n annotations (design sections 14 and 17), or the hash of the signed overlay that declares it. It replaces\n LockedKnowledgeTool, which names no plugin.",
+      "properties": {
+        "connection": {
+          "description": "connection is the name of the plugin's configured connection (the instance of an AdapterTool).",
+          "type": "string"
+        },
+        "hash": {
+          "$ref": "#/$defs/numinance.types.v1.Digest.jsonschema.strict.json",
+          "description": "hash is the approved hash."
+        },
+        "name": {
+          "description": "name is the tool name as the server lists it.",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "plugin is the plugin_id of the extension that serves the tool: a reverse-DNS identifier of at least two labels,\n as LockedExtension.id.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "connection",
+        "name"
+      ],
+      "title": "Locked Tool",
+      "type": "object"
+    },
     "numinance.kinds.v1.Lockfile.jsonschema.strict.json": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false,
@@ -125,9 +155,16 @@
           "type": "array"
         },
         "knowledge_tools": {
-          "description": "knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.",
+          "description": "knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.\n Deprecated in 1.3.0: pinned_tools replaces it and covers every plugin, not only knowledge connections\n (design sections 8 and 17). A lockfile may still carry it; the loader reports it with a DEPRECATED diagnostic.",
           "items": {
             "$ref": "#/$defs/numinance.kinds.v1.LockedKnowledgeTool.jsonschema.strict.json"
+          },
+          "type": "array"
+        },
+        "pinned_tools": {
+          "description": "pinned_tools are the admin-approved tool inventories of installed plugins (design sections 8 and 17), unique by\n plugin, connection and name; the install flow writes them sorted by that key. Drift of a tool from its pin\n quarantines the connection. Absent or empty means no tool is pinned.",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.LockedTool.jsonschema.strict.json"
           },
           "type": "array"
         }

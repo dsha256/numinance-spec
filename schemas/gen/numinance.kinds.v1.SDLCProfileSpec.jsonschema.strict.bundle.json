@@ -49,7 +49,7 @@
           "description": "database binds the database port."
         },
         "knowledge": {
-          "description": "knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.",
+          "description": "knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.\n Deprecated in 1.3.0: a knowledge source is an MCP-backed plugin named in AdapterSelectorSpec.tools (design sections 14 and 17).",
           "items": {
             "type": "string"
           },

@@ -47,7 +47,7 @@
           "description": "database binds the database port."
         },
         "knowledge": {
-          "description": "knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.",
+          "description": "knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.\n Deprecated in 1.3.0: a knowledge source is an MCP-backed plugin named in AdapterSelectorSpec.tools (design sections 14 and 17).",
           "items": {
             "type": "string"
           },
@@ -113,12 +113,50 @@
       "additionalProperties": false,
       "description": "AdapterSelectorSpec holds the port bindings.",
       "properties": {
+        "overrides": {
+          "additionalProperties": {
+            "$ref": "#/$defs/numinance.kinds.v1.AdapterBinding.jsonschema.strict.json"
+          },
+          "description": "overrides pins, per verb, a provider other than the one bound for the verb's port (design section 8; the resolution\n order of section 17 puts a provider pinned by the customer first). A key is a verb name of dot-joined ASCII\n identifiers (\"scm.CreatePullRequest\"), at most 253 bytes; each value is replaced as a unit, and a narrower scope's\n map replaces the wider one. An empty map overrides nothing.",
+          "propertyNames": {
+            "type": "string"
+          },
+          "type": "object"
+        },
         "ports": {
           "$ref": "#/$defs/numinance.kinds.v1.AdapterPorts.jsonschema.strict.json",
           "description": "ports is required; the loader enforces it, the schema cannot. An empty ports binds nothing: a valid no-op."
+        },
+        "tools": {
+          "description": "tools names the plugin installations whose tool capabilities (tool.\u003cplugin\u003e.\u003cname\u003e) the scope may grant to a\n harness, unique by plugin and instance; a narrower scope's list replaces the wider one. It replaces the knowledge\n list of ports, which named KnowledgeConnection objects (deprecated in 1.3.0).",
+          "items": {
+            "$ref": "#/$defs/numinance.kinds.v1.AdapterTool.jsonschema.strict.json"
+          },
+          "type": "array"
         }
       },
       "title": "Adapter Selector Spec",
+      "type": "object"
+    },
+    "numinance.kinds.v1.AdapterTool.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterTool is one plugin installation whose tools the scope may use.",
+      "properties": {
+        "instance": {
+          "description": "instance is required: the configured instance of the plugin (one plugin may serve several connections).",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "plugin is required: the extension id of a plugin that exposes tool capabilities, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "instance"
+      ],
+      "title": "Adapter Tool",
       "type": "object"
     },
     "numinance.kinds.v1.Metadata.jsonschema.strict.json": {

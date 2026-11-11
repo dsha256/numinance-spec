@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file numinance/kinds/v1/adapter_selector.proto.
  */
 export const file_numinance_kinds_v1_adapter_selector: GenFile = /*@__PURE__*/
-  fileDesc("CiludW1pbmFuY2Uva2luZHMvdjEvYWRhcHRlcl9zZWxlY3Rvci5wcm90bxISbnVtaW5hbmNlLmtpbmRzLnYxIvACCg9BZGFwdGVyU2VsZWN0b3ISIAoLYXBpX3ZlcnNpb24YASABKAlCC5K1GAcKBTEuMC4wEhkKBGtpbmQYAiABKAlCC5K1GAcKBTEuMC4wEjsKCG1ldGFkYXRhGAMgASgLMhwubnVtaW5hbmNlLmtpbmRzLnYxLk1ldGFkYXRhQguStRgHCgUxLjAuMBJCCgRzcGVjGAQgASgLMicubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJTZWxlY3RvclNwZWNCC5K1GAcKBTEuMC4wElQKCmV4dGVuc2lvbnMYBSADKAsyMy5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlclNlbGVjdG9yLkV4dGVuc2lvbnNFbnRyeUILkrUYBwoFMS4wLjAaSQoPRXh0ZW5zaW9uc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZToCOAEiUwoTQWRhcHRlclNlbGVjdG9yU3BlYxI8CgVwb3J0cxgBIAEoCzIgLm51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyUG9ydHNCC5K1GAcKBTEuMC4wIqEECgxBZGFwdGVyUG9ydHMSQAoDc2NtGAEgASgLMiIubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJCaW5kaW5nQg+StRgHCgUxLjAuMJi1GAESRgoJdGlja2V0aW5nGAIgASgLMiIubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJCaW5kaW5nQg+StRgHCgUxLjAuMJi1GAESRwoKY2lleGVjdXRvchgDIAEoCzIiLm51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyQmluZGluZ0IPkrUYBwoFMS4wLjCYtRgBEkcKCmNkcHJvdmlkZXIYBCABKAsyIi5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlckJpbmRpbmdCD5K1GAcKBTEuMC4wmLUYARJCCgVjbG91ZBgFIAEoCzIiLm51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyQmluZGluZ0IPkrUYBwoFMS4wLjCYtRgBEkUKCGRhdGFiYXNlGAYgASgLMiIubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJCaW5kaW5nQg+StRgHCgUxLjAuMJi1GAESSgoNb2JzZXJ2YWJpbGl0eRgHIAEoCzIiLm51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyQmluZGluZ0IPkrUYBwoFMS4wLjCYtRgBEh4KCWtub3dsZWRnZRgIIAMoCUILkrUYBwoFMS4wLjAiTgoOQWRhcHRlckJpbmRpbmcSHQoIcHJvdmlkZXIYASABKAlCC5K1GAcKBTEuMC4wEh0KCGluc3RhbmNlGAIgASgJQguStRgHCgUxLjAuMELjAQoWY29tLm51bWluYW5jZS5raW5kcy52MUIUQWRhcHRlclNlbGVjdG9yUHJvdG9QAVpJZ2l0aHViLmNvbS9udW1pbmFuY2UvbnVtaW5hbmNlLXNwZWMvc2RrL2dvL2dlbi9udW1pbmFuY2Uva2luZHMvdjE7a2luZHN2MaICA05LWKoCEk51bWluYW5jZS5LaW5kcy5WMcoCEk51bWluYW5jZVxLaW5kc1xWMeICHk51bWluYW5jZVxLaW5kc1xWMVxHUEJNZXRhZGF0YeoCFE51bWluYW5jZTo6S2luZHM6OlYxYgZwcm90bzM", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta]);
+  fileDesc("CiludW1pbmFuY2Uva2luZHMvdjEvYWRhcHRlcl9zZWxlY3Rvci5wcm90bxISbnVtaW5hbmNlLmtpbmRzLnYxIvACCg9BZGFwdGVyU2VsZWN0b3ISIAoLYXBpX3ZlcnNpb24YASABKAlCC5K1GAcKBTEuMC4wEhkKBGtpbmQYAiABKAlCC5K1GAcKBTEuMC4wEjsKCG1ldGFkYXRhGAMgASgLMhwubnVtaW5hbmNlLmtpbmRzLnYxLk1ldGFkYXRhQguStRgHCgUxLjAuMBJCCgRzcGVjGAQgASgLMicubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJTZWxlY3RvclNwZWNCC5K1GAcKBTEuMC4wElQKCmV4dGVuc2lvbnMYBSADKAsyMy5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlclNlbGVjdG9yLkV4dGVuc2lvbnNFbnRyeUILkrUYBwoFMS4wLjAaSQoPRXh0ZW5zaW9uc0VudHJ5EgsKA2tleRgBIAEoCRIlCgV2YWx1ZRgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5WYWx1ZToCOAEivgIKE0FkYXB0ZXJTZWxlY3RvclNwZWMSPAoFcG9ydHMYASABKAsyIC5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlclBvcnRzQguStRgHCgUxLjAuMBJWCglvdmVycmlkZXMYAiADKAsyNi5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlclNlbGVjdG9yU3BlYy5PdmVycmlkZXNFbnRyeUILkrUYBwoFMS4zLjASOwoFdG9vbHMYAyADKAsyHy5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlclRvb2xCC5K1GAcKBTEuMy4wGlQKDk92ZXJyaWRlc0VudHJ5EgsKA2tleRgBIAEoCRIxCgV2YWx1ZRgCIAEoCzIiLm51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyQmluZGluZzoCOAEiSQoLQWRhcHRlclRvb2wSGwoGcGx1Z2luGAEgASgJQguStRgHCgUxLjMuMBIdCghpbnN0YW5jZRgCIAEoCUILkrUYBwoFMS4zLjAi1gQKDEFkYXB0ZXJQb3J0cxJACgNzY20YASABKAsyIi5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlckJpbmRpbmdCD5K1GAcKBTEuMC4wmLUYARJGCgl0aWNrZXRpbmcYAiABKAsyIi5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlckJpbmRpbmdCD5K1GAcKBTEuMC4wmLUYARJHCgpjaWV4ZWN1dG9yGAMgASgLMiIubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJCaW5kaW5nQg+StRgHCgUxLjAuMJi1GAESRwoKY2Rwcm92aWRlchgEIAEoCzIiLm51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyQmluZGluZ0IPkrUYBwoFMS4wLjCYtRgBEkIKBWNsb3VkGAUgASgLMiIubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJCaW5kaW5nQg+StRgHCgUxLjAuMJi1GAESRQoIZGF0YWJhc2UYBiABKAsyIi5udW1pbmFuY2Uua2luZHMudjEuQWRhcHRlckJpbmRpbmdCD5K1GAcKBTEuMC4wmLUYARJKCg1vYnNlcnZhYmlsaXR5GAcgASgLMiIubnVtaW5hbmNlLmtpbmRzLnYxLkFkYXB0ZXJCaW5kaW5nQg+StRgHCgUxLjAuMJi1GAESUwoJa25vd2xlZGdlGAggAygJQkCStRg8CgUxLjAuMBIFMS4zLjAaLG51bWluYW5jZS5raW5kcy52MS5BZGFwdGVyU2VsZWN0b3JTcGVjLnRvb2xzIk4KDkFkYXB0ZXJCaW5kaW5nEh0KCHByb3ZpZGVyGAEgASgJQguStRgHCgUxLjAuMBIdCghpbnN0YW5jZRgCIAEoCUILkrUYBwoFMS4wLjBC4wEKFmNvbS5udW1pbmFuY2Uua2luZHMudjFCFEFkYXB0ZXJTZWxlY3RvclByb3RvUAFaSWdpdGh1Yi5jb20vbnVtaW5hbmNlL251bWluYW5jZS1zcGVjL3Nkay9nby9nZW4vbnVtaW5hbmNlL2tpbmRzL3YxO2tpbmRzdjGiAgNOS1iqAhJOdW1pbmFuY2UuS2luZHMuVjHKAhJOdW1pbmFuY2VcS2luZHNcVjHiAh5OdW1pbmFuY2VcS2luZHNcVjFcR1BCTWV0YWRhdGHqAhROdW1pbmFuY2U6OktpbmRzOjpWMWIGcHJvdG8z", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta]);
 
 /**
  * AdapterSelector says which provider implements which port for this scope.
@@ -80,6 +80,25 @@ export type AdapterSelectorSpec = Message<"numinance.kinds.v1.AdapterSelectorSpe
    * @generated from field: numinance.kinds.v1.AdapterPorts ports = 1;
    */
   ports?: AdapterPorts | undefined;
+
+  /**
+   * overrides pins, per verb, a provider other than the one bound for the verb's port (design section 8; the resolution
+   * order of section 17 puts a provider pinned by the customer first). A key is a verb name of dot-joined ASCII
+   * identifiers ("scm.CreatePullRequest"), at most 253 bytes; each value is replaced as a unit, and a narrower scope's
+   * map replaces the wider one. An empty map overrides nothing.
+   *
+   * @generated from field: map<string, numinance.kinds.v1.AdapterBinding> overrides = 2;
+   */
+  overrides: { [key: string]: AdapterBinding };
+
+  /**
+   * tools names the plugin installations whose tool capabilities (tool.<plugin>.<name>) the scope may grant to a
+   * harness, unique by plugin and instance; a narrower scope's list replaces the wider one. It replaces the knowledge
+   * list of ports, which named KnowledgeConnection objects (deprecated in 1.3.0).
+   *
+   * @generated from field: repeated numinance.kinds.v1.AdapterTool tools = 3;
+   */
+  tools: AdapterTool[];
 };
 
 /**
@@ -88,6 +107,34 @@ export type AdapterSelectorSpec = Message<"numinance.kinds.v1.AdapterSelectorSpe
  */
 export const AdapterSelectorSpecSchema: GenMessage<AdapterSelectorSpec> = /*@__PURE__*/
   messageDesc(file_numinance_kinds_v1_adapter_selector, 1);
+
+/**
+ * AdapterTool is one plugin installation whose tools the scope may use.
+ *
+ * @generated from message numinance.kinds.v1.AdapterTool
+ */
+export type AdapterTool = Message<"numinance.kinds.v1.AdapterTool"> & {
+  /**
+   * plugin is required: the extension id of a plugin that exposes tool capabilities, which must resolve to a lockfile entry.
+   *
+   * @generated from field: string plugin = 1;
+   */
+  plugin: string;
+
+  /**
+   * instance is required: the configured instance of the plugin (one plugin may serve several connections).
+   *
+   * @generated from field: string instance = 2;
+   */
+  instance: string;
+};
+
+/**
+ * Describes the message numinance.kinds.v1.AdapterTool.
+ * Use `create(AdapterToolSchema)` to create a new message.
+ */
+export const AdapterToolSchema: GenMessage<AdapterTool> = /*@__PURE__*/
+  messageDesc(file_numinance_kinds_v1_adapter_selector, 2);
 
 /**
  * AdapterPorts binds the ports that reach customer systems; a port added later is a new
@@ -147,6 +194,7 @@ export type AdapterPorts = Message<"numinance.kinds.v1.AdapterPorts"> & {
 
   /**
    * knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.
+   * Deprecated in 1.3.0: a knowledge source is an MCP-backed plugin named in AdapterSelectorSpec.tools (design sections 14 and 17).
    *
    * @generated from field: repeated string knowledge = 8;
    */
@@ -158,7 +206,7 @@ export type AdapterPorts = Message<"numinance.kinds.v1.AdapterPorts"> & {
  * Use `create(AdapterPortsSchema)` to create a new message.
  */
 export const AdapterPortsSchema: GenMessage<AdapterPorts> = /*@__PURE__*/
-  messageDesc(file_numinance_kinds_v1_adapter_selector, 2);
+  messageDesc(file_numinance_kinds_v1_adapter_selector, 3);
 
 /**
  * AdapterBinding is one provider installation serving a port.
@@ -186,5 +234,5 @@ export type AdapterBinding = Message<"numinance.kinds.v1.AdapterBinding"> & {
  * Use `create(AdapterBindingSchema)` to create a new message.
  */
 export const AdapterBindingSchema: GenMessage<AdapterBinding> = /*@__PURE__*/
-  messageDesc(file_numinance_kinds_v1_adapter_selector, 3);
+  messageDesc(file_numinance_kinds_v1_adapter_selector, 4);
 

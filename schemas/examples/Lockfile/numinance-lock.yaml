@@ -10,7 +10,8 @@ spec:
       zh: "zh:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"
       signer: "https://token.actions.githubusercontent.com#https://github.com/numinance/plugins/.github/workflows/release.yml@refs/tags/v1.2.0"
       permissions_digest: {value: "sha256:7c4e2a1b9d8f6e5c3a2b1d0f9e8c7b6a5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a"}
-  knowledge_tools:
-    - connection: confluence-eng
+  pinned_tools:
+    - plugin: dev.numinance.official.atlassian
+      connection: confluence-eng
       name: getConfluencePage
       hash: {value: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d"}

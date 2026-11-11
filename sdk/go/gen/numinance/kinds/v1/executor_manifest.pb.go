@@ -83,6 +83,59 @@ func (ExecutorCostClass) EnumDescriptor() ([]byte, []int) {
 	return file_numinance_kinds_v1_executor_manifest_proto_rawDescGZIP(), []int{0}
 }
 
+// McpTransport is an MCP transport a harness speaks. This enum may grow.
+type McpTransport int32
+
+const (
+	// MCP_TRANSPORT_UNSPECIFIED is the zero value; a loader rejects it.
+	McpTransport_MCP_TRANSPORT_UNSPECIFIED McpTransport = 0
+	// MCP_TRANSPORT_STDIO is a server process spoken to over standard input and output.
+	McpTransport_MCP_TRANSPORT_STDIO McpTransport = 1
+	// MCP_TRANSPORT_STREAMABLE_HTTP is the MCP streamable HTTP transport.
+	McpTransport_MCP_TRANSPORT_STREAMABLE_HTTP McpTransport = 2
+)
+
+// Enum value maps for McpTransport.
+var (
+	McpTransport_name = map[int32]string{
+		0: "MCP_TRANSPORT_UNSPECIFIED",
+		1: "MCP_TRANSPORT_STDIO",
+		2: "MCP_TRANSPORT_STREAMABLE_HTTP",
+	}
+	McpTransport_value = map[string]int32{
+		"MCP_TRANSPORT_UNSPECIFIED":     0,
+		"MCP_TRANSPORT_STDIO":           1,
+		"MCP_TRANSPORT_STREAMABLE_HTTP": 2,
+	}
+)
+
+func (x McpTransport) Enum() *McpTransport {
+	p := new(McpTransport)
+	*p = x
+	return p
+}
+
+func (x McpTransport) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (McpTransport) Descriptor() protoreflect.EnumDescriptor {
+	return file_numinance_kinds_v1_executor_manifest_proto_enumTypes[1].Descriptor()
+}
+
+func (McpTransport) Type() protoreflect.EnumType {
+	return &file_numinance_kinds_v1_executor_manifest_proto_enumTypes[1]
+}
+
+func (x McpTransport) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use McpTransport.Descriptor instead.
+func (McpTransport) EnumDescriptor() ([]byte, []int) {
+	return file_numinance_kinds_v1_executor_manifest_proto_rawDescGZIP(), []int{1}
+}
+
 // ExecutorManifest declares an author executor: its adapter, capabilities, models and cost class. Profiles select it by metadata.name, the executor id; one adapter ships one manifest per data path.
 // Org-scoped only (the loader refuses another metadata.scope); authority only as the manifest pinned with its adapter in
 // the lockfile. residency waits for a later minor; a residency class is never declared.
@@ -178,7 +231,30 @@ type ExecutorManifestSpec struct {
 	// models is required, non-empty and unique by id: the models the executor may run.
 	Models []*ExecutorModel `protobuf:"bytes,3,rep,name=models,proto3" json:"models,omitempty"`
 	// cost_class is required.
-	CostClass     ExecutorCostClass `protobuf:"varint,4,opt,name=cost_class,proto3,enum=numinance.kinds.v1.ExecutorCostClass" json:"cost_class,omitempty"`
+	CostClass ExecutorCostClass `protobuf:"varint,4,opt,name=cost_class,proto3,enum=numinance.kinds.v1.ExecutorCostClass" json:"cost_class,omitempty"`
+	// Field 5 is kept for residency (ADR 0019), added in a later minor. Until then the class derived from the live
+	// configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it.
+	// mcp_transports are the MCP transports the harness speaks to the tool gateway shim (design sections 8 and 11):
+	// unique, and empty or absent for a harness that attaches no MCP server. Only a claim; the gateway decides what it serves.
+	McpTransports []McpTransport `protobuf:"varint,6,rep,packed,name=mcp_transports,proto3,enum=numinance.kinds.v1.McpTransport" json:"mcp_transports,omitempty"`
+	// intent_channel names how the harness reports a built-in tool intent to the host before it runs (design section 11,
+	// "Built-in tool intents": for example "permission_prompt_tool", "hooks" or "request_permission"). Absent means the
+	// harness declares none. A token of 1 to 64 lower-case ASCII letters, digits and ". _ -", starting with a letter or
+	// digit; the vocabulary is the adapter's, so no harness name is fixed by this schema.
+	IntentChannel *string `protobuf:"bytes,7,opt,name=intent_channel,proto3,oneof" json:"intent_channel,omitempty"`
+	// skills_format names the format the harness reads skills in, to which the host renders them (design section 11,
+	// "Skills rendered to"); same token rule as intent_channel. Absent means the harness reads no rendered skills.
+	SkillsFormat *string `protobuf:"bytes,8,opt,name=skills_format,proto3,oneof" json:"skills_format,omitempty"`
+	// plugin_format names the plugin package format the harness installs, if any (design section 17); same token rule as
+	// intent_channel. Absent means the harness installs no plugin packages.
+	PluginFormat *string `protobuf:"bytes,9,opt,name=plugin_format,proto3,oneof" json:"plugin_format,omitempty"`
+	// lockdown names the mechanism the adapter uses to restrict the harness to the gateway and the granted tools (design
+	// section 11, "Lock-down"); same token rule as intent_channel. Absent means the adapter declares no mechanism, and the
+	// router must not treat the harness as locked down. A claim: the broker, egress proxy and read-only filesystem enforce.
+	Lockdown *string `protobuf:"bytes,10,opt,name=lockdown,proto3,oneof" json:"lockdown,omitempty"`
+	// feature_gaps lists, as tokens (same rule as intent_channel) unique within the list, the contract features the
+	// harness does not support, so that a playbook that needs one is never routed to it.
+	FeatureGaps   []string `protobuf:"bytes,11,rep,name=feature_gaps,proto3" json:"feature_gaps,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -239,6 +315,48 @@ func (x *ExecutorManifestSpec) GetCostClass() ExecutorCostClass {
 		return x.CostClass
 	}
 	return ExecutorCostClass_EXECUTOR_COST_CLASS_UNSPECIFIED
+}
+
+func (x *ExecutorManifestSpec) GetMcpTransports() []McpTransport {
+	if x != nil {
+		return x.McpTransports
+	}
+	return nil
+}
+
+func (x *ExecutorManifestSpec) GetIntentChannel() string {
+	if x != nil && x.IntentChannel != nil {
+		return *x.IntentChannel
+	}
+	return ""
+}
+
+func (x *ExecutorManifestSpec) GetSkillsFormat() string {
+	if x != nil && x.SkillsFormat != nil {
+		return *x.SkillsFormat
+	}
+	return ""
+}
+
+func (x *ExecutorManifestSpec) GetPluginFormat() string {
+	if x != nil && x.PluginFormat != nil {
+		return *x.PluginFormat
+	}
+	return ""
+}
+
+func (x *ExecutorManifestSpec) GetLockdown() string {
+	if x != nil && x.Lockdown != nil {
+		return *x.Lockdown
+	}
+	return ""
+}
+
+func (x *ExecutorManifestSpec) GetFeatureGaps() []string {
+	if x != nil {
+		return x.FeatureGaps
+	}
+	return nil
 }
 
 // ExecutorModel is one model the executor may run; a message, so per-model fields such as residency stay additive.
@@ -317,7 +435,7 @@ const file_numinance_kinds_v1_executor_manifest_proto_rawDesc = "" +
 	"extensions\x1aU\n" +
 	"\x0fExtensionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
-	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xb4\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xd8\x05\n" +
 	"\x14ExecutorManifestSpec\x12'\n" +
 	"\bprovider\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\bprovider\x12W\n" +
@@ -328,7 +446,24 @@ const file_numinance_kinds_v1_executor_manifest_proto_rawDesc = "" +
 	"\n" +
 	"cost_class\x18\x04 \x01(\x0e2%.numinance.kinds.v1.ExecutorCostClassB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\n" +
-	"cost_class\"[\n" +
+	"cost_class\x12U\n" +
+	"\x0emcp_transports\x18\x06 \x03(\x0e2 .numinance.kinds.v1.McpTransportB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\x0emcp_transports\x128\n" +
+	"\x0eintent_channel\x18\a \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0H\x00R\x0eintent_channel\x88\x01\x01\x126\n" +
+	"\rskills_format\x18\b \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0H\x01R\rskills_format\x88\x01\x01\x126\n" +
+	"\rplugin_format\x18\t \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0H\x02R\rplugin_format\x88\x01\x01\x12,\n" +
+	"\blockdown\x18\n" +
+	" \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0H\x03R\blockdown\x88\x01\x01\x12/\n" +
+	"\ffeature_gaps\x18\v \x03(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\ffeature_gapsB\x11\n" +
+	"\x0f_intent_channelB\x10\n" +
+	"\x0e_skills_formatB\x10\n" +
+	"\x0e_plugin_formatB\v\n" +
+	"\t_lockdown\"[\n" +
 	"\rExecutorModel\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x02id\x12-\n" +
@@ -338,7 +473,11 @@ const file_numinance_kinds_v1_executor_manifest_proto_rawDesc = "" +
 	"\x1fEXECUTOR_COST_CLASS_UNSPECIFIED\x10\x00\x12\x1b\n" +
 	"\x17EXECUTOR_COST_CLASS_LOW\x10\x01\x12\x1e\n" +
 	"\x1aEXECUTOR_COST_CLASS_MEDIUM\x10\x02\x12\x1c\n" +
-	"\x18EXECUTOR_COST_CLASS_HIGH\x10\x03B\xe4\x01\n" +
+	"\x18EXECUTOR_COST_CLASS_HIGH\x10\x03*i\n" +
+	"\fMcpTransport\x12\x1d\n" +
+	"\x19MCP_TRANSPORT_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13MCP_TRANSPORT_STDIO\x10\x01\x12!\n" +
+	"\x1dMCP_TRANSPORT_STREAMABLE_HTTP\x10\x02B\xe4\x01\n" +
 	"\x16com.numinance.kinds.v1B\x15ExecutorManifestProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3"
 
 var (
@@ -353,31 +492,33 @@ func file_numinance_kinds_v1_executor_manifest_proto_rawDescGZIP() []byte {
 	return file_numinance_kinds_v1_executor_manifest_proto_rawDescData
 }
 
-var file_numinance_kinds_v1_executor_manifest_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_numinance_kinds_v1_executor_manifest_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_numinance_kinds_v1_executor_manifest_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_numinance_kinds_v1_executor_manifest_proto_goTypes = []any{
 	(ExecutorCostClass)(0),       // 0: numinance.kinds.v1.ExecutorCostClass
-	(*ExecutorManifest)(nil),     // 1: numinance.kinds.v1.ExecutorManifest
-	(*ExecutorManifestSpec)(nil), // 2: numinance.kinds.v1.ExecutorManifestSpec
-	(*ExecutorModel)(nil),        // 3: numinance.kinds.v1.ExecutorModel
-	nil,                          // 4: numinance.kinds.v1.ExecutorManifest.ExtensionsEntry
-	(*Metadata)(nil),             // 5: numinance.kinds.v1.Metadata
-	(v1.ExecutorCapability)(0),   // 6: numinance.types.v1.ExecutorCapability
-	(*structpb.Value)(nil),       // 7: google.protobuf.Value
+	(McpTransport)(0),            // 1: numinance.kinds.v1.McpTransport
+	(*ExecutorManifest)(nil),     // 2: numinance.kinds.v1.ExecutorManifest
+	(*ExecutorManifestSpec)(nil), // 3: numinance.kinds.v1.ExecutorManifestSpec
+	(*ExecutorModel)(nil),        // 4: numinance.kinds.v1.ExecutorModel
+	nil,                          // 5: numinance.kinds.v1.ExecutorManifest.ExtensionsEntry
+	(*Metadata)(nil),             // 6: numinance.kinds.v1.Metadata
+	(v1.ExecutorCapability)(0),   // 7: numinance.types.v1.ExecutorCapability
+	(*structpb.Value)(nil),       // 8: google.protobuf.Value
 }
 var file_numinance_kinds_v1_executor_manifest_proto_depIdxs = []int32{
-	5, // 0: numinance.kinds.v1.ExecutorManifest.metadata:type_name -> numinance.kinds.v1.Metadata
-	2, // 1: numinance.kinds.v1.ExecutorManifest.spec:type_name -> numinance.kinds.v1.ExecutorManifestSpec
-	4, // 2: numinance.kinds.v1.ExecutorManifest.extensions:type_name -> numinance.kinds.v1.ExecutorManifest.ExtensionsEntry
-	6, // 3: numinance.kinds.v1.ExecutorManifestSpec.capabilities:type_name -> numinance.types.v1.ExecutorCapability
-	3, // 4: numinance.kinds.v1.ExecutorManifestSpec.models:type_name -> numinance.kinds.v1.ExecutorModel
+	6, // 0: numinance.kinds.v1.ExecutorManifest.metadata:type_name -> numinance.kinds.v1.Metadata
+	3, // 1: numinance.kinds.v1.ExecutorManifest.spec:type_name -> numinance.kinds.v1.ExecutorManifestSpec
+	5, // 2: numinance.kinds.v1.ExecutorManifest.extensions:type_name -> numinance.kinds.v1.ExecutorManifest.ExtensionsEntry
+	7, // 3: numinance.kinds.v1.ExecutorManifestSpec.capabilities:type_name -> numinance.types.v1.ExecutorCapability
+	4, // 4: numinance.kinds.v1.ExecutorManifestSpec.models:type_name -> numinance.kinds.v1.ExecutorModel
 	0, // 5: numinance.kinds.v1.ExecutorManifestSpec.cost_class:type_name -> numinance.kinds.v1.ExecutorCostClass
-	7, // 6: numinance.kinds.v1.ExecutorManifest.ExtensionsEntry.value:type_name -> google.protobuf.Value
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	1, // 6: numinance.kinds.v1.ExecutorManifestSpec.mcp_transports:type_name -> numinance.kinds.v1.McpTransport
+	8, // 7: numinance.kinds.v1.ExecutorManifest.ExtensionsEntry.value:type_name -> google.protobuf.Value
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_numinance_kinds_v1_executor_manifest_proto_init() }
@@ -386,12 +527,13 @@ func file_numinance_kinds_v1_executor_manifest_proto_init() {
 		return
 	}
 	file_numinance_kinds_v1_meta_proto_init()
+	file_numinance_kinds_v1_executor_manifest_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numinance_kinds_v1_executor_manifest_proto_rawDesc), len(file_numinance_kinds_v1_executor_manifest_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,

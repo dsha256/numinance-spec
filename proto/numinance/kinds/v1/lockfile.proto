@@ -31,7 +31,13 @@ message LockfileSpec {
   // extensions are the installed extensions, unique by id: one version of one extension per lockfile.
   repeated LockedExtension extensions = 1 [(numinance.annotations.v1.field).since = "1.1.0"];
   // knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.
-  repeated LockedKnowledgeTool knowledge_tools = 2 [json_name = "knowledge_tools", (numinance.annotations.v1.field).since = "1.1.0"];
+  // Deprecated in 1.3.0: pinned_tools replaces it and covers every plugin, not only knowledge connections
+  // (design sections 8 and 17). A lockfile may still carry it; the loader reports it with a DEPRECATED diagnostic.
+  repeated LockedKnowledgeTool knowledge_tools = 2 [json_name = "knowledge_tools", (numinance.annotations.v1.field) = {since: "1.1.0", deprecated_in: "1.3.0", replaced_by: "numinance.kinds.v1.LockfileSpec.pinned_tools"}];
+  // pinned_tools are the admin-approved tool inventories of installed plugins (design sections 8 and 17), unique by
+  // plugin, connection and name; the install flow writes them sorted by that key. Drift of a tool from its pin
+  // quarantines the connection. Absent or empty means no tool is pinned.
+  repeated LockedTool pinned_tools = 3 [json_name = "pinned_tools", (numinance.annotations.v1.field).since = "1.3.0"];
 }
 
 // LockedExtension pins one extension version by what was verified at install, never by what its manifest declares.
@@ -64,4 +70,19 @@ message LockedKnowledgeTool {
   string name = 2 [(numinance.annotations.v1.field).since = "1.1.0"];
   // hash is the approved hash.
   numinance.types.v1.Digest hash = 3 [(numinance.annotations.v1.field).since = "1.1.0"];
+}
+
+// LockedTool pins one tool of one plugin connection by the hash of its canonicalised description, schemas and
+// annotations (design sections 14 and 17), or the hash of the signed overlay that declares it. It replaces
+// LockedKnowledgeTool, which names no plugin.
+message LockedTool {
+  // plugin is the plugin_id of the extension that serves the tool: a reverse-DNS identifier of at least two labels,
+  // as LockedExtension.id.
+  string plugin = 1 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // connection is the name of the plugin's configured connection (the instance of an AdapterTool).
+  string connection = 2 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // name is the tool name as the server lists it.
+  string name = 3 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // hash is the approved hash.
+  numinance.types.v1.Digest hash = 4 [(numinance.annotations.v1.field).since = "1.3.0"];
 }

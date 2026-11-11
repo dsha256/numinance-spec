@@ -27,7 +27,7 @@ from numinance.annotations.v1 import annotations_pb2 as numinance_dot_annotation
 from numinance.kinds.v1 import meta_pb2 as numinance_dot_kinds_dot_v1_dot_meta__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)numinance/kinds/v1/adapter_selector.proto\x12\x12numinance.kinds.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\"\xaa\x03\n\x0f\x41\x64\x61pterSelector\x12,\n\x0b\x61pi_version\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\napiVersion\x12\x1f\n\x04kind\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04kind\x12\x45\n\x08metadata\x18\x03 \x01(\x0b\x32\x1c.numinance.kinds.v1.MetadataB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08metadata\x12H\n\x04spec\x18\x04 \x01(\x0b\x32\'.numinance.kinds.v1.AdapterSelectorSpecB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04spec\x12`\n\nextensions\x18\x05 \x03(\x0b\x32\x33.numinance.kinds.v1.AdapterSelector.ExtensionsEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\nextensions\x1aU\n\x0f\x45xtensionsEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.ValueR\x05value:\x02\x38\x01\"Z\n\x13\x41\x64\x61pterSelectorSpec\x12\x43\n\x05ports\x18\x01 \x01(\x0b\x32 .numinance.kinds.v1.AdapterPortsB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x05ports\"\xf4\x04\n\x0c\x41\x64\x61pterPorts\x12\x45\n\x03scm\x18\x01 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\x03scm\x12Q\n\tticketing\x18\x02 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\tticketing\x12S\n\nciexecutor\x18\x03 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\nciexecutor\x12S\n\ncdprovider\x18\x04 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\ncdprovider\x12I\n\x05\x63loud\x18\x05 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\x05\x63loud\x12O\n\x08\x64\x61tabase\x18\x06 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\x08\x64\x61tabase\x12Y\n\robservability\x18\x07 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\robservability\x12)\n\tknowledge\x18\x08 \x03(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\tknowledge\"b\n\x0e\x41\x64\x61pterBinding\x12\'\n\x08provider\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08provider\x12\'\n\x08instance\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08instanceB\xe3\x01\n\x16\x63om.numinance.kinds.v1B\x14\x41\x64\x61pterSelectorProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)numinance/kinds/v1/adapter_selector.proto\x12\x12numinance.kinds.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a*numinance/annotations/v1/annotations.proto\x1a\x1dnuminance/kinds/v1/meta.proto\"\xaa\x03\n\x0f\x41\x64\x61pterSelector\x12,\n\x0b\x61pi_version\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\napiVersion\x12\x1f\n\x04kind\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04kind\x12\x45\n\x08metadata\x18\x03 \x01(\x0b\x32\x1c.numinance.kinds.v1.MetadataB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08metadata\x12H\n\x04spec\x18\x04 \x01(\x0b\x32\'.numinance.kinds.v1.AdapterSelectorSpecB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x04spec\x12`\n\nextensions\x18\x05 \x03(\x0b\x32\x33.numinance.kinds.v1.AdapterSelector.ExtensionsEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\nextensions\x1aU\n\x0f\x45xtensionsEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12,\n\x05value\x18\x02 \x01(\x0b\x32\x16.google.protobuf.ValueR\x05value:\x02\x38\x01\"\xe3\x02\n\x13\x41\x64\x61pterSelectorSpec\x12\x43\n\x05ports\x18\x01 \x01(\x0b\x32 .numinance.kinds.v1.AdapterPortsB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x05ports\x12\x61\n\toverrides\x18\x02 \x03(\x0b\x32\x36.numinance.kinds.v1.AdapterSelectorSpec.OverridesEntryB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0R\toverrides\x12\x42\n\x05tools\x18\x03 \x03(\x0b\x32\x1f.numinance.kinds.v1.AdapterToolB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0R\x05tools\x1a`\n\x0eOverridesEntry\x12\x10\n\x03key\x18\x01 \x01(\tR\x03key\x12\x38\n\x05value\x18\x02 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingR\x05value:\x02\x38\x01\"[\n\x0b\x41\x64\x61pterTool\x12#\n\x06plugin\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0R\x06plugin\x12\'\n\x08instance\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.3.0R\x08instance\"\xa9\x05\n\x0c\x41\x64\x61pterPorts\x12\x45\n\x03scm\x18\x01 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\x03scm\x12Q\n\tticketing\x18\x02 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\tticketing\x12S\n\nciexecutor\x18\x03 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\nciexecutor\x12S\n\ncdprovider\x18\x04 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\ncdprovider\x12I\n\x05\x63loud\x18\x05 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\x05\x63loud\x12O\n\x08\x64\x61tabase\x18\x06 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\x08\x64\x61tabase\x12Y\n\robservability\x18\x07 \x01(\x0b\x32\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\x07\n\x05\x31.0.0\x98\xb5\x18\x01R\robservability\x12^\n\tknowledge\x18\x08 \x03(\tB@\x92\xb5\x18<\n\x05\x31.0.0\x12\x05\x31.3.0\x1a,numinance.kinds.v1.AdapterSelectorSpec.toolsR\tknowledge\"b\n\x0e\x41\x64\x61pterBinding\x12\'\n\x08provider\x18\x01 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08provider\x12\'\n\x08instance\x18\x02 \x01(\tB\x0b\x92\xb5\x18\x07\n\x05\x31.0.0R\x08instanceB\xe3\x01\n\x16\x63om.numinance.kinds.v1B\x14\x41\x64\x61pterSelectorProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -47,8 +47,18 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ADAPTERSELECTOR'].fields_by_name['spec']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_ADAPTERSELECTOR'].fields_by_name['extensions']._loaded_options = None
   _globals['_ADAPTERSELECTOR'].fields_by_name['extensions']._serialized_options = b'\222\265\030\007\n\0051.0.0'
+  _globals['_ADAPTERSELECTORSPEC_OVERRIDESENTRY']._loaded_options = None
+  _globals['_ADAPTERSELECTORSPEC_OVERRIDESENTRY']._serialized_options = b'8\001'
   _globals['_ADAPTERSELECTORSPEC'].fields_by_name['ports']._loaded_options = None
   _globals['_ADAPTERSELECTORSPEC'].fields_by_name['ports']._serialized_options = b'\222\265\030\007\n\0051.0.0'
+  _globals['_ADAPTERSELECTORSPEC'].fields_by_name['overrides']._loaded_options = None
+  _globals['_ADAPTERSELECTORSPEC'].fields_by_name['overrides']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_ADAPTERSELECTORSPEC'].fields_by_name['tools']._loaded_options = None
+  _globals['_ADAPTERSELECTORSPEC'].fields_by_name['tools']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_ADAPTERTOOL'].fields_by_name['plugin']._loaded_options = None
+  _globals['_ADAPTERTOOL'].fields_by_name['plugin']._serialized_options = b'\222\265\030\007\n\0051.3.0'
+  _globals['_ADAPTERTOOL'].fields_by_name['instance']._loaded_options = None
+  _globals['_ADAPTERTOOL'].fields_by_name['instance']._serialized_options = b'\222\265\030\007\n\0051.3.0'
   _globals['_ADAPTERPORTS'].fields_by_name['scm']._loaded_options = None
   _globals['_ADAPTERPORTS'].fields_by_name['scm']._serialized_options = b'\222\265\030\007\n\0051.0.0\230\265\030\001'
   _globals['_ADAPTERPORTS'].fields_by_name['ticketing']._loaded_options = None
@@ -64,7 +74,7 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ADAPTERPORTS'].fields_by_name['observability']._loaded_options = None
   _globals['_ADAPTERPORTS'].fields_by_name['observability']._serialized_options = b'\222\265\030\007\n\0051.0.0\230\265\030\001'
   _globals['_ADAPTERPORTS'].fields_by_name['knowledge']._loaded_options = None
-  _globals['_ADAPTERPORTS'].fields_by_name['knowledge']._serialized_options = b'\222\265\030\007\n\0051.0.0'
+  _globals['_ADAPTERPORTS'].fields_by_name['knowledge']._serialized_options = b'\222\265\030<\n\0051.0.0\022\0051.3.0\032,numinance.kinds.v1.AdapterSelectorSpec.tools'
   _globals['_ADAPTERBINDING'].fields_by_name['provider']._loaded_options = None
   _globals['_ADAPTERBINDING'].fields_by_name['provider']._serialized_options = b'\222\265\030\007\n\0051.0.0'
   _globals['_ADAPTERBINDING'].fields_by_name['instance']._loaded_options = None
@@ -73,10 +83,14 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_ADAPTERSELECTOR']._serialized_end=597
   _globals['_ADAPTERSELECTOR_EXTENSIONSENTRY']._serialized_start=512
   _globals['_ADAPTERSELECTOR_EXTENSIONSENTRY']._serialized_end=597
-  _globals['_ADAPTERSELECTORSPEC']._serialized_start=599
-  _globals['_ADAPTERSELECTORSPEC']._serialized_end=689
-  _globals['_ADAPTERPORTS']._serialized_start=692
-  _globals['_ADAPTERPORTS']._serialized_end=1320
-  _globals['_ADAPTERBINDING']._serialized_start=1322
-  _globals['_ADAPTERBINDING']._serialized_end=1420
+  _globals['_ADAPTERSELECTORSPEC']._serialized_start=600
+  _globals['_ADAPTERSELECTORSPEC']._serialized_end=955
+  _globals['_ADAPTERSELECTORSPEC_OVERRIDESENTRY']._serialized_start=859
+  _globals['_ADAPTERSELECTORSPEC_OVERRIDESENTRY']._serialized_end=955
+  _globals['_ADAPTERTOOL']._serialized_start=957
+  _globals['_ADAPTERTOOL']._serialized_end=1048
+  _globals['_ADAPTERPORTS']._serialized_start=1051
+  _globals['_ADAPTERPORTS']._serialized_end=1732
+  _globals['_ADAPTERBINDING']._serialized_start=1734
+  _globals['_ADAPTERBINDING']._serialized_end=1832
 # @@protoc_insertion_point(module_scope)

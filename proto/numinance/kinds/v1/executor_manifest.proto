@@ -49,6 +49,37 @@ message ExecutorManifestSpec {
   ExecutorCostClass cost_class = 4 [json_name = "cost_class", (numinance.annotations.v1.field).since = "1.0.0"];
   // Field 5 is kept for residency (ADR 0019), added in a later minor. Until then the class derived from the live
   // configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it.
+  // mcp_transports are the MCP transports the harness speaks to the tool gateway shim (design sections 8 and 11):
+  // unique, and empty or absent for a harness that attaches no MCP server. Only a claim; the gateway decides what it serves.
+  repeated McpTransport mcp_transports = 6 [json_name = "mcp_transports", (numinance.annotations.v1.field).since = "1.3.0"];
+  // intent_channel names how the harness reports a built-in tool intent to the host before it runs (design section 11,
+  // "Built-in tool intents": for example "permission_prompt_tool", "hooks" or "request_permission"). Absent means the
+  // harness declares none. A token of 1 to 64 lower-case ASCII letters, digits and ". _ -", starting with a letter or
+  // digit; the vocabulary is the adapter's, so no harness name is fixed by this schema.
+  optional string intent_channel = 7 [json_name = "intent_channel", (numinance.annotations.v1.field).since = "1.3.0"];
+  // skills_format names the format the harness reads skills in, to which the host renders them (design section 11,
+  // "Skills rendered to"); same token rule as intent_channel. Absent means the harness reads no rendered skills.
+  optional string skills_format = 8 [json_name = "skills_format", (numinance.annotations.v1.field).since = "1.3.0"];
+  // plugin_format names the plugin package format the harness installs, if any (design section 17); same token rule as
+  // intent_channel. Absent means the harness installs no plugin packages.
+  optional string plugin_format = 9 [json_name = "plugin_format", (numinance.annotations.v1.field).since = "1.3.0"];
+  // lockdown names the mechanism the adapter uses to restrict the harness to the gateway and the granted tools (design
+  // section 11, "Lock-down"); same token rule as intent_channel. Absent means the adapter declares no mechanism, and the
+  // router must not treat the harness as locked down. A claim: the broker, egress proxy and read-only filesystem enforce.
+  optional string lockdown = 10 [json_name = "lockdown", (numinance.annotations.v1.field).since = "1.3.0"];
+  // feature_gaps lists, as tokens (same rule as intent_channel) unique within the list, the contract features the
+  // harness does not support, so that a playbook that needs one is never routed to it.
+  repeated string feature_gaps = 11 [json_name = "feature_gaps", (numinance.annotations.v1.field).since = "1.3.0"];
+}
+
+// McpTransport is an MCP transport a harness speaks. This enum may grow.
+enum McpTransport {
+  // MCP_TRANSPORT_UNSPECIFIED is the zero value; a loader rejects it.
+  MCP_TRANSPORT_UNSPECIFIED = 0;
+  // MCP_TRANSPORT_STDIO is a server process spoken to over standard input and output.
+  MCP_TRANSPORT_STDIO = 1;
+  // MCP_TRANSPORT_STREAMABLE_HTTP is the MCP streamable HTTP transport.
+  MCP_TRANSPORT_STREAMABLE_HTTP = 2;
 }
 
 // ExecutorModel is one model the executor may run; a message, so per-model fields such as residency stay additive.

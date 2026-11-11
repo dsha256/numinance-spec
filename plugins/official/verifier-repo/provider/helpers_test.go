@@ -80,7 +80,7 @@ func ptr(n int) *int { return &n }
 
 // scope is a scope that allows new files under docs/runbooks and nothing else.
 func scope() Scope {
-	return Scope{AllowPaths: []string{"docs/runbooks/"}, ProtectedPaths: []string{".claude/", "docs/design/"}, MaxFiles: ptr(1), MaxAddedLines: ptr(50), MaxAddedBytes: ptr(1 << 20), MaxDeletedFiles: ptr(0)}
+	return Scope{AllowPaths: []string{"docs/runbooks/"}, ProtectedPaths: []string{".agent/", "docs/design/"}, MaxFiles: ptr(1), MaxAddedLines: ptr(50), MaxAddedBytes: ptr(1 << 20), MaxDeletedFiles: ptr(0)}
 }
 
 func rules(fs []finding) []string {

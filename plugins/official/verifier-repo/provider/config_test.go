@@ -11,7 +11,7 @@ func goodConfig() map[string]any {
 	return map[string]any{
 		"check": "repo",
 		"scope": map[string]any{
-			"allow_paths": []string{"docs/runbooks/"}, "protected_paths": []string{".claude/"},
+			"allow_paths": []string{"docs/runbooks/"}, "protected_paths": []string{".agent/"},
 			"max_files": 1, "max_added_lines": 50, "max_added_bytes": 1 << 20, "max_deleted_files": 0, "allow_modify": false,
 		},
 		"context": map[string]any{"base": testBase, "paths": []string{"README.md"}, "justfile": "check:\n"},

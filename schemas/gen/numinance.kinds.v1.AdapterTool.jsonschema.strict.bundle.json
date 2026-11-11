@@ -1,0 +1,28 @@
+{
+  "$defs": {
+    "numinance.kinds.v1.AdapterTool.jsonschema.strict.json": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "AdapterTool is one plugin installation whose tools the scope may use.",
+      "properties": {
+        "instance": {
+          "description": "instance is required: the configured instance of the plugin (one plugin may serve several connections).",
+          "type": "string"
+        },
+        "plugin": {
+          "description": "plugin is required: the extension id of a plugin that exposes tool capabilities, which must resolve to a lockfile entry.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plugin",
+        "instance"
+      ],
+      "title": "Adapter Tool",
+      "type": "object"
+    }
+  },
+  "$id": "numinance.kinds.v1.AdapterTool.jsonschema.strict.bundle.json",
+  "$ref": "#/$defs/numinance.kinds.v1.AdapterTool.jsonschema.strict.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

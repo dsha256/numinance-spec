@@ -441,3 +441,30 @@ func TestValidate_AlphaKinds_OnlyInFilesMode(t *testing.T) {
 		t.Errorf("Run(repository) = %d (%q), want %d: an alpha kind is not configuration", code, out.String(), cli.ExitInvalid)
 	}
 }
+
+func TestValidate_ReportsDeprecatedFieldsWithoutFailing(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", "..", "schemas", "examples", "Lockfile", "legacy-knowledge-tools.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "text", args: []string{"--files", "x"}, want: `DEPRECATED "spec.knowledge_tools" since 1.3.0, replaced by "numinance.kinds.v1.LockfileSpec.pinned_tools"`},
+		{name: "json", args: []string{"--files", "--json", "x"}, want: `"reason":"DEPRECATED","path":"spec.knowledge_tools","deprecated_in":"1.3.0"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out bytes.Buffer
+			v := cli.Validate{Files: oneDoc(string(b)), Stdout: &out}
+			if code := v.Run(context.Background(), tt.args); code != cli.ExitOK {
+				t.Fatalf("Run(%v) = %d, want 0: a deprecated field warns and does not fail (%q)", tt.args, code, out.String())
+			}
+			if !strings.Contains(out.String(), tt.want) {
+				t.Errorf("output %q, want it to contain %q", out.String(), tt.want)
+			}
+		})
+	}
+}

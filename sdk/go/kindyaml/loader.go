@@ -136,6 +136,8 @@ func requiredFields() []protoreflect.FullName {
 		"numinance.kinds.v1.AdapterSelectorSpec.ports",
 		"numinance.kinds.v1.AdapterBinding.provider",
 		"numinance.kinds.v1.AdapterBinding.instance",
+		"numinance.kinds.v1.AdapterTool.plugin",
+		"numinance.kinds.v1.AdapterTool.instance",
 		"numinance.kinds.v1.AutonomyRule.match",
 		"numinance.kinds.v1.AutonomyFloors.rules",
 		"numinance.kinds.v1.AutonomyFloor.match",
@@ -179,6 +181,10 @@ func requiredFields() []protoreflect.FullName {
 		"numinance.kinds.v1.LockedKnowledgeTool.connection",
 		"numinance.kinds.v1.LockedKnowledgeTool.name",
 		"numinance.kinds.v1.LockedKnowledgeTool.hash",
+		"numinance.kinds.v1.LockedTool.plugin",
+		"numinance.kinds.v1.LockedTool.connection",
+		"numinance.kinds.v1.LockedTool.name",
+		"numinance.kinds.v1.LockedTool.hash",
 	}
 }
 
@@ -219,25 +225,58 @@ func produced(kind protoreflect.Name) bool {
 func uniqueKeys() map[protoreflect.FullName]func(protoreflect.Value) string {
 	str := func(v protoreflect.Value) string { return v.String() }
 	return map[protoreflect.FullName]func(protoreflect.Value) string{
-		"numinance.kinds.v1.SDLCProfileSpec.playbooks":          str,
-		"numinance.kinds.v1.SDLCProfileSpec.control_packs":      str,
-		"numinance.kinds.v1.SDLCProfileSpec.architecture_packs": str,
-		"numinance.kinds.v1.SDLCProfileSpec.toolchains":         str,
-		"numinance.kinds.v1.ControlPackSpec.sources":            str,
-		"numinance.kinds.v1.RolloutPlan.stages":                 field("name"),
-		"numinance.kinds.v1.ControlPackSpec.controls":           field("id"),
-		"numinance.kinds.v1.ControlPackSpec.export_views":       field("name"),
-		"numinance.kinds.v1.Control.requires_evidence":          str,
-		"numinance.kinds.v1.ExportView.controls":                str,
-		"numinance.kinds.v1.ExecutorManifestSpec.capabilities":  func(v protoreflect.Value) string { return strconv.Itoa(int(v.Enum())) },
-		"numinance.kinds.v1.ExecutorManifestSpec.models":        field("id"),
+		"numinance.kinds.v1.SDLCProfileSpec.playbooks":           str,
+		"numinance.kinds.v1.SDLCProfileSpec.control_packs":       str,
+		"numinance.kinds.v1.SDLCProfileSpec.architecture_packs":  str,
+		"numinance.kinds.v1.SDLCProfileSpec.toolchains":          str,
+		"numinance.kinds.v1.ControlPackSpec.sources":             str,
+		"numinance.kinds.v1.RolloutPlan.stages":                  field("name"),
+		"numinance.kinds.v1.ControlPackSpec.controls":            field("id"),
+		"numinance.kinds.v1.ControlPackSpec.export_views":        field("name"),
+		"numinance.kinds.v1.Control.requires_evidence":           str,
+		"numinance.kinds.v1.ExportView.controls":                 str,
+		"numinance.kinds.v1.ExecutorManifestSpec.capabilities":   func(v protoreflect.Value) string { return strconv.Itoa(int(v.Enum())) },
+		"numinance.kinds.v1.ExecutorManifestSpec.models":         field("id"),
+		"numinance.kinds.v1.ExecutorManifestSpec.mcp_transports": func(v protoreflect.Value) string { return strconv.Itoa(int(v.Enum())) },
+		"numinance.kinds.v1.ExecutorManifestSpec.feature_gaps":   str,
+		"numinance.kinds.v1.AdapterSelectorSpec.tools":           pairKey("plugin", "instance"),
 		// Folded, since a source may compare scope names without case.
 		"numinance.kinds.v1.KnowledgeConnectionSpec.scope":        func(v protoreflect.Value) string { return strings.ToLower(v.String()) },
 		"numinance.kinds.v1.KnowledgeConnectionSpec.pinned_tools": field("name"),
 		"numinance.kinds.v1.LockfileSpec.extensions":              field("id"),
 		"numinance.kinds.v1.LockfileSpec.knowledge_tools":         pairKey("connection", "name"),
+		"numinance.kinds.v1.LockfileSpec.pinned_tools":            pairKey("plugin", "connection", "name"),
 	}
 }
+
+// mapKeyChecks maps the map fields whose keys pass a check the schema cannot express to that check. The keys of an
+// extensions map are always checked as reverse-DNS.
+func mapKeyChecks() map[protoreflect.FullName]func(string) bool {
+	return map[protoreflect.FullName]func(string) bool{
+		"numinance.kinds.v1.AdapterSelectorSpec.overrides": isVerbName,
+	}
+}
+
+// isVerbName reports whether s is a verb name: dot-joined ASCII identifiers (a letter, then letters, digits and "_"),
+// such as "scm.CreatePullRequest", at most MaxNameBytes bytes.
+func isVerbName(s string) bool {
+	if s == "" || len(s) > MaxNameBytes {
+		return false
+	}
+	for seg := range strings.SplitSeq(s, ".") {
+		if seg == "" || !isASCIILetter(seg[0]) {
+			return false
+		}
+		for i := range len(seg) {
+			if c := seg[i]; !isASCIILetter(c) && (c < '0' || c > '9') && c != '_' {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func isASCIILetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 
 // field returns the key of a list element that is a message: its string field name.
 func field(name protoreflect.Name) func(protoreflect.Value) string {
@@ -282,6 +321,17 @@ func valueChecks() map[protoreflect.FullName]func(protoreflect.Value) bool {
 		"numinance.kinds.v1.LockedExtension.h1":             func(v protoreflect.Value) bool { return isH1(v.String()) },
 		"numinance.kinds.v1.LockedExtension.zh":             func(v protoreflect.Value) bool { return isZH(v.String()) },
 		"numinance.kinds.v1.LockedExtension.signer":         func(v protoreflect.Value) bool { return isSigner(v.String()) },
+		"numinance.kinds.v1.LockedTool.plugin":              func(v protoreflect.Value) bool { return isExtensionID(v.String()) },
+	}
+	// Open vocabularies of the adapter (design section 8): tokens, never a harness name fixed by the schema.
+	for _, f := range []protoreflect.FullName{
+		"numinance.kinds.v1.ExecutorManifestSpec.intent_channel",
+		"numinance.kinds.v1.ExecutorManifestSpec.skills_format",
+		"numinance.kinds.v1.ExecutorManifestSpec.plugin_format",
+		"numinance.kinds.v1.ExecutorManifestSpec.lockdown",
+		"numinance.kinds.v1.ExecutorManifestSpec.feature_gaps",
+	} {
+		m[f] = func(v protoreflect.Value) bool { return isToken(v.String()) }
 	}
 	for _, f := range []protoreflect.FullName{
 		"numinance.kinds.v1.EvalCase.name",
@@ -304,6 +354,8 @@ func valueChecks() map[protoreflect.FullName]func(protoreflect.Value) bool {
 		"numinance.kinds.v1.PinnedTool.name",
 		"numinance.kinds.v1.LockedKnowledgeTool.connection",
 		"numinance.kinds.v1.LockedKnowledgeTool.name",
+		"numinance.kinds.v1.LockedTool.connection",
+		"numinance.kinds.v1.LockedTool.name",
 	} {
 		m[f] = func(v protoreflect.Value) bool { return isName(v.String()) }
 	}
@@ -318,6 +370,8 @@ func valueChecks() map[protoreflect.FullName]func(protoreflect.Value) bool {
 		"numinance.kinds.v1.AdapterPorts.knowledge",
 		"numinance.kinds.v1.AdapterBinding.provider",
 		"numinance.kinds.v1.AdapterBinding.instance",
+		"numinance.kinds.v1.AdapterTool.plugin",
+		"numinance.kinds.v1.AdapterTool.instance",
 		"numinance.kinds.v1.ControlPackSpec.jurisdiction",
 		"numinance.kinds.v1.ControlPackSpec.framework",
 		"numinance.kinds.v1.ControlPackSpec.version",
@@ -824,13 +878,14 @@ func (l *Loader) walk(m protoreflect.Message) error {
 		case fd.IsMap():
 			ext := fd.Name() == "extensions" && fd.MapKey().Kind() == protoreflect.StringKind
 			badKey := false
+			keyCheck := mapKeyChecks()[fd.FullName()]
 			v.Map().Range(func(k protoreflect.MapKey, e protoreflect.Value) bool {
-				badKey = ext && !reverseDNS(k.String())
+				badKey = ext && !reverseDNS(k.String()) || keyCheck != nil && !keyCheck(k.String())
 				vals = append(vals, e)
 				return !badKey
 			})
 			if badKey {
-				return fmt.Errorf("%w: a key of %s is not reverse-DNS", ErrInvalid, fd.FullName())
+				return fmt.Errorf("%w: a key of %s is not valid", ErrInvalid, fd.FullName())
 			}
 			fd = fd.MapValue()
 		case !fd.HasPresence() || m.Has(fd):

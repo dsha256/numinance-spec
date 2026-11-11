@@ -1,0 +1,11 @@
+apiVersion: numinance.dev/v1
+kind: AdapterSelector
+metadata: {name: payments-tools, scope: SCOPE_REPO}
+spec:
+  ports:
+    scm: {provider: dev.numinance.official/github, instance: main}
+  overrides:
+    scm.CreatePullRequest: {provider: dev.numinance.official/gitlab, instance: mirror}
+  tools:
+    - {plugin: dev.numinance.official/atlassian, instance: confluence-eng}
+    - {plugin: dev.numinance.official/atlassian, instance: jira-pay}

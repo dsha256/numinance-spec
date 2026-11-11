@@ -60,11 +60,15 @@ func isSigner(s string) bool {
 	return isText(s, MaxSignerBytes) && !strings.ContainsAny(s, " \t")
 }
 
-// pairKey keys a list element by two string fields, so "a"+"bc" and "ab"+"c" differ.
-func pairKey(a, b protoreflect.Name) func(protoreflect.Value) string {
+// pairKey keys a list element by two or more string fields, so "a"+"bc" and "ab"+"c" differ.
+func pairKey(names ...protoreflect.Name) func(protoreflect.Value) string {
 	return func(v protoreflect.Value) string {
 		m := v.Message()
 		fs := m.Descriptor().Fields()
-		return m.Get(fs.ByName(a)).String() + "\x00" + m.Get(fs.ByName(b)).String()
+		parts := make([]string, len(names))
+		for i, n := range names {
+			parts[i] = m.Get(fs.ByName(n)).String()
+		}
+		return strings.Join(parts, "\x00")
 	}
 }

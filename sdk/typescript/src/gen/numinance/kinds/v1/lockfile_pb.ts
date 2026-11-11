@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file numinance/kinds/v1/lockfile.proto.
  */
 export const file_numinance_kinds_v1_lockfile: GenFile = /*@__PURE__*/
-  fileDesc("CiFudW1pbmFuY2Uva2luZHMvdjEvbG9ja2ZpbGUucHJvdG8SEm51bWluYW5jZS5raW5kcy52MSLbAgoITG9ja2ZpbGUSIAoLYXBpX3ZlcnNpb24YASABKAlCC5K1GAcKBTEuMS4wEhkKBGtpbmQYAiABKAlCC5K1GAcKBTEuMS4wEjsKCG1ldGFkYXRhGAMgASgLMhwubnVtaW5hbmNlLmtpbmRzLnYxLk1ldGFkYXRhQguStRgHCgUxLjEuMBI7CgRzcGVjGAQgASgLMiAubnVtaW5hbmNlLmtpbmRzLnYxLkxvY2tmaWxlU3BlY0ILkrUYBwoFMS4xLjASTQoKZXh0ZW5zaW9ucxgFIAMoCzIsLm51bWluYW5jZS5raW5kcy52MS5Mb2NrZmlsZS5FeHRlbnNpb25zRW50cnlCC5K1GAcKBTEuMS4wGkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIrQBCgxMb2NrZmlsZVNwZWMSRAoKZXh0ZW5zaW9ucxgBIAMoCzIjLm51bWluYW5jZS5raW5kcy52MS5Mb2NrZWRFeHRlbnNpb25CC5K1GAcKBTEuMS4wEl4KD2tub3dsZWRnZV90b29scxgCIAMoCzInLm51bWluYW5jZS5raW5kcy52MS5Mb2NrZWRLbm93bGVkZ2VUb29sQguStRgHCgUxLjEuMFIPa25vd2xlZGdlX3Rvb2xzIqkCCg9Mb2NrZWRFeHRlbnNpb24SFwoCaWQYASABKAlCC5K1GAcKBTEuMS4wEhwKB3ZlcnNpb24YAiABKAlCC5K1GAcKBTEuMS4wEjcKBmRpZ2VzdBgDIAEoCzIaLm51bWluYW5jZS50eXBlcy52MS5EaWdlc3RCC5K1GAcKBTEuMS4wEhcKAmgxGAQgASgJQguStRgHCgUxLjEuMBIXCgJ6aBgFIAEoCUILkrUYBwoFMS4xLjASGwoGc2lnbmVyGAYgASgJQguStRgHCgUxLjEuMBJXChJwZXJtaXNzaW9uc19kaWdlc3QYByABKAsyGi5udW1pbmFuY2UudHlwZXMudjEuRGlnZXN0QguStRgHCgUxLjEuMFIScGVybWlzc2lvbnNfZGlnZXN0IogBChNMb2NrZWRLbm93bGVkZ2VUb29sEh8KCmNvbm5lY3Rpb24YASABKAlCC5K1GAcKBTEuMS4wEhkKBG5hbWUYAiABKAlCC5K1GAcKBTEuMS4wEjUKBGhhc2gYAyABKAsyGi5udW1pbmFuY2UudHlwZXMudjEuRGlnZXN0QguStRgHCgUxLjEuMELcAQoWY29tLm51bWluYW5jZS5raW5kcy52MUINTG9ja2ZpbGVQcm90b1ABWklnaXRodWIuY29tL251bWluYW5jZS9udW1pbmFuY2Utc3BlYy9zZGsvZ28vZ2VuL251bWluYW5jZS9raW5kcy92MTtraW5kc3YxogIDTktYqgISTnVtaW5hbmNlLktpbmRzLlYxygISTnVtaW5hbmNlXEtpbmRzXFYx4gIeTnVtaW5hbmNlXEtpbmRzXFYxXEdQQk1ldGFkYXRh6gIUTnVtaW5hbmNlOjpLaW5kczo6VjFiBnByb3RvMw", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta, file_numinance_types_v1_types]);
+  fileDesc("CiFudW1pbmFuY2Uva2luZHMvdjEvbG9ja2ZpbGUucHJvdG8SEm51bWluYW5jZS5raW5kcy52MSLbAgoITG9ja2ZpbGUSIAoLYXBpX3ZlcnNpb24YASABKAlCC5K1GAcKBTEuMS4wEhkKBGtpbmQYAiABKAlCC5K1GAcKBTEuMS4wEjsKCG1ldGFkYXRhGAMgASgLMhwubnVtaW5hbmNlLmtpbmRzLnYxLk1ldGFkYXRhQguStRgHCgUxLjEuMBI7CgRzcGVjGAQgASgLMiAubnVtaW5hbmNlLmtpbmRzLnYxLkxvY2tmaWxlU3BlY0ILkrUYBwoFMS4xLjASTQoKZXh0ZW5zaW9ucxgFIAMoCzIsLm51bWluYW5jZS5raW5kcy52MS5Mb2NrZmlsZS5FeHRlbnNpb25zRW50cnlCC5K1GAcKBTEuMS4wGkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIrsCCgxMb2NrZmlsZVNwZWMSRAoKZXh0ZW5zaW9ucxgBIAMoCzIjLm51bWluYW5jZS5raW5kcy52MS5Mb2NrZWRFeHRlbnNpb25CC5K1GAcKBTEuMS4wEpMBCg9rbm93bGVkZ2VfdG9vbHMYAiADKAsyJy5udW1pbmFuY2Uua2luZHMudjEuTG9ja2VkS25vd2xlZGdlVG9vbEJAkrUYPAoFMS4xLjASBTEuMy4wGixudW1pbmFuY2Uua2luZHMudjEuTG9ja2ZpbGVTcGVjLnBpbm5lZF90b29sc1IPa25vd2xlZGdlX3Rvb2xzEk8KDHBpbm5lZF90b29scxgDIAMoCzIeLm51bWluYW5jZS5raW5kcy52MS5Mb2NrZWRUb29sQguStRgHCgUxLjMuMFIMcGlubmVkX3Rvb2xzIqkCCg9Mb2NrZWRFeHRlbnNpb24SFwoCaWQYASABKAlCC5K1GAcKBTEuMS4wEhwKB3ZlcnNpb24YAiABKAlCC5K1GAcKBTEuMS4wEjcKBmRpZ2VzdBgDIAEoCzIaLm51bWluYW5jZS50eXBlcy52MS5EaWdlc3RCC5K1GAcKBTEuMS4wEhcKAmgxGAQgASgJQguStRgHCgUxLjEuMBIXCgJ6aBgFIAEoCUILkrUYBwoFMS4xLjASGwoGc2lnbmVyGAYgASgJQguStRgHCgUxLjEuMBJXChJwZXJtaXNzaW9uc19kaWdlc3QYByABKAsyGi5udW1pbmFuY2UudHlwZXMudjEuRGlnZXN0QguStRgHCgUxLjEuMFIScGVybWlzc2lvbnNfZGlnZXN0IogBChNMb2NrZWRLbm93bGVkZ2VUb29sEh8KCmNvbm5lY3Rpb24YASABKAlCC5K1GAcKBTEuMS4wEhkKBG5hbWUYAiABKAlCC5K1GAcKBTEuMS4wEjUKBGhhc2gYAyABKAsyGi5udW1pbmFuY2UudHlwZXMudjEuRGlnZXN0QguStRgHCgUxLjEuMCKcAQoKTG9ja2VkVG9vbBIbCgZwbHVnaW4YASABKAlCC5K1GAcKBTEuMy4wEh8KCmNvbm5lY3Rpb24YAiABKAlCC5K1GAcKBTEuMy4wEhkKBG5hbWUYAyABKAlCC5K1GAcKBTEuMy4wEjUKBGhhc2gYBCABKAsyGi5udW1pbmFuY2UudHlwZXMudjEuRGlnZXN0QguStRgHCgUxLjMuMELcAQoWY29tLm51bWluYW5jZS5raW5kcy52MUINTG9ja2ZpbGVQcm90b1ABWklnaXRodWIuY29tL251bWluYW5jZS9udW1pbmFuY2Utc3BlYy9zZGsvZ28vZ2VuL251bWluYW5jZS9raW5kcy92MTtraW5kc3YxogIDTktYqgISTnVtaW5hbmNlLktpbmRzLlYxygISTnVtaW5hbmNlXEtpbmRzXFYx4gIeTnVtaW5hbmNlXEtpbmRzXFYxXEdQQk1ldGFkYXRh6gIUTnVtaW5hbmNlOjpLaW5kczo6VjFiBnByb3RvMw", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta, file_numinance_types_v1_types]);
 
 /**
  * Lockfile is the document .numinance.lock.yaml at the repository root: it pins every installed extension and every
@@ -89,10 +89,21 @@ export type LockfileSpec = Message<"numinance.kinds.v1.LockfileSpec"> & {
 
   /**
    * knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.
+   * Deprecated in 1.3.0: pinned_tools replaces it and covers every plugin, not only knowledge connections
+   * (design sections 8 and 17). A lockfile may still carry it; the loader reports it with a DEPRECATED diagnostic.
    *
    * @generated from field: repeated numinance.kinds.v1.LockedKnowledgeTool knowledge_tools = 2 [json_name = "knowledge_tools"];
    */
   knowledgeTools: LockedKnowledgeTool[];
+
+  /**
+   * pinned_tools are the admin-approved tool inventories of installed plugins (design sections 8 and 17), unique by
+   * plugin, connection and name; the install flow writes them sorted by that key. Drift of a tool from its pin
+   * quarantines the connection. Absent or empty means no tool is pinned.
+   *
+   * @generated from field: repeated numinance.kinds.v1.LockedTool pinned_tools = 3 [json_name = "pinned_tools"];
+   */
+  pinnedTools: LockedTool[];
 };
 
 /**
@@ -203,4 +214,49 @@ export type LockedKnowledgeTool = Message<"numinance.kinds.v1.LockedKnowledgeToo
  */
 export const LockedKnowledgeToolSchema: GenMessage<LockedKnowledgeTool> = /*@__PURE__*/
   messageDesc(file_numinance_kinds_v1_lockfile, 3);
+
+/**
+ * LockedTool pins one tool of one plugin connection by the hash of its canonicalised description, schemas and
+ * annotations (design sections 14 and 17), or the hash of the signed overlay that declares it. It replaces
+ * LockedKnowledgeTool, which names no plugin.
+ *
+ * @generated from message numinance.kinds.v1.LockedTool
+ */
+export type LockedTool = Message<"numinance.kinds.v1.LockedTool"> & {
+  /**
+   * plugin is the plugin_id of the extension that serves the tool: a reverse-DNS identifier of at least two labels,
+   * as LockedExtension.id.
+   *
+   * @generated from field: string plugin = 1;
+   */
+  plugin: string;
+
+  /**
+   * connection is the name of the plugin's configured connection (the instance of an AdapterTool).
+   *
+   * @generated from field: string connection = 2;
+   */
+  connection: string;
+
+  /**
+   * name is the tool name as the server lists it.
+   *
+   * @generated from field: string name = 3;
+   */
+  name: string;
+
+  /**
+   * hash is the approved hash.
+   *
+   * @generated from field: numinance.types.v1.Digest hash = 4;
+   */
+  hash?: Digest | undefined;
+};
+
+/**
+ * Describes the message numinance.kinds.v1.LockedTool.
+ * Use `create(LockedToolSchema)` to create a new message.
+ */
+export const LockedToolSchema: GenMessage<LockedTool> = /*@__PURE__*/
+  messageDesc(file_numinance_kinds_v1_lockfile, 4);
 

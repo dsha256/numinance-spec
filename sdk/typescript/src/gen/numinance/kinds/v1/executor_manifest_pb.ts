@@ -19,7 +19,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file numinance/kinds/v1/executor_manifest.proto.
  */
 export const file_numinance_kinds_v1_executor_manifest: GenFile = /*@__PURE__*/
-  fileDesc("CipudW1pbmFuY2Uva2luZHMvdjEvZXhlY3V0b3JfbWFuaWZlc3QucHJvdG8SEm51bWluYW5jZS5raW5kcy52MSLzAgoQRXhlY3V0b3JNYW5pZmVzdBIgCgthcGlfdmVyc2lvbhgBIAEoCUILkrUYBwoFMS4wLjASGQoEa2luZBgCIAEoCUILkrUYBwoFMS4wLjASOwoIbWV0YWRhdGEYAyABKAsyHC5udW1pbmFuY2Uua2luZHMudjEuTWV0YWRhdGFCC5K1GAcKBTEuMC4wEkMKBHNwZWMYBCABKAsyKC5udW1pbmFuY2Uua2luZHMudjEuRXhlY3V0b3JNYW5pZmVzdFNwZWNCC5K1GAcKBTEuMC4wElUKCmV4dGVuc2lvbnMYBSADKAsyNC5udW1pbmFuY2Uua2luZHMudjEuRXhlY3V0b3JNYW5pZmVzdC5FeHRlbnNpb25zRW50cnlCC5K1GAcKBTEuMC4wGkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIpQCChRFeGVjdXRvck1hbmlmZXN0U3BlYxIdCghwcm92aWRlchgBIAEoCUILkrUYBwoFMS4wLjASSQoMY2FwYWJpbGl0aWVzGAIgAygOMiYubnVtaW5hbmNlLnR5cGVzLnYxLkV4ZWN1dG9yQ2FwYWJpbGl0eUILkrUYBwoFMS4wLjASPgoGbW9kZWxzGAMgAygLMiEubnVtaW5hbmNlLmtpbmRzLnYxLkV4ZWN1dG9yTW9kZWxCC5K1GAcKBTEuMC4wElIKCmNvc3RfY2xhc3MYBCABKA4yJS5udW1pbmFuY2Uua2luZHMudjEuRXhlY3V0b3JDb3N0Q2xhc3NCC5K1GAcKBTEuMC4wUgpjb3N0X2NsYXNzIlcKDUV4ZWN1dG9yTW9kZWwSFwoCaWQYASABKAlCC5K1GAcKBTEuMC4wEi0KC21heF9jb250ZXh0GAIgASgNQguStRgHCgUxLjAuMFILbWF4X2NvbnRleHQqkwEKEUV4ZWN1dG9yQ29zdENsYXNzEiMKH0VYRUNVVE9SX0NPU1RfQ0xBU1NfVU5TUEVDSUZJRUQQABIbChdFWEVDVVRPUl9DT1NUX0NMQVNTX0xPVxABEh4KGkVYRUNVVE9SX0NPU1RfQ0xBU1NfTUVESVVNEAISHAoYRVhFQ1VUT1JfQ09TVF9DTEFTU19ISUdIEANC5AEKFmNvbS5udW1pbmFuY2Uua2luZHMudjFCFUV4ZWN1dG9yTWFuaWZlc3RQcm90b1ABWklnaXRodWIuY29tL251bWluYW5jZS9udW1pbmFuY2Utc3BlYy9zZGsvZ28vZ2VuL251bWluYW5jZS9raW5kcy92MTtraW5kc3YxogIDTktYqgISTnVtaW5hbmNlLktpbmRzLlYxygISTnVtaW5hbmNlXEtpbmRzXFYx4gIeTnVtaW5hbmNlXEtpbmRzXFYxXEdQQk1ldGFkYXRh6gIUTnVtaW5hbmNlOjpLaW5kczo6VjFiBnByb3RvMw", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta, file_numinance_types_v1_types]);
+  fileDesc("CipudW1pbmFuY2Uva2luZHMvdjEvZXhlY3V0b3JfbWFuaWZlc3QucHJvdG8SEm51bWluYW5jZS5raW5kcy52MSLzAgoQRXhlY3V0b3JNYW5pZmVzdBIgCgthcGlfdmVyc2lvbhgBIAEoCUILkrUYBwoFMS4wLjASGQoEa2luZBgCIAEoCUILkrUYBwoFMS4wLjASOwoIbWV0YWRhdGEYAyABKAsyHC5udW1pbmFuY2Uua2luZHMudjEuTWV0YWRhdGFCC5K1GAcKBTEuMC4wEkMKBHNwZWMYBCABKAsyKC5udW1pbmFuY2Uua2luZHMudjEuRXhlY3V0b3JNYW5pZmVzdFNwZWNCC5K1GAcKBTEuMC4wElUKCmV4dGVuc2lvbnMYBSADKAsyNC5udW1pbmFuY2Uua2luZHMudjEuRXhlY3V0b3JNYW5pZmVzdC5FeHRlbnNpb25zRW50cnlCC5K1GAcKBTEuMC4wGkkKD0V4dGVuc2lvbnNFbnRyeRILCgNrZXkYASABKAkSJQoFdmFsdWUYAiABKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWU6AjgBIq4FChRFeGVjdXRvck1hbmlmZXN0U3BlYxIdCghwcm92aWRlchgBIAEoCUILkrUYBwoFMS4wLjASSQoMY2FwYWJpbGl0aWVzGAIgAygOMiYubnVtaW5hbmNlLnR5cGVzLnYxLkV4ZWN1dG9yQ2FwYWJpbGl0eUILkrUYBwoFMS4wLjASPgoGbW9kZWxzGAMgAygLMiEubnVtaW5hbmNlLmtpbmRzLnYxLkV4ZWN1dG9yTW9kZWxCC5K1GAcKBTEuMC4wElIKCmNvc3RfY2xhc3MYBCABKA4yJS5udW1pbmFuY2Uua2luZHMudjEuRXhlY3V0b3JDb3N0Q2xhc3NCC5K1GAcKBTEuMC4wUgpjb3N0X2NsYXNzElUKDm1jcF90cmFuc3BvcnRzGAYgAygOMiAubnVtaW5hbmNlLmtpbmRzLnYxLk1jcFRyYW5zcG9ydEILkrUYBwoFMS4zLjBSDm1jcF90cmFuc3BvcnRzEjgKDmludGVudF9jaGFubmVsGAcgASgJQguStRgHCgUxLjMuMEgAUg5pbnRlbnRfY2hhbm5lbIgBARI2Cg1za2lsbHNfZm9ybWF0GAggASgJQguStRgHCgUxLjMuMEgBUg1za2lsbHNfZm9ybWF0iAEBEjYKDXBsdWdpbl9mb3JtYXQYCSABKAlCC5K1GAcKBTEuMy4wSAJSDXBsdWdpbl9mb3JtYXSIAQESIgoIbG9ja2Rvd24YCiABKAlCC5K1GAcKBTEuMy4wSAOIAQESLwoMZmVhdHVyZV9nYXBzGAsgAygJQguStRgHCgUxLjMuMFIMZmVhdHVyZV9nYXBzQhEKD19pbnRlbnRfY2hhbm5lbEIQCg5fc2tpbGxzX2Zvcm1hdEIQCg5fcGx1Z2luX2Zvcm1hdEILCglfbG9ja2Rvd24iVwoNRXhlY3V0b3JNb2RlbBIXCgJpZBgBIAEoCUILkrUYBwoFMS4wLjASLQoLbWF4X2NvbnRleHQYAiABKA1CC5K1GAcKBTEuMC4wUgttYXhfY29udGV4dCqTAQoRRXhlY3V0b3JDb3N0Q2xhc3MSIwofRVhFQ1VUT1JfQ09TVF9DTEFTU19VTlNQRUNJRklFRBAAEhsKF0VYRUNVVE9SX0NPU1RfQ0xBU1NfTE9XEAESHgoaRVhFQ1VUT1JfQ09TVF9DTEFTU19NRURJVU0QAhIcChhFWEVDVVRPUl9DT1NUX0NMQVNTX0hJR0gQAyppCgxNY3BUcmFuc3BvcnQSHQoZTUNQX1RSQU5TUE9SVF9VTlNQRUNJRklFRBAAEhcKE01DUF9UUkFOU1BPUlRfU1RESU8QARIhCh1NQ1BfVFJBTlNQT1JUX1NUUkVBTUFCTEVfSFRUUBACQuQBChZjb20ubnVtaW5hbmNlLmtpbmRzLnYxQhVFeGVjdXRvck1hbmlmZXN0UHJvdG9QAVpJZ2l0aHViLmNvbS9udW1pbmFuY2UvbnVtaW5hbmNlLXNwZWMvc2RrL2dvL2dlbi9udW1pbmFuY2Uva2luZHMvdjE7a2luZHN2MaICA05LWKoCEk51bWluYW5jZS5LaW5kcy5WMcoCEk51bWluYW5jZVxLaW5kc1xWMeICHk51bWluYW5jZVxLaW5kc1xWMVxHUEJNZXRhZGF0YeoCFE51bWluYW5jZTo6S2luZHM6OlYxYgZwcm90bzM", [file_google_protobuf_struct, file_numinance_annotations_v1_annotations, file_numinance_kinds_v1_meta, file_numinance_types_v1_types]);
 
 /**
  * ExecutorManifest declares an author executor: its adapter, capabilities, models and cost class. Profiles select it by metadata.name, the executor id; one adapter ships one manifest per data path.
@@ -103,12 +103,62 @@ export type ExecutorManifestSpec = Message<"numinance.kinds.v1.ExecutorManifestS
   /**
    * cost_class is required.
    *
-   * Field 5 is kept for residency (ADR 0019), added in a later minor. Until then the class derived from the live
-   * configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it.
-   *
    * @generated from field: numinance.kinds.v1.ExecutorCostClass cost_class = 4 [json_name = "cost_class"];
    */
   costClass: ExecutorCostClass;
+
+  /**
+   * Field 5 is kept for residency (ADR 0019), added in a later minor. Until then the class derived from the live
+   * configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it.
+   * mcp_transports are the MCP transports the harness speaks to the tool gateway shim (design sections 8 and 11):
+   * unique, and empty or absent for a harness that attaches no MCP server. Only a claim; the gateway decides what it serves.
+   *
+   * @generated from field: repeated numinance.kinds.v1.McpTransport mcp_transports = 6 [json_name = "mcp_transports"];
+   */
+  mcpTransports: McpTransport[];
+
+  /**
+   * intent_channel names how the harness reports a built-in tool intent to the host before it runs (design section 11,
+   * "Built-in tool intents": for example "permission_prompt_tool", "hooks" or "request_permission"). Absent means the
+   * harness declares none. A token of 1 to 64 lower-case ASCII letters, digits and ". _ -", starting with a letter or
+   * digit; the vocabulary is the adapter's, so no harness name is fixed by this schema.
+   *
+   * @generated from field: optional string intent_channel = 7 [json_name = "intent_channel"];
+   */
+  intentChannel?: string | undefined;
+
+  /**
+   * skills_format names the format the harness reads skills in, to which the host renders them (design section 11,
+   * "Skills rendered to"); same token rule as intent_channel. Absent means the harness reads no rendered skills.
+   *
+   * @generated from field: optional string skills_format = 8 [json_name = "skills_format"];
+   */
+  skillsFormat?: string | undefined;
+
+  /**
+   * plugin_format names the plugin package format the harness installs, if any (design section 17); same token rule as
+   * intent_channel. Absent means the harness installs no plugin packages.
+   *
+   * @generated from field: optional string plugin_format = 9 [json_name = "plugin_format"];
+   */
+  pluginFormat?: string | undefined;
+
+  /**
+   * lockdown names the mechanism the adapter uses to restrict the harness to the gateway and the granted tools (design
+   * section 11, "Lock-down"); same token rule as intent_channel. Absent means the adapter declares no mechanism, and the
+   * router must not treat the harness as locked down. A claim: the broker, egress proxy and read-only filesystem enforce.
+   *
+   * @generated from field: optional string lockdown = 10;
+   */
+  lockdown?: string | undefined;
+
+  /**
+   * feature_gaps lists, as tokens (same rule as intent_channel) unique within the list, the contract features the
+   * harness does not support, so that a playbook that needs one is never routed to it.
+   *
+   * @generated from field: repeated string feature_gaps = 11 [json_name = "feature_gaps"];
+   */
+  featureGaps: string[];
 };
 
 /**
@@ -186,4 +236,38 @@ export enum ExecutorCostClass {
  */
 export const ExecutorCostClassSchema: GenEnum<ExecutorCostClass> = /*@__PURE__*/
   enumDesc(file_numinance_kinds_v1_executor_manifest, 0);
+
+/**
+ * McpTransport is an MCP transport a harness speaks. This enum may grow.
+ *
+ * @generated from enum numinance.kinds.v1.McpTransport
+ */
+export enum McpTransport {
+  /**
+   * MCP_TRANSPORT_UNSPECIFIED is the zero value; a loader rejects it.
+   *
+   * @generated from enum value: MCP_TRANSPORT_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * MCP_TRANSPORT_STDIO is a server process spoken to over standard input and output.
+   *
+   * @generated from enum value: MCP_TRANSPORT_STDIO = 1;
+   */
+  STDIO = 1,
+
+  /**
+   * MCP_TRANSPORT_STREAMABLE_HTTP is the MCP streamable HTTP transport.
+   *
+   * @generated from enum value: MCP_TRANSPORT_STREAMABLE_HTTP = 2;
+   */
+  STREAMABLE_HTTP = 2,
+}
+
+/**
+ * Describes the enum numinance.kinds.v1.McpTransport.
+ */
+export const McpTransportSchema: GenEnum<McpTransport> = /*@__PURE__*/
+  enumDesc(file_numinance_kinds_v1_executor_manifest, 1);
 

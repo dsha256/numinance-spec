@@ -675,7 +675,9 @@ type CapabilityDescriptor struct {
 	// mcp_tool is the name of the MCP tool the capability maps to, printable characters only, at most 1024 bytes; legal only on a tool capability and rejected on any other; required on a tool capability of a manifest whose runtime is BRIDGE_MCP. A long-running MCP task maps to exec mode OPERATION (section 7); that is the host's mapping, not a field here.
 	McpTool string `protobuf:"bytes,18,opt,name=mcp_tool,json=mcpTool,proto3" json:"mcp_tool,omitempty"`
 	// verify_with names the read capability used to establish the outcome of a write, matching the capability name pattern, at most 128 bytes; legal only on a tool capability and rejected on any other; when set it must name a different capability of the same manifest (a name with no entry is rejected); empty means none declared.
-	VerifyWith    string `protobuf:"bytes,19,opt,name=verify_with,json=verifyWith,proto3" json:"verify_with,omitempty"`
+	VerifyWith string `protobuf:"bytes,19,opt,name=verify_with,json=verifyWith,proto3" json:"verify_with,omitempty"`
+	// resource_args declares which arguments of a tool call carry the resource a grant's resource scope applies to (design section 12, "Grants"): each entry is an RFC 6901 JSON pointer into the call's arguments object (for example "/jobFullName"), and the resource name is the values the pointers select, joined by "/" in order, so ["/owner", "/repo"] names "owner/repo". At most 4 entries of at most 256 bytes, each a pointer, none repeated; legal only on a tool capability and rejected on any other; empty means the tool declares no resource and its calls touch none (the scope does not apply to it). The decision point reads the names from the exact argument bytes it decides on and checks them against the grant's resource scope by exact match; when the capability declares any entry, a call whose arguments do not hold every pointer as a non-empty string is denied, never read as naming nothing. The declaration only narrows what a grant lets through; it grants nothing.
+	ResourceArgs  []string `protobuf:"bytes,20,rep,name=resource_args,json=resourceArgs,proto3" json:"resource_args,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -841,6 +843,13 @@ func (x *CapabilityDescriptor) GetVerifyWith() string {
 		return x.VerifyWith
 	}
 	return ""
+}
+
+func (x *CapabilityDescriptor) GetResourceArgs() []string {
+	if x != nil {
+		return x.ResourceArgs
+	}
+	return nil
 }
 
 // NetworkIntent is one egress destination.
@@ -1059,7 +1068,7 @@ const file_numinance_plugin_v1_manifest_proto_rawDesc = "" +
 	"\bprevious\x18\x02 \x01(\v2).numinance.plugin.v1.CapabilityDescriptorB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\bprevious\x12P\n" +
 	"\acurrent\x18\x03 \x01(\v2).numinance.plugin.v1.CapabilityDescriptorB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\acurrent\"\xc6\t\n" +
+	"\x051.0.0R\acurrent\"\xf8\t\n" +
 	"\x14CapabilityDescriptor\x12\x1f\n" +
 	"\x04name\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x04name\x12O\n" +
@@ -1102,7 +1111,9 @@ const file_numinance_plugin_v1_manifest_proto_rawDesc = "" +
 	"\x051.3.0R\amcpTool\x12,\n" +
 	"\vverify_with\x18\x13 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.3.0R\n" +
-	"verifyWith\"Q\n" +
+	"verifyWith\x120\n" +
+	"\rresource_args\x18\x14 \x03(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\fresourceArgs\"Q\n" +
 	"\rNetworkIntent\x12\x1f\n" +
 	"\x04host\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x04host\x12\x1f\n" +

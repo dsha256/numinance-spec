@@ -118,9 +118,15 @@ type LockfileSpec struct {
 	// extensions are the installed extensions, unique by id: one version of one extension per lockfile.
 	Extensions []*LockedExtension `protobuf:"bytes,1,rep,name=extensions,proto3" json:"extensions,omitempty"`
 	// knowledge_tools are the admin-approved tool inventories of knowledge connections, unique by connection and name.
+	// Deprecated in 1.3.0: pinned_tools replaces it and covers every plugin, not only knowledge connections
+	// (design sections 8 and 17). A lockfile may still carry it; the loader reports it with a DEPRECATED diagnostic.
 	KnowledgeTools []*LockedKnowledgeTool `protobuf:"bytes,2,rep,name=knowledge_tools,proto3" json:"knowledge_tools,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// pinned_tools are the admin-approved tool inventories of installed plugins (design sections 8 and 17), unique by
+	// plugin, connection and name; the install flow writes them sorted by that key. Drift of a tool from its pin
+	// quarantines the connection. Absent or empty means no tool is pinned.
+	PinnedTools   []*LockedTool `protobuf:"bytes,3,rep,name=pinned_tools,proto3" json:"pinned_tools,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LockfileSpec) Reset() {
@@ -163,6 +169,13 @@ func (x *LockfileSpec) GetExtensions() []*LockedExtension {
 func (x *LockfileSpec) GetKnowledgeTools() []*LockedKnowledgeTool {
 	if x != nil {
 		return x.KnowledgeTools
+	}
+	return nil
+}
+
+func (x *LockfileSpec) GetPinnedTools() []*LockedTool {
+	if x != nil {
+		return x.PinnedTools
 	}
 	return nil
 }
@@ -335,6 +348,82 @@ func (x *LockedKnowledgeTool) GetHash() *v1.Digest {
 	return nil
 }
 
+// LockedTool pins one tool of one plugin connection by the hash of its canonicalised description, schemas and
+// annotations (design sections 14 and 17), or the hash of the signed overlay that declares it. It replaces
+// LockedKnowledgeTool, which names no plugin.
+type LockedTool struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// plugin is the plugin_id of the extension that serves the tool: a reverse-DNS identifier of at least two labels,
+	// as LockedExtension.id.
+	Plugin string `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	// connection is the name of the plugin's configured connection (the instance of an AdapterTool).
+	Connection string `protobuf:"bytes,2,opt,name=connection,proto3" json:"connection,omitempty"`
+	// name is the tool name as the server lists it.
+	Name string `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	// hash is the approved hash.
+	Hash          *v1.Digest `protobuf:"bytes,4,opt,name=hash,proto3" json:"hash,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LockedTool) Reset() {
+	*x = LockedTool{}
+	mi := &file_numinance_kinds_v1_lockfile_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LockedTool) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LockedTool) ProtoMessage() {}
+
+func (x *LockedTool) ProtoReflect() protoreflect.Message {
+	mi := &file_numinance_kinds_v1_lockfile_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LockedTool.ProtoReflect.Descriptor instead.
+func (*LockedTool) Descriptor() ([]byte, []int) {
+	return file_numinance_kinds_v1_lockfile_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *LockedTool) GetPlugin() string {
+	if x != nil {
+		return x.Plugin
+	}
+	return ""
+}
+
+func (x *LockedTool) GetConnection() string {
+	if x != nil {
+		return x.Connection
+	}
+	return ""
+}
+
+func (x *LockedTool) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *LockedTool) GetHash() *v1.Digest {
+	if x != nil {
+		return x.Hash
+	}
+	return nil
+}
+
 var File_numinance_kinds_v1_lockfile_proto protoreflect.FileDescriptor
 
 const file_numinance_kinds_v1_lockfile_proto_rawDesc = "" +
@@ -356,14 +445,16 @@ const file_numinance_kinds_v1_lockfile_proto_rawDesc = "" +
 	"extensions\x1aU\n" +
 	"\x0fExtensionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
-	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xc0\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xc7\x02\n" +
 	"\fLockfileSpec\x12P\n" +
 	"\n" +
 	"extensions\x18\x01 \x03(\v2#.numinance.kinds.v1.LockedExtensionB\v\x92\xb5\x18\a\n" +
 	"\x051.1.0R\n" +
-	"extensions\x12^\n" +
-	"\x0fknowledge_tools\x18\x02 \x03(\v2'.numinance.kinds.v1.LockedKnowledgeToolB\v\x92\xb5\x18\a\n" +
-	"\x051.1.0R\x0fknowledge_tools\"\xce\x02\n" +
+	"extensions\x12\x93\x01\n" +
+	"\x0fknowledge_tools\x18\x02 \x03(\v2'.numinance.kinds.v1.LockedKnowledgeToolB@\x92\xb5\x18<\n" +
+	"\x051.1.0\x12\x051.3.0\x1a,numinance.kinds.v1.LockfileSpec.pinned_toolsR\x0fknowledge_tools\x12O\n" +
+	"\fpinned_tools\x18\x03 \x03(\v2\x1e.numinance.kinds.v1.LockedToolB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\fpinned_tools\"\xce\x02\n" +
 	"\x0fLockedExtension\x12\x1b\n" +
 	"\x02id\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.1.0R\x02id\x12%\n" +
@@ -387,7 +478,19 @@ const file_numinance_kinds_v1_lockfile_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.1.0R\x04name\x12;\n" +
 	"\x04hash\x18\x03 \x01(\v2\x1a.numinance.types.v1.DigestB\v\x92\xb5\x18\a\n" +
-	"\x051.1.0R\x04hashB\xdc\x01\n" +
+	"\x051.1.0R\x04hash\"\xbc\x01\n" +
+	"\n" +
+	"LockedTool\x12#\n" +
+	"\x06plugin\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\x06plugin\x12+\n" +
+	"\n" +
+	"connection\x18\x02 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\n" +
+	"connection\x12\x1f\n" +
+	"\x04name\x18\x03 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\x04name\x12;\n" +
+	"\x04hash\x18\x04 \x01(\v2\x1a.numinance.types.v1.DigestB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\x04hashB\xdc\x01\n" +
 	"\x16com.numinance.kinds.v1B\rLockfileProtoP\x01ZIgithub.com/numinance/numinance-spec/sdk/go/gen/numinance/kinds/v1;kindsv1\xa2\x02\x03NKX\xaa\x02\x12Numinance.Kinds.V1\xca\x02\x12Numinance\\Kinds\\V1\xe2\x02\x1eNuminance\\Kinds\\V1\\GPBMetadata\xea\x02\x14Numinance::Kinds::V1b\x06proto3"
 
 var (
@@ -402,32 +505,35 @@ func file_numinance_kinds_v1_lockfile_proto_rawDescGZIP() []byte {
 	return file_numinance_kinds_v1_lockfile_proto_rawDescData
 }
 
-var file_numinance_kinds_v1_lockfile_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_numinance_kinds_v1_lockfile_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_numinance_kinds_v1_lockfile_proto_goTypes = []any{
 	(*Lockfile)(nil),            // 0: numinance.kinds.v1.Lockfile
 	(*LockfileSpec)(nil),        // 1: numinance.kinds.v1.LockfileSpec
 	(*LockedExtension)(nil),     // 2: numinance.kinds.v1.LockedExtension
 	(*LockedKnowledgeTool)(nil), // 3: numinance.kinds.v1.LockedKnowledgeTool
-	nil,                         // 4: numinance.kinds.v1.Lockfile.ExtensionsEntry
-	(*Metadata)(nil),            // 5: numinance.kinds.v1.Metadata
-	(*v1.Digest)(nil),           // 6: numinance.types.v1.Digest
-	(*structpb.Value)(nil),      // 7: google.protobuf.Value
+	(*LockedTool)(nil),          // 4: numinance.kinds.v1.LockedTool
+	nil,                         // 5: numinance.kinds.v1.Lockfile.ExtensionsEntry
+	(*Metadata)(nil),            // 6: numinance.kinds.v1.Metadata
+	(*v1.Digest)(nil),           // 7: numinance.types.v1.Digest
+	(*structpb.Value)(nil),      // 8: google.protobuf.Value
 }
 var file_numinance_kinds_v1_lockfile_proto_depIdxs = []int32{
-	5, // 0: numinance.kinds.v1.Lockfile.metadata:type_name -> numinance.kinds.v1.Metadata
-	1, // 1: numinance.kinds.v1.Lockfile.spec:type_name -> numinance.kinds.v1.LockfileSpec
-	4, // 2: numinance.kinds.v1.Lockfile.extensions:type_name -> numinance.kinds.v1.Lockfile.ExtensionsEntry
-	2, // 3: numinance.kinds.v1.LockfileSpec.extensions:type_name -> numinance.kinds.v1.LockedExtension
-	3, // 4: numinance.kinds.v1.LockfileSpec.knowledge_tools:type_name -> numinance.kinds.v1.LockedKnowledgeTool
-	6, // 5: numinance.kinds.v1.LockedExtension.digest:type_name -> numinance.types.v1.Digest
-	6, // 6: numinance.kinds.v1.LockedExtension.permissions_digest:type_name -> numinance.types.v1.Digest
-	6, // 7: numinance.kinds.v1.LockedKnowledgeTool.hash:type_name -> numinance.types.v1.Digest
-	7, // 8: numinance.kinds.v1.Lockfile.ExtensionsEntry.value:type_name -> google.protobuf.Value
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	6,  // 0: numinance.kinds.v1.Lockfile.metadata:type_name -> numinance.kinds.v1.Metadata
+	1,  // 1: numinance.kinds.v1.Lockfile.spec:type_name -> numinance.kinds.v1.LockfileSpec
+	5,  // 2: numinance.kinds.v1.Lockfile.extensions:type_name -> numinance.kinds.v1.Lockfile.ExtensionsEntry
+	2,  // 3: numinance.kinds.v1.LockfileSpec.extensions:type_name -> numinance.kinds.v1.LockedExtension
+	3,  // 4: numinance.kinds.v1.LockfileSpec.knowledge_tools:type_name -> numinance.kinds.v1.LockedKnowledgeTool
+	4,  // 5: numinance.kinds.v1.LockfileSpec.pinned_tools:type_name -> numinance.kinds.v1.LockedTool
+	7,  // 6: numinance.kinds.v1.LockedExtension.digest:type_name -> numinance.types.v1.Digest
+	7,  // 7: numinance.kinds.v1.LockedExtension.permissions_digest:type_name -> numinance.types.v1.Digest
+	7,  // 8: numinance.kinds.v1.LockedKnowledgeTool.hash:type_name -> numinance.types.v1.Digest
+	7,  // 9: numinance.kinds.v1.LockedTool.hash:type_name -> numinance.types.v1.Digest
+	8,  // 10: numinance.kinds.v1.Lockfile.ExtensionsEntry.value:type_name -> google.protobuf.Value
+	11, // [11:11] is the sub-list for method output_type
+	11, // [11:11] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_numinance_kinds_v1_lockfile_proto_init() }
@@ -442,7 +548,7 @@ func file_numinance_kinds_v1_lockfile_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numinance_kinds_v1_lockfile_proto_rawDesc), len(file_numinance_kinds_v1_lockfile_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

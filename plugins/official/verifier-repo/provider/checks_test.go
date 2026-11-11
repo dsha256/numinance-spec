@@ -18,7 +18,7 @@ func TestCheckScope(t *testing.T) {
 	}{
 		{"one new file under the allowed path is clean", []file{add("docs/runbooks/local.md", lines(50))}, nil, nil},
 		{"a path outside the allowed paths", []file{add("docs/other.md", "x\n")}, nil, []string{catalog.RuleScopePath}},
-		{"a protected path, also outside the allowed paths", []file{add(".claude/rules/x.md", "x\n")}, nil, []string{catalog.RuleScopePath, catalog.RuleScopeProtected}},
+		{"a protected path, also outside the allowed paths", []file{add(".agent/rules/x.md", "x\n")}, nil, []string{catalog.RuleScopePath, catalog.RuleScopeProtected}},
 		{"a protected path under an allowed one", []file{add("docs/runbooks/x.md", "x\n")}, func(s *Scope) { s.ProtectedPaths = []string{"docs/runbooks/"} }, []string{catalog.RuleScopeProtected}},
 		{"a protected path in another case", []file{add("DOCS/Design/x.md", "x\n")}, nil, []string{catalog.RuleScopePath, catalog.RuleScopeProtected}},
 		{"an allowed prefix is a whole segment", []file{add("docs/runbooks-extra/x.md", "x\n")}, nil, []string{catalog.RuleScopePath}},
@@ -50,7 +50,7 @@ func TestCheckScope(t *testing.T) {
 }
 
 func TestCheckScope_AProtectedPathIsCritical(t *testing.T) {
-	fs := checkScope(parse(t, add(".claude/x.md", "x\n")), scope())
+	fs := checkScope(parse(t, add(".agent/x.md", "x\n")), scope())
 	for _, f := range fs {
 		if f.rule == catalog.RuleScopeProtected && f.severity != sevCritical {
 			t.Errorf("%s severity = %v, want critical", f.rule, f.severity)

@@ -111,7 +111,16 @@ func (x *AdapterSelector) GetExtensions() map[string]*structpb.Value {
 type AdapterSelectorSpec struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// ports is required; the loader enforces it, the schema cannot. An empty ports binds nothing: a valid no-op.
-	Ports         *AdapterPorts `protobuf:"bytes,1,opt,name=ports,proto3" json:"ports,omitempty"`
+	Ports *AdapterPorts `protobuf:"bytes,1,opt,name=ports,proto3" json:"ports,omitempty"`
+	// overrides pins, per verb, a provider other than the one bound for the verb's port (design section 8; the resolution
+	// order of section 17 puts a provider pinned by the customer first). A key is a verb name of dot-joined ASCII
+	// identifiers ("scm.CreatePullRequest"), at most 253 bytes; each value is replaced as a unit, and a narrower scope's
+	// map replaces the wider one. An empty map overrides nothing.
+	Overrides map[string]*AdapterBinding `protobuf:"bytes,2,rep,name=overrides,proto3" json:"overrides,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// tools names the plugin installations whose tool capabilities (tool.<plugin>.<name>) the scope may grant to a
+	// harness, unique by plugin and instance; a narrower scope's list replaces the wider one. It replaces the knowledge
+	// list of ports, which named KnowledgeConnection objects (deprecated in 1.3.0).
+	Tools         []*AdapterTool `protobuf:"bytes,3,rep,name=tools,proto3" json:"tools,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -153,6 +162,75 @@ func (x *AdapterSelectorSpec) GetPorts() *AdapterPorts {
 	return nil
 }
 
+func (x *AdapterSelectorSpec) GetOverrides() map[string]*AdapterBinding {
+	if x != nil {
+		return x.Overrides
+	}
+	return nil
+}
+
+func (x *AdapterSelectorSpec) GetTools() []*AdapterTool {
+	if x != nil {
+		return x.Tools
+	}
+	return nil
+}
+
+// AdapterTool is one plugin installation whose tools the scope may use.
+type AdapterTool struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// plugin is required: the extension id of a plugin that exposes tool capabilities, which must resolve to a lockfile entry.
+	Plugin string `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	// instance is required: the configured instance of the plugin (one plugin may serve several connections).
+	Instance      string `protobuf:"bytes,2,opt,name=instance,proto3" json:"instance,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdapterTool) Reset() {
+	*x = AdapterTool{}
+	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdapterTool) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdapterTool) ProtoMessage() {}
+
+func (x *AdapterTool) ProtoReflect() protoreflect.Message {
+	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdapterTool.ProtoReflect.Descriptor instead.
+func (*AdapterTool) Descriptor() ([]byte, []int) {
+	return file_numinance_kinds_v1_adapter_selector_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AdapterTool) GetPlugin() string {
+	if x != nil {
+		return x.Plugin
+	}
+	return ""
+}
+
+func (x *AdapterTool) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
 // AdapterPorts binds the ports that reach customer systems; a port added later is a new
 // optional field. Each binding is replaced as a unit, never pairing one scope's provider with another's instance.
 type AdapterPorts struct {
@@ -172,6 +250,7 @@ type AdapterPorts struct {
 	// observability binds the observability port.
 	Observability *AdapterBinding `protobuf:"bytes,7,opt,name=observability,proto3" json:"observability,omitempty"`
 	// knowledge names the KnowledgeConnection objects the scope may read; a narrower scope's list replaces the wider one.
+	// Deprecated in 1.3.0: a knowledge source is an MCP-backed plugin named in AdapterSelectorSpec.tools (design sections 14 and 17).
 	Knowledge     []string `protobuf:"bytes,8,rep,name=knowledge,proto3" json:"knowledge,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -179,7 +258,7 @@ type AdapterPorts struct {
 
 func (x *AdapterPorts) Reset() {
 	*x = AdapterPorts{}
-	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[2]
+	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -191,7 +270,7 @@ func (x *AdapterPorts) String() string {
 func (*AdapterPorts) ProtoMessage() {}
 
 func (x *AdapterPorts) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[2]
+	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -204,7 +283,7 @@ func (x *AdapterPorts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdapterPorts.ProtoReflect.Descriptor instead.
 func (*AdapterPorts) Descriptor() ([]byte, []int) {
-	return file_numinance_kinds_v1_adapter_selector_proto_rawDescGZIP(), []int{2}
+	return file_numinance_kinds_v1_adapter_selector_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *AdapterPorts) GetScm() *AdapterBinding {
@@ -276,7 +355,7 @@ type AdapterBinding struct {
 
 func (x *AdapterBinding) Reset() {
 	*x = AdapterBinding{}
-	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[3]
+	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -288,7 +367,7 @@ func (x *AdapterBinding) String() string {
 func (*AdapterBinding) ProtoMessage() {}
 
 func (x *AdapterBinding) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[3]
+	mi := &file_numinance_kinds_v1_adapter_selector_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -301,7 +380,7 @@ func (x *AdapterBinding) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AdapterBinding.ProtoReflect.Descriptor instead.
 func (*AdapterBinding) Descriptor() ([]byte, []int) {
-	return file_numinance_kinds_v1_adapter_selector_proto_rawDescGZIP(), []int{3}
+	return file_numinance_kinds_v1_adapter_selector_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *AdapterBinding) GetProvider() string {
@@ -339,10 +418,22 @@ const file_numinance_kinds_v1_adapter_selector_proto_rawDesc = "" +
 	"extensions\x1aU\n" +
 	"\x0fExtensionsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
-	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"Z\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01\"\xe3\x02\n" +
 	"\x13AdapterSelectorSpec\x12C\n" +
 	"\x05ports\x18\x01 \x01(\v2 .numinance.kinds.v1.AdapterPortsB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\x05ports\"\xf4\x04\n" +
+	"\x051.0.0R\x05ports\x12a\n" +
+	"\toverrides\x18\x02 \x03(\v26.numinance.kinds.v1.AdapterSelectorSpec.OverridesEntryB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\toverrides\x12B\n" +
+	"\x05tools\x18\x03 \x03(\v2\x1f.numinance.kinds.v1.AdapterToolB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\x05tools\x1a`\n" +
+	"\x0eOverridesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x128\n" +
+	"\x05value\x18\x02 \x01(\v2\".numinance.kinds.v1.AdapterBindingR\x05value:\x028\x01\"[\n" +
+	"\vAdapterTool\x12#\n" +
+	"\x06plugin\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\x06plugin\x12'\n" +
+	"\binstance\x18\x02 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\binstance\"\xa9\x05\n" +
 	"\fAdapterPorts\x12E\n" +
 	"\x03scm\x18\x01 \x01(\v2\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\a\n" +
 	"\x051.0.0\x98\xb5\x18\x01R\x03scm\x12Q\n" +
@@ -361,9 +452,9 @@ const file_numinance_kinds_v1_adapter_selector_proto_rawDesc = "" +
 	"\bdatabase\x18\x06 \x01(\v2\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\a\n" +
 	"\x051.0.0\x98\xb5\x18\x01R\bdatabase\x12Y\n" +
 	"\robservability\x18\a \x01(\v2\".numinance.kinds.v1.AdapterBindingB\x0f\x92\xb5\x18\a\n" +
-	"\x051.0.0\x98\xb5\x18\x01R\robservability\x12)\n" +
-	"\tknowledge\x18\b \x03(\tB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\tknowledge\"b\n" +
+	"\x051.0.0\x98\xb5\x18\x01R\robservability\x12^\n" +
+	"\tknowledge\x18\b \x03(\tB@\x92\xb5\x18<\n" +
+	"\x051.0.0\x12\x051.3.0\x1a,numinance.kinds.v1.AdapterSelectorSpec.toolsR\tknowledge\"b\n" +
 	"\x0eAdapterBinding\x12'\n" +
 	"\bprovider\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\bprovider\x12'\n" +
@@ -383,34 +474,39 @@ func file_numinance_kinds_v1_adapter_selector_proto_rawDescGZIP() []byte {
 	return file_numinance_kinds_v1_adapter_selector_proto_rawDescData
 }
 
-var file_numinance_kinds_v1_adapter_selector_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_numinance_kinds_v1_adapter_selector_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_numinance_kinds_v1_adapter_selector_proto_goTypes = []any{
 	(*AdapterSelector)(nil),     // 0: numinance.kinds.v1.AdapterSelector
 	(*AdapterSelectorSpec)(nil), // 1: numinance.kinds.v1.AdapterSelectorSpec
-	(*AdapterPorts)(nil),        // 2: numinance.kinds.v1.AdapterPorts
-	(*AdapterBinding)(nil),      // 3: numinance.kinds.v1.AdapterBinding
-	nil,                         // 4: numinance.kinds.v1.AdapterSelector.ExtensionsEntry
-	(*Metadata)(nil),            // 5: numinance.kinds.v1.Metadata
-	(*structpb.Value)(nil),      // 6: google.protobuf.Value
+	(*AdapterTool)(nil),         // 2: numinance.kinds.v1.AdapterTool
+	(*AdapterPorts)(nil),        // 3: numinance.kinds.v1.AdapterPorts
+	(*AdapterBinding)(nil),      // 4: numinance.kinds.v1.AdapterBinding
+	nil,                         // 5: numinance.kinds.v1.AdapterSelector.ExtensionsEntry
+	nil,                         // 6: numinance.kinds.v1.AdapterSelectorSpec.OverridesEntry
+	(*Metadata)(nil),            // 7: numinance.kinds.v1.Metadata
+	(*structpb.Value)(nil),      // 8: google.protobuf.Value
 }
 var file_numinance_kinds_v1_adapter_selector_proto_depIdxs = []int32{
-	5,  // 0: numinance.kinds.v1.AdapterSelector.metadata:type_name -> numinance.kinds.v1.Metadata
+	7,  // 0: numinance.kinds.v1.AdapterSelector.metadata:type_name -> numinance.kinds.v1.Metadata
 	1,  // 1: numinance.kinds.v1.AdapterSelector.spec:type_name -> numinance.kinds.v1.AdapterSelectorSpec
-	4,  // 2: numinance.kinds.v1.AdapterSelector.extensions:type_name -> numinance.kinds.v1.AdapterSelector.ExtensionsEntry
-	2,  // 3: numinance.kinds.v1.AdapterSelectorSpec.ports:type_name -> numinance.kinds.v1.AdapterPorts
-	3,  // 4: numinance.kinds.v1.AdapterPorts.scm:type_name -> numinance.kinds.v1.AdapterBinding
-	3,  // 5: numinance.kinds.v1.AdapterPorts.ticketing:type_name -> numinance.kinds.v1.AdapterBinding
-	3,  // 6: numinance.kinds.v1.AdapterPorts.ciexecutor:type_name -> numinance.kinds.v1.AdapterBinding
-	3,  // 7: numinance.kinds.v1.AdapterPorts.cdprovider:type_name -> numinance.kinds.v1.AdapterBinding
-	3,  // 8: numinance.kinds.v1.AdapterPorts.cloud:type_name -> numinance.kinds.v1.AdapterBinding
-	3,  // 9: numinance.kinds.v1.AdapterPorts.database:type_name -> numinance.kinds.v1.AdapterBinding
-	3,  // 10: numinance.kinds.v1.AdapterPorts.observability:type_name -> numinance.kinds.v1.AdapterBinding
-	6,  // 11: numinance.kinds.v1.AdapterSelector.ExtensionsEntry.value:type_name -> google.protobuf.Value
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	5,  // 2: numinance.kinds.v1.AdapterSelector.extensions:type_name -> numinance.kinds.v1.AdapterSelector.ExtensionsEntry
+	3,  // 3: numinance.kinds.v1.AdapterSelectorSpec.ports:type_name -> numinance.kinds.v1.AdapterPorts
+	6,  // 4: numinance.kinds.v1.AdapterSelectorSpec.overrides:type_name -> numinance.kinds.v1.AdapterSelectorSpec.OverridesEntry
+	2,  // 5: numinance.kinds.v1.AdapterSelectorSpec.tools:type_name -> numinance.kinds.v1.AdapterTool
+	4,  // 6: numinance.kinds.v1.AdapterPorts.scm:type_name -> numinance.kinds.v1.AdapterBinding
+	4,  // 7: numinance.kinds.v1.AdapterPorts.ticketing:type_name -> numinance.kinds.v1.AdapterBinding
+	4,  // 8: numinance.kinds.v1.AdapterPorts.ciexecutor:type_name -> numinance.kinds.v1.AdapterBinding
+	4,  // 9: numinance.kinds.v1.AdapterPorts.cdprovider:type_name -> numinance.kinds.v1.AdapterBinding
+	4,  // 10: numinance.kinds.v1.AdapterPorts.cloud:type_name -> numinance.kinds.v1.AdapterBinding
+	4,  // 11: numinance.kinds.v1.AdapterPorts.database:type_name -> numinance.kinds.v1.AdapterBinding
+	4,  // 12: numinance.kinds.v1.AdapterPorts.observability:type_name -> numinance.kinds.v1.AdapterBinding
+	8,  // 13: numinance.kinds.v1.AdapterSelector.ExtensionsEntry.value:type_name -> google.protobuf.Value
+	4,  // 14: numinance.kinds.v1.AdapterSelectorSpec.OverridesEntry.value:type_name -> numinance.kinds.v1.AdapterBinding
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_numinance_kinds_v1_adapter_selector_proto_init() }
@@ -425,7 +521,7 @@ func file_numinance_kinds_v1_adapter_selector_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numinance_kinds_v1_adapter_selector_proto_rawDesc), len(file_numinance_kinds_v1_adapter_selector_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

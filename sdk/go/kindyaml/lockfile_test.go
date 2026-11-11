@@ -64,8 +64,17 @@ func TestLockfile_Decode_Rejects(t *testing.T) {
 		{name: "permissions digest omitted", old: "      permissions_digest: {value: \"sha256:7c4e2a1b9d8f6e5c3a2b1d0f9e8c7b6a5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a\"}\n", new: "", want: kindyaml.ErrInvalid},
 		{name: "signer omitted", old: signerLine, new: "", want: kindyaml.ErrSchema},
 		{name: "signer with a space", old: "signer: \"https://token", new: "signer: \"x y https://token", want: kindyaml.ErrInvalid},
-		{name: "duplicate extension id", old: "  knowledge_tools:\n", new: "    - {id: dev.numinance.official.scm-github, version: 1.3.0, digest: {value: \"sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f\"}, h1: \"h1:qlU4YlPoeX3FQnGgA4XKl0ZUVXGBn0C5lEcRB6Zo9yk=\", zh: \"zh:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d\", signer: \"https://i.example#s\", permissions_digest: {value: \"sha256:7c4e2a1b9d8f6e5c3a2b1d0f9e8c7b6a5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a\"}}\n  knowledge_tools:\n", want: kindyaml.ErrInvalid},
+		{name: "duplicate extension id", old: "  pinned_tools:\n", new: "    - {id: dev.numinance.official.scm-github, version: 1.3.0, digest: {value: \"sha256:3f1a9c0e5b7d2a4f6e8c1b3d5a7f9e2c4b6d8a0f1e3c5b7d9a2f4e6c8b0d1a3f\"}, h1: \"h1:qlU4YlPoeX3FQnGgA4XKl0ZUVXGBn0C5lEcRB6Zo9yk=\", zh: \"zh:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d\", signer: \"https://i.example#s\", permissions_digest: {value: \"sha256:7c4e2a1b9d8f6e5c3a2b1d0f9e8c7b6a5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a\"}}\n  pinned_tools:\n", want: kindyaml.ErrInvalid},
 		{name: "tool name with a colon", old: "name: getConfluencePage", new: "name: get:Page", want: kindyaml.ErrInvalid},
+		{name: "pinned tool without a plugin", old: "    - plugin: dev.numinance.official.atlassian\n      connection:", new: "    - connection:", want: kindyaml.ErrSchema},
+		{name: "pinned tool plugin with one label", old: "plugin: dev.numinance.official.atlassian", new: "plugin: atlassian", want: kindyaml.ErrInvalid},
+		{name: "pinned tool plugin that is a path", old: "plugin: dev.numinance.official.atlassian", new: "plugin: dev.numinance.official/atlassian", want: kindyaml.ErrInvalid},
+		{name: "pinned tool without a connection", old: "      connection: confluence-eng\n", new: "", want: kindyaml.ErrSchema},
+		{name: "pinned tool with an empty connection", old: "connection: confluence-eng", new: `connection: ""`, want: kindyaml.ErrInvalid},
+		{name: "pinned tool without a hash", old: "      hash: {value: \"sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d\"}\n", new: "", want: kindyaml.ErrInvalid},
+		{name: "pinned tool with a short hash", old: "sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d", new: "sha256:9b2d", want: kindyaml.ErrInvalid},
+		{name: "pinned tool with an unknown field", old: "      name: getConfluencePage\n", new: "      name: getConfluencePage\n      note: x\n", want: kindyaml.ErrSchema},
+		{name: "pinned tool twice", old: "  pinned_tools:\n", new: "  pinned_tools:\n    - {plugin: dev.numinance.official.atlassian, connection: confluence-eng, name: getConfluencePage, hash: {value: \"sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d\"}}\n", want: kindyaml.ErrInvalid},
 		{name: "scope unspecified", old: "scope: SCOPE_REPO", new: "scope: SCOPE_UNSPECIFIED", want: kindyaml.ErrInvalid},
 		{name: "extension key that is not reverse-DNS", old: "spec:\n", new: "extensions: {vendor: 1}\nspec:\n", want: kindyaml.ErrInvalid},
 	}
@@ -96,5 +105,37 @@ func TestLockfile_Decode_EmptyListsAreValid(t *testing.T) {
 	doc := "apiVersion: numinance.dev/v1\nkind: Lockfile\nmetadata: {name: numinance-lock, scope: SCOPE_REPO}\nspec: {}\n"
 	if _, err := l.Decode([]byte(doc)); err != nil {
 		t.Errorf("Decode(empty lockfile) = %v, want nil", err)
+	}
+}
+
+func TestLockfile_Decode_PinnedToolKeyIncludesThePlugin(t *testing.T) {
+	t.Parallel()
+	l, err := kindyaml.NewLoader()
+	if err != nil {
+		t.Fatalf("NewLoader() = %v", err)
+	}
+	doc := example(t, lockfileExample)
+	other := "    - {plugin: dev.numinance.official.other, connection: confluence-eng, name: getConfluencePage, hash: {value: \"sha256:9b2d4f6a8c0e1b3d5f7a9c2e4b6d8f0a1c3e5b7d9f2a4c6e8b0d2f4a6c8e0b1d\"}}\n"
+	m, err := l.Decode([]byte(doc + other))
+	if err != nil {
+		t.Fatalf("Decode(same connection and name under another plugin) = %v, want nil", err)
+	}
+	if n := len(m.(*kindsv1.Lockfile).GetSpec().GetPinnedTools()); n != 2 {
+		t.Errorf("pinned_tools = %d entries, want 2", n)
+	}
+}
+
+func TestLockfile_Decode_LegacyKnowledgeToolsStillLoad(t *testing.T) {
+	t.Parallel()
+	l, err := kindyaml.NewLoader()
+	if err != nil {
+		t.Fatalf("NewLoader() = %v", err)
+	}
+	m, err := l.Decode([]byte(example(t, "Lockfile/legacy-knowledge-tools.yaml")))
+	if err != nil {
+		t.Fatalf("Decode(legacy lockfile) = %v, want nil: a deprecated field loads for the deprecation window", err)
+	}
+	if n := len(m.(*kindsv1.Lockfile).GetSpec().GetKnowledgeTools()); n != 1 {
+		t.Errorf("knowledge_tools = %d entries, want 1", n)
 	}
 }

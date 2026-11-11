@@ -116,6 +116,20 @@ type docReport struct {
 	Name   string `json:"name,omitempty"`
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
+	// Deprecations lists the deprecated fields the document sets; a document that uses one is still ok.
+	Deprecations []depReport `json:"deprecations,omitempty"`
+}
+
+// deprecatedReason is the reason code of the diagnostic of a deprecated field, the name of plugin/v1 REASON_DEPRECATED
+// without its prefix.
+const deprecatedReason = "DEPRECATED"
+
+// depReport is one use of a deprecated field: reason is always DEPRECATED, the warning of the deprecation procedure.
+type depReport struct {
+	Reason       string `json:"reason"`
+	Path         string `json:"path"`
+	DeprecatedIn string `json:"deprecated_in"`
+	ReplacedBy   string `json:"replaced_by,omitempty"`
 }
 
 type provReport struct {
@@ -319,6 +333,14 @@ func (v Validate) run(ctx context.Context, req Request, rep *report) int {
 		default:
 			kind, name := identify(m)
 			r.Kind, r.Name = kind, clean(name, maxFieldRunes)
+			for _, dep := range kindyaml.Deprecations(m) {
+				r.Deprecations = append(r.Deprecations, depReport{
+					Reason:       deprecatedReason,
+					Path:         clean(dep.Path, maxFieldRunes),
+					DeprecatedIn: clean(dep.DeprecatedIn, maxFieldRunes),
+					ReplacedBy:   clean(dep.ReplacedBy, maxFieldRunes),
+				})
+			}
 		}
 		rep.Documents = append(rep.Documents, r)
 	}
@@ -386,9 +408,11 @@ func (v Validate) print(rep report, asJSON bool) {
 		if d.Status == "ok" {
 			if d.Name == "" {
 				_, _ = fmt.Fprintf(w, "ok       %s \"%s\" %s\n", d.Scope, d.Path, d.Kind)
+				printDeprecations(w, d)
 				continue
 			}
 			_, _ = fmt.Fprintf(w, "ok       %s \"%s\" %s \"%s\"\n", d.Scope, d.Path, d.Kind, d.Name)
+			printDeprecations(w, d)
 			continue
 		}
 		_, _ = fmt.Fprintf(w, "invalid  %s \"%s\": %s\n", d.Scope, d.Path, d.Error)
@@ -405,5 +429,16 @@ func (v Validate) print(rep report, asJSON bool) {
 	}
 	if rep.Error != "" {
 		_, _ = fmt.Fprintf(v.Stderr, "numi validate: %s\n", rep.Error)
+	}
+}
+
+// printDeprecations writes one DEPRECATED line per deprecated field the document sets.
+func printDeprecations(w io.Writer, d docReport) {
+	for _, dep := range d.Deprecations {
+		_, _ = fmt.Fprintf(w, "  %s \"%s\" since %s", dep.Reason, dep.Path, dep.DeprecatedIn)
+		if dep.ReplacedBy != "" {
+			_, _ = fmt.Fprintf(w, ", replaced by \"%s\"", dep.ReplacedBy)
+		}
+		_, _ = fmt.Fprintln(w)
 	}
 }

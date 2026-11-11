@@ -2,7 +2,7 @@ module github.com/numinance/numinance-spec
 
 go 1.27
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	connectrpc.com/connect v1.21.1

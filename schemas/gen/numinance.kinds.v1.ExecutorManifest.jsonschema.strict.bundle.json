@@ -82,6 +82,34 @@
           "title": "Executor Cost Class",
           "type": "string"
         },
+        "feature_gaps": {
+          "description": "feature_gaps lists, as tokens (same rule as intent_channel) unique within the list, the contract features the\n harness does not support, so that a playbook that needs one is never routed to it.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "intent_channel": {
+          "description": "intent_channel names how the harness reports a built-in tool intent to the host before it runs (design section 11,\n \"Built-in tool intents\": for example \"permission_prompt_tool\", \"hooks\" or \"request_permission\"). Absent means the\n harness declares none. A token of 1 to 64 lower-case ASCII letters, digits and \". _ -\", starting with a letter or\n digit; the vocabulary is the adapter's, so no harness name is fixed by this schema.",
+          "type": "string"
+        },
+        "lockdown": {
+          "description": "lockdown names the mechanism the adapter uses to restrict the harness to the gateway and the granted tools (design\n section 11, \"Lock-down\"); same token rule as intent_channel. Absent means the adapter declares no mechanism, and the\n router must not treat the harness as locked down. A claim: the broker, egress proxy and read-only filesystem enforce.",
+          "type": "string"
+        },
+        "mcp_transports": {
+          "description": "Field 5 is kept for residency (ADR 0019), added in a later minor. Until then the class derived from the live\n configuration must still meet every floor, and a manifest that cannot be checked against a floor fails it.\n mcp_transports are the MCP transports the harness speaks to the tool gateway shim (design sections 8 and 11):\n unique, and empty or absent for a harness that attaches no MCP server. Only a claim; the gateway decides what it serves.",
+          "items": {
+            "enum": [
+              "MCP_TRANSPORT_UNSPECIFIED",
+              "MCP_TRANSPORT_STDIO",
+              "MCP_TRANSPORT_STREAMABLE_HTTP"
+            ],
+            "title": "Mcp Transport",
+            "type": "string"
+          },
+          "type": "array"
+        },
         "models": {
           "description": "models is required, non-empty and unique by id: the models the executor may run.",
           "items": {
@@ -89,8 +117,16 @@
           },
           "type": "array"
         },
+        "plugin_format": {
+          "description": "plugin_format names the plugin package format the harness installs, if any (design section 17); same token rule as\n intent_channel. Absent means the harness installs no plugin packages.",
+          "type": "string"
+        },
         "provider": {
           "description": "provider is required: the extension id of the authorexecutor adapter, which must resolve to a lockfile entry.",
+          "type": "string"
+        },
+        "skills_format": {
+          "description": "skills_format names the format the harness reads skills in, to which the host renders them (design section 11,\n \"Skills rendered to\"); same token rule as intent_channel. Absent means the harness reads no rendered skills.",
           "type": "string"
         }
       },

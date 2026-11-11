@@ -8,3 +8,9 @@ spec:
   models:
     - {id: eu.anthropic.claude-sonnet-v1:0, max_context: 200000}
   cost_class: EXECUTOR_COST_CLASS_MEDIUM
+  mcp_transports: [MCP_TRANSPORT_STDIO, MCP_TRANSPORT_STREAMABLE_HTTP]
+  intent_channel: permission_prompt_tool
+  skills_format: skill-md-folders
+  plugin_format: claude-plugin
+  lockdown: generated-settings
+  feature_gaps: [mcp-sampling]

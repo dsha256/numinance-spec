@@ -264,3 +264,110 @@ func TestLoader_Decode_UnknownGateKind(t *testing.T) {
 		})
 	}
 }
+
+// TestLoader_Decode_ExecutorManifestHarnessFields pins the ExecutorManifestSpec fields of 1.3.0 (design section 8):
+// mcp_transports, intent_channel, skills_format, plugin_format, lockdown and feature_gaps. Each is optional, so the
+// older example still decodes; each case breaks the example in one place.
+func TestLoader_Decode_ExecutorManifestHarnessFields(t *testing.T) {
+	l := newLoader(t)
+	manifest := example(t, "ExecutorManifest/claude-cli-bedrock.yaml")
+	m, err := l.Decode([]byte(manifest))
+	if err != nil {
+		t.Fatalf("Decode(example) = %v", err)
+	}
+	spec := m.(*kindsv1.ExecutorManifest).GetSpec()
+	if got := spec.GetMcpTransports(); len(got) != 2 || got[0] != kindsv1.McpTransport_MCP_TRANSPORT_STDIO {
+		t.Errorf("mcp_transports = %v, want stdio and streamable http", got)
+	}
+	if spec.GetIntentChannel() == "" || spec.GetSkillsFormat() == "" || spec.GetPluginFormat() == "" || spec.GetLockdown() == "" || len(spec.GetFeatureGaps()) != 1 {
+		t.Errorf("spec = %v, want every harness field set", spec)
+	}
+	_, old, _ := strings.Cut(manifest, "  mcp_transports:")
+	bare := strings.Replace(manifest, "  mcp_transports:"+old, "", 1)
+	if _, err := l.Decode([]byte(bare)); err != nil {
+		t.Errorf("Decode(example without the 1.3.0 fields) = %v, want nil", err)
+	}
+	tests := []struct {
+		name string
+		old  string
+		new  string
+		want error
+	}{
+		{name: "transport twice", old: "MCP_TRANSPORT_STREAMABLE_HTTP", new: "MCP_TRANSPORT_STDIO", want: kindyaml.ErrInvalid},
+		{name: "zero transport", old: "MCP_TRANSPORT_STREAMABLE_HTTP", new: "MCP_TRANSPORT_UNSPECIFIED", want: kindyaml.ErrInvalid},
+		{name: "unknown transport", old: "MCP_TRANSPORT_STREAMABLE_HTTP", new: "MCP_TRANSPORT_SMOKE", want: kindyaml.ErrSchema},
+		{name: "empty transports are accepted", old: "[MCP_TRANSPORT_STDIO, MCP_TRANSPORT_STREAMABLE_HTTP]", new: "[]", want: nil},
+		{name: "empty intent_channel", old: "intent_channel: permission_prompt_tool", new: `intent_channel: ""`, want: kindyaml.ErrInvalid},
+		{name: "intent_channel with a space", old: "intent_channel: permission_prompt_tool", new: `intent_channel: "permission prompt"`, want: kindyaml.ErrInvalid},
+		{name: "intent_channel with capitals", old: "intent_channel: permission_prompt_tool", new: "intent_channel: Hooks", want: kindyaml.ErrInvalid},
+		{name: "skills_format over the token bound", old: "skills_format: skill-md-folders", new: "skills_format: " + strings.Repeat("a", kindyaml.MaxTokenBytes+1), want: kindyaml.ErrInvalid},
+		{name: "plugin_format with a slash", old: "plugin_format: claude-plugin", new: "plugin_format: a/b", want: kindyaml.ErrInvalid},
+		{name: "lockdown with a bidi character", old: "lockdown: generated-settings", new: `lockdown: "generated\u202e"`, want: kindyaml.ErrInvalid},
+		{name: "lockdown that is not a string", old: "lockdown: generated-settings", new: "lockdown: [a]", want: kindyaml.ErrSchema},
+		{name: "feature gap twice", old: "feature_gaps: [mcp-sampling]", new: "feature_gaps: [mcp-sampling, mcp-sampling]", want: kindyaml.ErrInvalid},
+		{name: "feature gap that is not a token", old: "feature_gaps: [mcp-sampling]", new: `feature_gaps: ["MCP sampling"]`, want: kindyaml.ErrInvalid},
+		{name: "a field the manifest does not have", old: "  lockdown:", new: "  sandbox: none\n  lockdown:", want: kindyaml.ErrSchema},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(manifest, tt.old) {
+				t.Fatalf("example has no %q", tt.old)
+			}
+			doc := strings.Replace(manifest, tt.old, tt.new, 1)
+			if m, err := l.Decode([]byte(doc)); !errors.Is(err, tt.want) {
+				t.Errorf("Decode(%q) = %v, %v; want error %v", doc, m, err, tt.want)
+			}
+		})
+	}
+}
+
+// TestLoader_Decode_AdapterSelectorOverridesAndTools pins AdapterSelectorSpec.overrides and tools of 1.3.0 (design
+// section 8): a per-verb provider pin and the plugin installations whose tools the scope may grant.
+func TestLoader_Decode_AdapterSelectorOverridesAndTools(t *testing.T) {
+	l := newLoader(t)
+	doc := example(t, "AdapterSelector/payments-tools.yaml")
+	m, err := l.Decode([]byte(doc))
+	if err != nil {
+		t.Fatalf("Decode(example) = %v", err)
+	}
+	spec := m.(*kindsv1.AdapterSelector).GetSpec()
+	if got := spec.GetOverrides()["scm.CreatePullRequest"].GetInstance(); got != "mirror" {
+		t.Errorf("overrides[scm.CreatePullRequest].instance = %q, want mirror", got)
+	}
+	if got := spec.GetTools(); len(got) != 2 || got[1].GetInstance() != "jira-pay" {
+		t.Errorf("tools = %v, want two entries", got)
+	}
+	tests := []struct {
+		name string
+		old  string
+		new  string
+		want error
+	}{
+		{name: "override of an empty verb", old: "scm.CreatePullRequest:", new: `"":`, want: kindyaml.ErrInvalid},
+		{name: "override verb with a slash", old: "scm.CreatePullRequest:", new: `"scm/CreatePullRequest":`, want: kindyaml.ErrInvalid},
+		{name: "override verb with an empty segment", old: "scm.CreatePullRequest:", new: `"scm..CreatePullRequest":`, want: kindyaml.ErrInvalid},
+		{name: "override verb starting with a digit", old: "scm.CreatePullRequest:", new: `"1scm.CreatePullRequest":`, want: kindyaml.ErrInvalid},
+		{name: "override verb over the bound", old: "scm.CreatePullRequest:", new: strings.Repeat("a", kindyaml.MaxNameBytes+1) + ":", want: kindyaml.ErrInvalid},
+		{name: "override without an instance", old: ", instance: mirror", new: "", want: kindyaml.ErrSchema},
+		{name: "override with an empty provider", old: "provider: dev.numinance.official/gitlab", new: `provider: ""`, want: kindyaml.ErrInvalid},
+		{name: "override instance with a colon", old: "instance: mirror", new: "instance: host:80", want: kindyaml.ErrInvalid},
+		{name: "tool without an instance", old: "{plugin: dev.numinance.official/atlassian, instance: jira-pay}", new: "{plugin: dev.numinance.official/atlassian}", want: kindyaml.ErrSchema},
+		{name: "tool with an empty plugin", old: "plugin: dev.numinance.official/atlassian, instance: jira-pay", new: `plugin: "", instance: jira-pay`, want: kindyaml.ErrInvalid},
+		{name: "tool with an empty instance", old: "instance: jira-pay", new: `instance: ""`, want: kindyaml.ErrInvalid},
+		{name: "tool plugin with a dot-dot segment", old: "plugin: dev.numinance.official/atlassian, instance: jira-pay", new: "plugin: ../x, instance: jira-pay", want: kindyaml.ErrInvalid},
+		{name: "tool twice", old: "instance: jira-pay", new: "instance: confluence-eng", want: kindyaml.ErrInvalid},
+		{name: "the same plugin with two instances is accepted", old: "instance: jira-pay", new: "instance: jira-ops", want: nil},
+		{name: "tools of the wrong shape", old: "  tools:\n", new: "  tools: [a]\n  x:\n", want: kindyaml.ErrSchema},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if !strings.Contains(doc, tt.old) {
+				t.Fatalf("example has no %q", tt.old)
+			}
+			d := strings.Replace(doc, tt.old, tt.new, 1)
+			if m, err := l.Decode([]byte(d)); !errors.Is(err, tt.want) {
+				t.Errorf("Decode(%q) = %v, %v; want error %v", d, m, err, tt.want)
+			}
+		})
+	}
+}

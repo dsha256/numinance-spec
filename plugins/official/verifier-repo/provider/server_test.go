@@ -128,9 +128,9 @@ func TestServer_Run_SeededDefectsGiveTheirRuleID(t *testing.T) {
 		{"a broken relative link", []file{add("docs/runbooks/a.md", "[x](missing.md)\n")}, nil, "repo/markdown-link"},
 		{"an unbalanced fence", []file{add("docs/runbooks/a.md", "```sh\njust check\n")}, nil, "repo/markdown-fence"},
 		{"an out of scope path", []file{add("docs/other-place/a.md", "x\n")}, nil, "repo/scope-path"},
-		{"a protected path", []file{add(".claude/a.md", "x\n")}, func(m map[string]any) {
-			m["scope"].(map[string]any)["allow_paths"] = []string{".claude/"}
-			m["scope"].(map[string]any)["protected_paths"] = []string{".claude/"}
+		{"a protected path", []file{add(".agent/a.md", "x\n")}, func(m map[string]any) {
+			m["scope"].(map[string]any)["allow_paths"] = []string{".agent/"}
+			m["scope"].(map[string]any)["protected_paths"] = []string{".agent/"}
 		}, "repo/scope-protected"},
 		{"a deleted file", []file{del("docs/runbooks/a.md")}, nil, "repo/scope-deleted"},
 		{"too many added lines", []file{add("docs/runbooks/a.md", lines(51))}, nil, "repo/scope-added-lines"},
