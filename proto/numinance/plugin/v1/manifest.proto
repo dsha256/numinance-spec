@@ -1,5 +1,5 @@
 // The Manifest is declared by the plugin (also manifest.yaml in the package); the plugin describes, the host authorises and enforces the declared intents.
-// Enums are closed as in types.v1 (a consumer rejects zero and unknown numbers), except an absent optional FilesystemIntent.mode. Every element is since 1.0.0.
+// Enums are closed as in types.v1 (a consumer rejects zero and unknown numbers), except an absent optional FilesystemIntent.mode and an absent Manifest.runtime (see there). Every element is since 1.0.0 unless its field states a later since (the tool-capability fields are since 1.3.0).
 // Bounds: every string is at most 1024 bytes and every repeated field at most 256 entries unless a field states otherwise; over-limit input is rejected, never truncated; duplicate entries in any repeated field are rejected, keyed as capabilities and changes by name, network_intents by host and port, filesystem_intents by path, strings by value. No field carries credential material. A rejection names an index-based field path (for example capabilities[3].network_intents[0].host) and the violated bound, never the offending value.
 syntax = "proto3";
 
@@ -62,6 +62,26 @@ enum FilesystemMode {
   FILESYSTEM_MODE_READ_WRITE = 2;
 }
 
+// PluginRuntime is how the host reaches the plugin's capabilities.
+enum PluginRuntime {
+  // PLUGIN_RUNTIME_UNSPECIFIED is the zero value; on Manifest.runtime it means absent and is read as PLUGIN_RUNTIME_NATIVE, because every manifest written before this enum existed is a native provider.
+  PLUGIN_RUNTIME_UNSPECIFIED = 0;
+  // PLUGIN_RUNTIME_NATIVE is a provider binary the host launches and speaks plugin/v1 to.
+  PLUGIN_RUNTIME_NATIVE = 1;
+  // PLUGIN_RUNTIME_BRIDGE_MCP is a vendor MCP server reached through the bridge (bridge.mcp).
+  PLUGIN_RUNTIME_BRIDGE_MCP = 2;
+}
+
+// ToolExposure says who the gateway offers a tool capability to.
+enum ToolExposure {
+  // TOOL_EXPOSURE_UNSPECIFIED is the zero value; it is rejected by the host on a tool capability.
+  TOOL_EXPOSURE_UNSPECIFIED = 0;
+  // TOOL_EXPOSURE_EXECUTOR offers the tool to the coding-agent harness (the executor).
+  TOOL_EXPOSURE_EXECUTOR = 1;
+  // TOOL_EXPOSURE_ENGINE offers the tool to the Engine only.
+  TOOL_EXPOSURE_ENGINE = 2;
+}
+
 // Manifest is the declaration of one extension version.
 message Manifest {
   // plugin_id is a reverse-DNS identifier of at least two labels, each matching ^[a-z]([a-z0-9-]*[a-z0-9])?$ and joined by dots, at most 253 bytes, immutable across versions.
@@ -86,6 +106,8 @@ message Manifest {
   PermissionsDelta permissions_delta = 10 [(numinance.annotations.v1.field).since = "1.0.0"];
   // deprecated_after is when the version stops being supported; absent means not deprecated.
   google.protobuf.Timestamp deprecated_after = 11 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // runtime is the plugin's runtime, native or bridge.mcp (design section 7, tool capabilities); absent (UNSPECIFIED) is read as NATIVE for manifests that predate the field, an unknown number is rejected, and BRIDGE_MCP is a declaration the host honours only when it has the bridge. It is declarative: it grants nothing, and intents, risk and permissions are declared and checked per capability as for any capability.
+  PluginRuntime runtime = 12 [(numinance.annotations.v1.field).since = "1.3.0"];
 }
 
 // PermissionsDelta is the declared change of capabilities from the previous version; it is declared, compared and never trusted.
@@ -138,6 +160,14 @@ message CapabilityDescriptor {
   string conformance_suite = 14 [(numinance.annotations.v1.field).since = "1.0.0"];
   // llm_description is untrusted (TRUST_CLASS_UNTRUSTED_RETRIEVED), printable characters only, at most 2048 bytes; it is rendered delimited and labelled, never as instructions.
   string llm_description = 15 [(numinance.annotations.v1.field).since = "1.0.0"];
+  // expose_to says who the gateway offers a tool capability to, the executor or the engine; legal only on a tool capability (name tool.<plugin>.<name>) and required there (zero or an unknown number is rejected); on any other capability a non-zero value is rejected. It only selects the audience; the host still authorises every call by policy.
+  ToolExposure expose_to = 16 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // tool_hash is the declared hash of the tool the capability maps to, at most 1024 bytes; legal only on a tool capability and rejected on any other; a declared claim, never trusted: section 7 names the field and does not fix the algorithm or the comparison, so this proto keeps it opaque and declarative.
+  string tool_hash = 17 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // mcp_tool is the name of the MCP tool the capability maps to, printable characters only, at most 1024 bytes; legal only on a tool capability and rejected on any other; required on a tool capability of a manifest whose runtime is BRIDGE_MCP. A long-running MCP task maps to exec mode OPERATION (section 7); that is the host's mapping, not a field here.
+  string mcp_tool = 18 [(numinance.annotations.v1.field).since = "1.3.0"];
+  // verify_with names the read capability used to establish the outcome of a write, matching the capability name pattern, at most 128 bytes; legal only on a tool capability and rejected on any other; when set it must name a different capability of the same manifest (a name with no entry is rejected); empty means none declared.
+  string verify_with = 19 [(numinance.annotations.v1.field).since = "1.3.0"];
 }
 
 // NetworkIntent is one egress destination.
