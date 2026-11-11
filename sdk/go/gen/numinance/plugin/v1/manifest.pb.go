@@ -677,7 +677,9 @@ type CapabilityDescriptor struct {
 	// verify_with names the read capability used to establish the outcome of a write, matching the capability name pattern, at most 128 bytes; legal only on a tool capability and rejected on any other; when set it must name a different capability of the same manifest (a name with no entry is rejected); empty means none declared.
 	VerifyWith string `protobuf:"bytes,19,opt,name=verify_with,json=verifyWith,proto3" json:"verify_with,omitempty"`
 	// resource_args declares which arguments of a tool call carry the resource a grant's resource scope applies to (design section 12, "Grants"): each entry is an RFC 6901 JSON pointer into the call's arguments object (for example "/jobFullName"), and the resource name is the values the pointers select, joined by "/" in order, so ["/owner", "/repo"] names "owner/repo". At most 4 entries of at most 256 bytes, each a pointer, none repeated; legal only on a tool capability and rejected on any other; empty means the tool declares no resource and its calls touch none (the scope does not apply to it). The decision point reads the names from the exact argument bytes it decides on and checks them against the grant's resource scope by exact match; when the capability declares any entry, a call whose arguments do not hold every pointer as a non-empty string is denied, never read as naming nothing. The declaration only narrows what a grant lets through; it grants nothing.
-	ResourceArgs  []string `protobuf:"bytes,20,rep,name=resource_args,json=resourceArgs,proto3" json:"resource_args,omitempty"`
+	ResourceArgs []string `protobuf:"bytes,20,rep,name=resource_args,json=resourceArgs,proto3" json:"resource_args,omitempty"`
+	// verify_outcome says how the host reads the answer of the verify_with read tool, so that a write whose response was lost can be settled without the host reading vendor text; legal only on a tool capability that sets verify_with and rejected anywhere else; absent means the answer is never interpreted and a lost write is escalated.
+	VerifyOutcome *OutcomeRule `protobuf:"bytes,21,opt,name=verify_outcome,json=verifyOutcome,proto3" json:"verify_outcome,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -852,6 +854,77 @@ func (x *CapabilityDescriptor) GetResourceArgs() []string {
 	return nil
 }
 
+func (x *CapabilityDescriptor) GetVerifyOutcome() *OutcomeRule {
+	if x != nil {
+		return x.VerifyOutcome
+	}
+	return nil
+}
+
+// OutcomeRule maps the structured answer of a verify read to applied, not applied or unknown. The host parses the answer text as one JSON document (duplicate keys, trailing data, an error answer and an answer over 64 KiB are all unknown), selects the one value the pointer names and compares its canonical JSON text with the two literals for an exact match; it interprets nothing else and never reads free text. Anything that is not an exact match, including a missing value, is unknown, and unknown escalates.
+type OutcomeRule struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// pointer is an RFC 6901 JSON Pointer to the one value of the answer that carries the outcome (for example /state), at most 256 bytes, printable ASCII only; required, and it must name a value, never the whole document.
+	Pointer string `protobuf:"bytes,1,opt,name=pointer,proto3" json:"pointer,omitempty"`
+	// applied is the canonical JSON text of the value that shows the write took effect (for example "merged" with its quotes, or true), at most 256 bytes, printable ASCII only; required.
+	Applied string `protobuf:"bytes,2,opt,name=applied,proto3" json:"applied,omitempty"`
+	// not_applied is the canonical JSON text of the value that shows the write did not take effect, same form and bound; optional, and different from applied. Without it nothing is ever read as not applied: a not-applied reading lets the caller retry, so it is declared on purpose or not at all.
+	NotApplied    string `protobuf:"bytes,3,opt,name=not_applied,json=notApplied,proto3" json:"not_applied,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OutcomeRule) Reset() {
+	*x = OutcomeRule{}
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutcomeRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutcomeRule) ProtoMessage() {}
+
+func (x *OutcomeRule) ProtoReflect() protoreflect.Message {
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutcomeRule.ProtoReflect.Descriptor instead.
+func (*OutcomeRule) Descriptor() ([]byte, []int) {
+	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *OutcomeRule) GetPointer() string {
+	if x != nil {
+		return x.Pointer
+	}
+	return ""
+}
+
+func (x *OutcomeRule) GetApplied() string {
+	if x != nil {
+		return x.Applied
+	}
+	return ""
+}
+
+func (x *OutcomeRule) GetNotApplied() string {
+	if x != nil {
+		return x.NotApplied
+	}
+	return ""
+}
+
 // NetworkIntent is one egress destination.
 type NetworkIntent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -865,7 +938,7 @@ type NetworkIntent struct {
 
 func (x *NetworkIntent) Reset() {
 	*x = NetworkIntent{}
-	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[4]
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -877,7 +950,7 @@ func (x *NetworkIntent) String() string {
 func (*NetworkIntent) ProtoMessage() {}
 
 func (x *NetworkIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[4]
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -890,7 +963,7 @@ func (x *NetworkIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NetworkIntent.ProtoReflect.Descriptor instead.
 func (*NetworkIntent) Descriptor() ([]byte, []int) {
-	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{4}
+	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *NetworkIntent) GetHost() string {
@@ -920,7 +993,7 @@ type FilesystemIntent struct {
 
 func (x *FilesystemIntent) Reset() {
 	*x = FilesystemIntent{}
-	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[5]
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +1005,7 @@ func (x *FilesystemIntent) String() string {
 func (*FilesystemIntent) ProtoMessage() {}
 
 func (x *FilesystemIntent) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[5]
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1018,7 @@ func (x *FilesystemIntent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FilesystemIntent.ProtoReflect.Descriptor instead.
 func (*FilesystemIntent) Descriptor() ([]byte, []int) {
-	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{5}
+	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *FilesystemIntent) GetPath() string {
@@ -977,7 +1050,7 @@ type ResourceBudget struct {
 
 func (x *ResourceBudget) Reset() {
 	*x = ResourceBudget{}
-	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[6]
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -989,7 +1062,7 @@ func (x *ResourceBudget) String() string {
 func (*ResourceBudget) ProtoMessage() {}
 
 func (x *ResourceBudget) ProtoReflect() protoreflect.Message {
-	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[6]
+	mi := &file_numinance_plugin_v1_manifest_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1002,7 +1075,7 @@ func (x *ResourceBudget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceBudget.ProtoReflect.Descriptor instead.
 func (*ResourceBudget) Descriptor() ([]byte, []int) {
-	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{6}
+	return file_numinance_plugin_v1_manifest_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ResourceBudget) GetCpuMillicores() uint64 {
@@ -1068,7 +1141,8 @@ const file_numinance_plugin_v1_manifest_proto_rawDesc = "" +
 	"\bprevious\x18\x02 \x01(\v2).numinance.plugin.v1.CapabilityDescriptorB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\bprevious\x12P\n" +
 	"\acurrent\x18\x03 \x01(\v2).numinance.plugin.v1.CapabilityDescriptorB\v\x92\xb5\x18\a\n" +
-	"\x051.0.0R\acurrent\"\xf8\t\n" +
+	"\x051.0.0R\acurrent\"\xce\n" +
+	"\n" +
 	"\x14CapabilityDescriptor\x12\x1f\n" +
 	"\x04name\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x04name\x12O\n" +
@@ -1113,7 +1187,17 @@ const file_numinance_plugin_v1_manifest_proto_rawDesc = "" +
 	"\x051.3.0R\n" +
 	"verifyWith\x120\n" +
 	"\rresource_args\x18\x14 \x03(\tB\v\x92\xb5\x18\a\n" +
-	"\x051.3.0R\fresourceArgs\"Q\n" +
+	"\x051.3.0R\fresourceArgs\x12T\n" +
+	"\x0everify_outcome\x18\x15 \x01(\v2 .numinance.plugin.v1.OutcomeRuleB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\rverifyOutcome\"\x89\x01\n" +
+	"\vOutcomeRule\x12%\n" +
+	"\apointer\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\apointer\x12%\n" +
+	"\aapplied\x18\x02 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\aapplied\x12,\n" +
+	"\vnot_applied\x18\x03 \x01(\tB\v\x92\xb5\x18\a\n" +
+	"\x051.3.0R\n" +
+	"notApplied\"Q\n" +
 	"\rNetworkIntent\x12\x1f\n" +
 	"\x04host\x18\x01 \x01(\tB\v\x92\xb5\x18\a\n" +
 	"\x051.0.0R\x04host\x12\x1f\n" +
@@ -1179,7 +1263,7 @@ func file_numinance_plugin_v1_manifest_proto_rawDescGZIP() []byte {
 }
 
 var file_numinance_plugin_v1_manifest_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
-var file_numinance_plugin_v1_manifest_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_numinance_plugin_v1_manifest_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_numinance_plugin_v1_manifest_proto_goTypes = []any{
 	(ExtensionClass)(0),           // 0: numinance.plugin.v1.ExtensionClass
 	(SideEffect)(0),               // 1: numinance.plugin.v1.SideEffect
@@ -1191,41 +1275,43 @@ var file_numinance_plugin_v1_manifest_proto_goTypes = []any{
 	(*PermissionsDelta)(nil),      // 7: numinance.plugin.v1.PermissionsDelta
 	(*CapabilityChange)(nil),      // 8: numinance.plugin.v1.CapabilityChange
 	(*CapabilityDescriptor)(nil),  // 9: numinance.plugin.v1.CapabilityDescriptor
-	(*NetworkIntent)(nil),         // 10: numinance.plugin.v1.NetworkIntent
-	(*FilesystemIntent)(nil),      // 11: numinance.plugin.v1.FilesystemIntent
-	(*ResourceBudget)(nil),        // 12: numinance.plugin.v1.ResourceBudget
-	(*v1.Digest)(nil),             // 13: numinance.types.v1.Digest
-	(*v1.Reference)(nil),          // 14: numinance.types.v1.Reference
-	(*timestamppb.Timestamp)(nil), // 15: google.protobuf.Timestamp
-	(v11.RiskClass)(0),            // 16: numinance.annotations.v1.RiskClass
-	(*durationpb.Duration)(nil),   // 17: google.protobuf.Duration
+	(*OutcomeRule)(nil),           // 10: numinance.plugin.v1.OutcomeRule
+	(*NetworkIntent)(nil),         // 11: numinance.plugin.v1.NetworkIntent
+	(*FilesystemIntent)(nil),      // 12: numinance.plugin.v1.FilesystemIntent
+	(*ResourceBudget)(nil),        // 13: numinance.plugin.v1.ResourceBudget
+	(*v1.Digest)(nil),             // 14: numinance.types.v1.Digest
+	(*v1.Reference)(nil),          // 15: numinance.types.v1.Reference
+	(*timestamppb.Timestamp)(nil), // 16: google.protobuf.Timestamp
+	(v11.RiskClass)(0),            // 17: numinance.annotations.v1.RiskClass
+	(*durationpb.Duration)(nil),   // 18: google.protobuf.Duration
 }
 var file_numinance_plugin_v1_manifest_proto_depIdxs = []int32{
-	13, // 0: numinance.plugin.v1.Manifest.digest:type_name -> numinance.types.v1.Digest
+	14, // 0: numinance.plugin.v1.Manifest.digest:type_name -> numinance.types.v1.Digest
 	0,  // 1: numinance.plugin.v1.Manifest.kind:type_name -> numinance.plugin.v1.ExtensionClass
 	9,  // 2: numinance.plugin.v1.Manifest.capabilities:type_name -> numinance.plugin.v1.CapabilityDescriptor
-	14, // 3: numinance.plugin.v1.Manifest.sbom_ref:type_name -> numinance.types.v1.Reference
-	14, // 4: numinance.plugin.v1.Manifest.provenance_ref:type_name -> numinance.types.v1.Reference
+	15, // 3: numinance.plugin.v1.Manifest.sbom_ref:type_name -> numinance.types.v1.Reference
+	15, // 4: numinance.plugin.v1.Manifest.provenance_ref:type_name -> numinance.types.v1.Reference
 	7,  // 5: numinance.plugin.v1.Manifest.permissions_delta:type_name -> numinance.plugin.v1.PermissionsDelta
-	15, // 6: numinance.plugin.v1.Manifest.deprecated_after:type_name -> google.protobuf.Timestamp
+	16, // 6: numinance.plugin.v1.Manifest.deprecated_after:type_name -> google.protobuf.Timestamp
 	4,  // 7: numinance.plugin.v1.Manifest.runtime:type_name -> numinance.plugin.v1.PluginRuntime
 	8,  // 8: numinance.plugin.v1.PermissionsDelta.changes:type_name -> numinance.plugin.v1.CapabilityChange
 	9,  // 9: numinance.plugin.v1.CapabilityChange.previous:type_name -> numinance.plugin.v1.CapabilityDescriptor
 	9,  // 10: numinance.plugin.v1.CapabilityChange.current:type_name -> numinance.plugin.v1.CapabilityDescriptor
-	16, // 11: numinance.plugin.v1.CapabilityDescriptor.risk_floor:type_name -> numinance.annotations.v1.RiskClass
+	17, // 11: numinance.plugin.v1.CapabilityDescriptor.risk_floor:type_name -> numinance.annotations.v1.RiskClass
 	1,  // 12: numinance.plugin.v1.CapabilityDescriptor.side_effect:type_name -> numinance.plugin.v1.SideEffect
 	2,  // 13: numinance.plugin.v1.CapabilityDescriptor.idempotency:type_name -> numinance.plugin.v1.Idempotency
-	10, // 14: numinance.plugin.v1.CapabilityDescriptor.network_intents:type_name -> numinance.plugin.v1.NetworkIntent
-	11, // 15: numinance.plugin.v1.CapabilityDescriptor.filesystem_intents:type_name -> numinance.plugin.v1.FilesystemIntent
-	17, // 16: numinance.plugin.v1.CapabilityDescriptor.timeout:type_name -> google.protobuf.Duration
-	12, // 17: numinance.plugin.v1.CapabilityDescriptor.resource_budget:type_name -> numinance.plugin.v1.ResourceBudget
+	11, // 14: numinance.plugin.v1.CapabilityDescriptor.network_intents:type_name -> numinance.plugin.v1.NetworkIntent
+	12, // 15: numinance.plugin.v1.CapabilityDescriptor.filesystem_intents:type_name -> numinance.plugin.v1.FilesystemIntent
+	18, // 16: numinance.plugin.v1.CapabilityDescriptor.timeout:type_name -> google.protobuf.Duration
+	13, // 17: numinance.plugin.v1.CapabilityDescriptor.resource_budget:type_name -> numinance.plugin.v1.ResourceBudget
 	5,  // 18: numinance.plugin.v1.CapabilityDescriptor.expose_to:type_name -> numinance.plugin.v1.ToolExposure
-	3,  // 19: numinance.plugin.v1.FilesystemIntent.mode:type_name -> numinance.plugin.v1.FilesystemMode
-	20, // [20:20] is the sub-list for method output_type
-	20, // [20:20] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	10, // 19: numinance.plugin.v1.CapabilityDescriptor.verify_outcome:type_name -> numinance.plugin.v1.OutcomeRule
+	3,  // 20: numinance.plugin.v1.FilesystemIntent.mode:type_name -> numinance.plugin.v1.FilesystemMode
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_numinance_plugin_v1_manifest_proto_init() }
@@ -1233,14 +1319,14 @@ func file_numinance_plugin_v1_manifest_proto_init() {
 	if File_numinance_plugin_v1_manifest_proto != nil {
 		return
 	}
-	file_numinance_plugin_v1_manifest_proto_msgTypes[5].OneofWrappers = []any{}
+	file_numinance_plugin_v1_manifest_proto_msgTypes[6].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numinance_plugin_v1_manifest_proto_rawDesc), len(file_numinance_plugin_v1_manifest_proto_rawDesc)),
 			NumEnums:      6,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
